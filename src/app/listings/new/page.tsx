@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -17,6 +17,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { summarizeVehicleListing, type SummarizeVehicleListingInput } from '@/ai/flows/summarize-vehicle-listing';
 import { Loader2, Sparkles, Upload } from 'lucide-react';
+import { useUser } from '@/firebase';
 
 const vehicleFeatures = ["Apple CarPlay", "Android Auto", "4x4", "Asientos de Cuero", "Techo Corredizo", "7 Puestos", "Suspensión Mejorada", "Winch"];
 
@@ -42,9 +43,21 @@ type ListingFormValues = z.infer<typeof listingFormSchema>;
 export default function NewListingPage() {
   const { toast } = useToast();
   const router = useRouter();
+  const { user, loading: userLoading } = useUser();
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [compressedImages, setCompressedImages] = useState<string[]>([]);
   
+  useEffect(() => {
+    if (!userLoading && !user) {
+      toast({
+        title: "Acceso Denegado",
+        description: "Debes iniciar sesión para publicar un anuncio.",
+        variant: "destructive",
+      });
+      router.push('/');
+    }
+  }, [user, userLoading, router, toast]);
+
   const form = useForm<ListingFormValues>({
     resolver: zodResolver(listingFormSchema),
     defaultValues: {
@@ -149,6 +162,14 @@ export default function NewListingPage() {
     setTimeout(() => {
         router.push('/listings');
     }, 1500)
+  }
+
+  if (userLoading || !user) {
+    return (
+      <div className="flex justify-center items-center min-h-[60vh]">
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+      </div>
+    );
   }
 
   return (
