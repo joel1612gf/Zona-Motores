@@ -1,3 +1,58 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "hero-car",
+      "description": "A modern silver car on a scenic road",
+      "imageUrl": "https://images.unsplash.com/photo-1657549952432-d7a3c49e3e30?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxtb2Rlcm4lMjBjYXJ8ZW58MHx8fHwxNzY4OTUyNDA2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "modern car"
+    },
+    {
+      "id": "corolla-main",
+      "description": "White Toyota Corolla",
+      "imageUrl": "https://images.unsplash.com/photo-1620882788693-cd891b20837d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHx3aGl0ZSUyMGNhcnxlbnwwfHx8fDE3Njg4OTY3NjZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "white car"
+    },
+    {
+      "id": "corolla-interior",
+      "description": "Toyota Corolla Interior",
+      "imageUrl": "https://images.unsplash.com/photo-1606224103857-e4c74b0139df?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxjYXIlMjBpbnRlcmlvcnxlbnwwfHx8fDE3Njg4OTAxNTh8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "car interior"
+    },
+    {
+      "id": "corolla-side",
+      "description": "Toyota Corolla Side View",
+      "imageUrl": "https://images.unsplash.com/photo-1652368876768-ba817a44ef30?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHx3aGl0ZSUyMGNhciUyMHNpZGV8ZW58MHx8fHwxNzY4OTUyNDA2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "white car side"
+    },
+    {
+      "id": "fortuner-main",
+      "description": "Silver Toyota Fortuner",
+      "imageUrl": "https://images.unsplash.com/photo-1705769944019-a490299946e8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxzaWx2ZXIlMjBzdXZ8ZW58MHx8fHwxNzY4OTUyNDA2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "silver suv"
+    },
+    {
+      "id": "fortuner-interior",
+      "description": "Toyota Fortuner Interior",
+      "imageUrl": "https://images.unsplash.com/photo-1748214311678-5c080f1f50a0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxzdXYlMjBpbnRlcmlvcnxlbnwwfHx8fDE3Njg5NTI0MDZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "suv interior"
+    },
+    {
+      "id": "machito-main",
+      "description": "Beige Toyota Land Cruiser",
+      "imageUrl": "https://images.unsplash.com/photo-1762235634111-f1c8a719c9f1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxiZWlnZSUyMHRydWNrfGVufDB8fHx8MTc2ODk1MjQwNnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "beige truck"
+    },
+    {
+      "id": "cherokee-main",
+      "description": "Black Jeep Grand Cherokee",
+      "imageUrl": "https://images.unsplash.com/photo-1735620731955-b047a7122892?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxibGFjayUyMHN1dnxlbnwwfHx8fDE3Njg5NTI0MDZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "black suv"
+    },
+    {
+      "id": "elantra-main",
+      "description": "Blue Hyundai Elantra",
+      "imageUrl": "https://images.unsplash.com/photo-1621601628445-ff13122a9caf?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8Ymx1ZSUyMHNlZGFufGVufDB8fHx8MTc2ODgzNjY1MXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "blue sedan"
+    }
+  ]
 }
