@@ -9,11 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { CheckCircle, Gauge, MapPin, Phone, ShieldCheck, User, Settings2, Palette } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { useCurrency } from '@/context/currency-context';
 
 export default function ListingDetailPage({ params }: { params: { id: string } }) {
   const vehicle = vehicles.find(v => v.id === params.id);
-  const { bcvRate } = useCurrency();
 
   if (!vehicle) {
     notFound();
@@ -83,7 +81,6 @@ export default function ListingDetailPage({ params }: { params: { id: string } }
             <CardContent>
               <div className="space-y-4">
                 <div className="text-3xl font-bold font-headline text-accent">{formatCurrency(vehicle.priceUSD)}</div>
-                <div className="text-lg font-semibold text-muted-foreground">{formatCurrency(vehicle.priceUSD, 'VES', bcvRate)}</div>
                 <Separator />
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div className="font-semibold flex items-center gap-1"><Gauge className="h-4 w-4 text-muted-foreground" /> Kilometraje</div><div className="text-muted-foreground">{vehicle.mileage.toLocaleString()} km</div>

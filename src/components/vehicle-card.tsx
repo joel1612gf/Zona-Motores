@@ -7,11 +7,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { MapPin, Gauge } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { useCurrency } from '@/context/currency-context';
 
 export function VehicleCard({ vehicle }: { vehicle: Vehicle }) {
-  const { bcvRate } = useCurrency();
-
   return (
     <Card className="overflow-hidden transition-all hover:shadow-lg focus-within:ring-2 focus-within:ring-ring">
       <Link href={`/listings/${vehicle.id}`} className="focus:outline-none">
@@ -30,12 +27,9 @@ export function VehicleCard({ vehicle }: { vehicle: Vehicle }) {
         </div>
         <CardContent className="p-4 space-y-2">
           <h3 className="font-headline text-lg font-semibold truncate">{`${vehicle.year} ${vehicle.make} ${vehicle.model}`}</h3>
-          <div className="flex items-baseline justify-between text-primary">
+          <div className="flex items-baseline justify-start text-primary">
             <p className="font-headline text-2xl font-bold text-accent">
-              {formatCurrency(vehicle.priceUSD, 'USD')}
-            </p>
-            <p className="text-sm font-semibold text-muted-foreground">
-              {formatCurrency(vehicle.priceUSD, 'VES', bcvRate)}
+              {formatCurrency(vehicle.priceUSD)}
             </p>
           </div>
           <div className="flex justify-between text-sm text-muted-foreground pt-2 border-t">
