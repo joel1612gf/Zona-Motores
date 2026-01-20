@@ -19,7 +19,7 @@ export function SiteHeader() {
             <Button asChild>
               <Link href="/listings/new">
                 <PlusCircle className="mr-2 h-4 w-4" />
-                List a Vehicle
+                Publicar un Vehículo
               </Link>
             </Button>
           </nav>

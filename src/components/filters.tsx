@@ -64,11 +64,11 @@ export function Filters({ filters, onFilterChange, initialSearchTerm }: FiltersP
         },
         (error) => {
           console.error("Error getting location: ", error);
-          alert("Could not get your location. Please enable location services in your browser.");
+          alert("No se pudo obtener tu ubicación. Por favor, activa los servicios de ubicación en tu navegador.");
         }
       );
     } else {
-      alert("Geolocation is not supported by this browser.");
+      alert("La geolocalización no es compatible con este navegador.");
     }
   };
 
@@ -76,40 +76,40 @@ export function Filters({ filters, onFilterChange, initialSearchTerm }: FiltersP
     <div className="space-y-6">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Filters</CardTitle>
+          <CardTitle>Filtros</CardTitle>
           <Button variant="ghost" size="sm" onClick={resetFilters}>
-            Reset
+            Limpiar
             <X className="ml-2 h-4 w-4" />
           </Button>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="search">Search</Label>
+            <Label htmlFor="search">Buscar</Label>
             <Input
               id="search"
-              placeholder="e.g., Corolla, 4x4..."
+              placeholder="Ej: Corolla, 4x4..."
               value={filters.searchTerm}
               onChange={(e) => onFilterChange({ ...filters, searchTerm: e.target.value })}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="make">Make</Label>
+            <Label htmlFor="make">Marca</Label>
             <Select
               value={filters.make}
               onValueChange={(value) => onFilterChange({ ...filters, make: value })}
             >
               <SelectTrigger id="make">
-                <SelectValue placeholder="All Makes" />
+                <SelectValue placeholder="Todas las Marcas" />
               </SelectTrigger>
               <SelectContent>
                 {uniqueMakes.map(make => (
-                  <SelectItem key={make} value={make}>{make === 'all' ? 'All Makes' : make}</SelectItem>
+                  <SelectItem key={make} value={make}>{make === 'all' ? 'Todas las Marcas' : make}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Price Range (USD)</Label>
+            <Label>Rango de Precio (USD)</Label>
             <Slider
               min={0}
               max={100000}
@@ -124,11 +124,11 @@ export function Filters({ filters, onFilterChange, initialSearchTerm }: FiltersP
           </div>
           <Button variant="secondary" className="w-full" onClick={handleLocationSearch}>
             <MapPin className="mr-2 h-4 w-4" />
-            Find Vehicles Near Me
+            Buscar Vehículos Cerca de Mí
           </Button>
            {filters.location && (
               <p className="text-xs text-muted-foreground text-center">
-                Using location: Lat: {filters.location.latitude.toFixed(2)}, Lon: {filters.location.longitude.toFixed(2)}
+                Usando ubicación: Lat: {filters.location.latitude.toFixed(2)}, Lon: {filters.location.longitude.toFixed(2)}
               </p>
             )}
         </CardContent>
@@ -136,14 +136,14 @@ export function Filters({ filters, onFilterChange, initialSearchTerm }: FiltersP
       
       <Card>
         <CardHeader>
-          <CardTitle>Currency Tool</CardTitle>
+          <CardTitle>Herramienta de Moneda</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Current rate: 1 USD = {bcvRate.toFixed(2)} VES
+            Tasa actual: 1 USD = {bcvRate.toFixed(2)} VES
           </p>
           <div className="space-y-2">
-            <Label htmlFor="bcv-rate">Set BCV Rate</Label>
+            <Label htmlFor="bcv-rate">Establecer Tasa BCV</Label>
             <div className="flex gap-2">
               <Input
                 id="bcv-rate"
@@ -157,7 +157,7 @@ export function Filters({ filters, onFilterChange, initialSearchTerm }: FiltersP
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              This is a demo tool. In a real app, this would be updated automatically.
+              Esta es una herramienta de demostración. En una aplicación real, esto se actualizaría automáticamente.
             </p>
           </div>
         </CardContent>

@@ -1,33 +1,33 @@
 'use server';
 
 /**
- * @fileOverview A flow that summarizes a vehicle listing using generative AI.
+ * @fileOverview Un flujo que resume un anuncio de vehículo usando IA generativa.
  *
- * - summarizeVehicleListing - A function that summarizes a vehicle listing.
- * - SummarizeVehicleListingInput - The input type for the summarizeVehicleListing function.
- * - SummarizeVehicleListingOutput - The return type for the summarizeVehicleListing function.
+ * - summarizeVehicleListing - Una función que resume un anuncio de vehículo.
+ * - SummarizeVehicleListingInput - El tipo de entrada para la función summarizeVehicleListing.
+ * - SummarizeVehicleListingOutput - El tipo de retorno para la función summarizeVehicleListing.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const SummarizeVehicleListingInputSchema = z.object({
-  make: z.string().describe('The make of the vehicle (e.g., Toyota)'),
-  model: z.string().describe('The model of the vehicle (e.g., Corolla)'),
-  year: z.number().describe('The year the vehicle was manufactured'),
-  trim: z.string().optional().describe('The trim level of the vehicle (e.g., LE, XLE)'),
-  mileage: z.number().describe('The mileage of the vehicle'),
-  bodyType: z.string().describe('The body type of the vehicle (e.g., Sedan, SUV, Truck)'),
-  exteriorColor: z.string().describe('The exterior color of the vehicle'),
-  interiorColor: z.string().describe('The interior color of the vehicle'),
-  features: z.array(z.string()).describe('An array of key features of the vehicle'),
-  description: z.string().describe('A free-text description of the vehicle from the seller'),
-  referenceListing: z.string().optional().describe('A reference listing URL for a similar vehicle to guide the summarization.'),
+  make: z.string().describe('La marca del vehículo (ej: Toyota)'),
+  model: z.string().describe('El modelo del vehículo (ej: Corolla)'),
+  year: z.number().describe('El año de fabricación del vehículo'),
+  trim: z.string().optional().describe('El nivel de equipamiento del vehículo (ej: LE, XLE)'),
+  mileage: z.number().describe('El kilometraje del vehículo'),
+  bodyType: z.string().describe('El tipo de carrocería del vehículo (ej: Sedan, SUV, Camioneta)'),
+  exteriorColor: z.string().describe('El color exterior del vehículo'),
+  interiorColor: z.string().describe('El color interior del vehículo'),
+  features: z.array(z.string()).describe('Un arreglo de características clave del vehículo'),
+  description: z.string().describe('Una descripción de texto libre del vehículo por parte del vendedor'),
+  referenceListing: z.string().optional().describe('Una URL de un anuncio de referencia para un vehículo similar para guiar el resumen.'),
 });
 export type SummarizeVehicleListingInput = z.infer<typeof SummarizeVehicleListingInputSchema>;
 
 const SummarizeVehicleListingOutputSchema = z.object({
-  summary: z.string().describe('A concise and engaging summary of the vehicle listing.'),
+  summary: z.string().describe('Un resumen conciso y atractivo del anuncio del vehículo.'),
 });
 export type SummarizeVehicleListingOutput = z.infer<typeof SummarizeVehicleListingOutputSchema>;
 
@@ -39,26 +39,26 @@ const summarizeVehicleListingPrompt = ai.definePrompt({
   name: 'summarizeVehicleListingPrompt',
   input: {schema: SummarizeVehicleListingInputSchema},
   output: {schema: SummarizeVehicleListingOutputSchema},
-  prompt: `You are an expert at writing compelling vehicle listing summaries.
+  prompt: `Eres un experto en escribir resúmenes atractivos para anuncios de vehículos. Tu respuesta debe ser en español.
 
-  Given the following details about a vehicle, create a concise and engaging summary that will attract potential buyers. The summary should highlight the key features and benefits of the vehicle.
+  Dados los siguientes detalles sobre un vehículo, crea un resumen conciso y atractivo que atraiga a compradores potenciales. El resumen debe resaltar las características y beneficios clave del vehículo.
 
-  Make: {{{make}}}
-  Model: {{{model}}}
-  Year: {{{year}}}
-  Trim: {{{trim}}}
-  Mileage: {{{mileage}}}
-  Body Type: {{{bodyType}}}
-  Exterior Color: {{{exteriorColor}}}
-  Interior Color: {{{interiorColor}}}
-  Features: {{#each features}}{{{this}}}, {{/each}}
-  Description: {{{description}}}
+  Marca: {{{make}}}
+  Modelo: {{{model}}}
+  Año: {{{year}}}
+  Versión: {{{trim}}}
+  Kilometraje: {{{mileage}}}
+  Tipo de Carrocería: {{{bodyType}}}
+  Color Exterior: {{{exteriorColor}}}
+  Color Interior: {{{interiorColor}}}
+  Características: {{#each features}}{{{this}}}, {{/each}}
+  Descripción: {{{description}}}
   {{#if referenceListing}}
-  Reference Listing: {{{referenceListing}}}
-  Use this reference listing to guide the summarization, particularly in terms of highlighting comparable features and benefits.
+  Anuncio de Referencia: {{{referenceListing}}}
+  Usa este anuncio de referencia para guiar el resumen, particularmente en términos de resaltar características y beneficios comparables.
   {{/if}}
 
-  Write a summary of no more than 150 words.
+  Escribe un resumen de no más de 150 palabras. El resumen debe estar en español.
   `,
 });
 

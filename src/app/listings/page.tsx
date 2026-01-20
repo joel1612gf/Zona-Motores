@@ -52,12 +52,12 @@ function ListingsPageContent() {
         </div>
         <div className="lg:col-span-3">
           <div className="flex justify-between items-center mb-6">
-            <h1 className="font-headline text-3xl font-bold">All Listings ({filteredVehicles.length})</h1>
+            <h1 className="font-headline text-3xl font-bold">Todos los Anuncios ({filteredVehicles.length})</h1>
             <div className="hidden sm:flex items-center gap-2">
-              <Button variant={layout === 'grid' ? 'secondary' : 'ghost'} size="icon" onClick={() => setLayout('grid')} aria-label="Grid view">
+              <Button variant={layout === 'grid' ? 'secondary' : 'ghost'} size="icon" onClick={() => setLayout('grid')} aria-label="Vista de cuadrícula">
                 <Grid className="h-4 w-4" />
               </Button>
-              <Button variant={layout === 'list' ? 'secondary' : 'ghost'} size="icon" onClick={() => setLayout('list')} aria-label="List view">
+              <Button variant={layout === 'list' ? 'secondary' : 'ghost'} size="icon" onClick={() => setLayout('list')} aria-label="Vista de lista">
                 <List className="h-4 w-4" />
               </Button>
             </div>
@@ -70,8 +70,8 @@ function ListingsPageContent() {
             </div>
           ) : (
             <div className="text-center py-16 border rounded-lg bg-card">
-              <h2 className="text-2xl font-semibold font-headline">No vehicles found</h2>
-              <p className="text-muted-foreground mt-2">Try adjusting your search filters.</p>
+              <h2 className="text-2xl font-semibold font-headline">No se encontraron vehículos</h2>
+              <p className="text-muted-foreground mt-2">Intenta ajustar tus filtros de búsqueda.</p>
             </div>
           )}
         </div>

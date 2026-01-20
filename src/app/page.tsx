@@ -19,11 +19,10 @@ export default function Home() {
             <div className="flex flex-col justify-center space-y-4">
               <div className="space-y-2">
                 <h1 className="font-headline text-3xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none">
-                  Find Your Next Ride in Venezuela
+                  Encuentra Tu Próximo Vehículo en Venezuela
                 </h1>
                 <p className="max-w-[600px] text-muted-foreground md:text-xl">
-                  The most trusted marketplace to buy and sell vehicles. Safe,
-                  fast, and easy.
+                  El mercado más confiable para comprar y vender vehículos. Seguro, rápido y fácil.
                 </p>
               </div>
               <div className="w-full max-w-sm space-y-2">
@@ -31,16 +30,16 @@ export default function Home() {
                   <Input
                     name="search"
                     type="search"
-                    placeholder="Search by make or model..."
+                    placeholder="Busca por marca o modelo..."
                     className="max-w-lg flex-1"
                   />
                   <Button type="submit">
                     <Search className="h-4 w-4" />
-                    <span className="sr-only">Search</span>
+                    <span className="sr-only">Buscar</span>
                   </Button>
                 </form>
                 <Button asChild className="w-full" size="lg">
-                  <Link href="/listings">Browse All Listings</Link>
+                  <Link href="/listings">Ver Todos los Anuncios</Link>
                 </Button>
               </div>
             </div>
@@ -51,7 +50,7 @@ export default function Home() {
               }
               width={1200}
               height={800}
-              alt={heroImage?.description || 'Hero Car'}
+              alt={heroImage?.description || 'Auto de portada'}
               data-ai-hint={heroImage?.imageHint || 'modern car'}
               className="mx-auto aspect-video overflow-hidden rounded-xl object-cover sm:w-full lg:order-last lg:aspect-square"
               priority
@@ -63,7 +62,7 @@ export default function Home() {
       <section className="w-full py-12 md:py-24 lg:py-32">
         <div className="container px-4 md:px-6">
           <h2 className="font-headline text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl text-center mb-12">
-            Featured Listings
+            Anuncios Destacados
           </h2>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {featuredVehicles.map((vehicle) => (
