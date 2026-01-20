@@ -7,9 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
-import { MapPin, RefreshCw, X } from "lucide-react";
+import { MapPin, X } from "lucide-react";
 import { vehicles } from '@/lib/data';
-import { useCurrency } from '@/context/currency-context';
 
 export type FilterState = {
   searchTerm: string;
@@ -28,19 +27,11 @@ type FiltersProps = {
 const uniqueMakes = ['all', ...Array.from(new Set(vehicles.map(v => v.make)))];
 
 export function Filters({ filters, onFilterChange, initialSearchTerm }: FiltersProps) {
-  const { bcvRate, setBcvRate } = useCurrency();
-  const [rateInput, setRateInput] = useState(bcvRate.toString());
-
   useEffect(() => {
     if (initialSearchTerm) {
         onFilterChange(prev => ({...prev, searchTerm: initialSearchTerm}));
     }
   }, [initialSearchTerm, onFilterChange]);
-
-  useEffect(() => {
-    setRateInput(bcvRate.toString());
-  }, [bcvRate]);
-
 
   const handlePriceChange = (value: number[]) => {
     onFilterChange({ ...filters, minPrice: value[0], maxPrice: value[1] });
@@ -131,35 +122,6 @@ export function Filters({ filters, onFilterChange, initialSearchTerm }: FiltersP
                 Usando ubicación: Lat: {filters.location.latitude.toFixed(2)}, Lon: {filters.location.longitude.toFixed(2)}
               </p>
             )}
-        </CardContent>
-      </Card>
-      
-      <Card>
-        <CardHeader>
-          <CardTitle>Herramienta de Moneda</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Tasa actual: 1 USD = {bcvRate.toFixed(2)} VES
-          </p>
-          <div className="space-y-2">
-            <Label htmlFor="bcv-rate">Establecer Tasa BCV</Label>
-            <div className="flex gap-2">
-              <Input
-                id="bcv-rate"
-                type="number"
-                value={rateInput}
-                onChange={(e) => setRateInput(e.target.value)}
-                onBlur={() => setBcvRate(parseFloat(rateInput) || bcvRate)}
-              />
-              <Button onClick={() => setBcvRate(parseFloat(rateInput) || bcvRate)} variant="outline" size="icon">
-                <RefreshCw className="h-4 w-4" />
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Esta es una herramienta de demostración. En una aplicación real, esto se actualizaría automáticamente.
-            </p>
-          </div>
         </CardContent>
       </Card>
     </div>
