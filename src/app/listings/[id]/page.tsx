@@ -23,7 +23,8 @@ import {
   PenSquare,
   GitCompareArrows,
   ArrowDownToLine,
-  ArrowUpFromLine
+  ArrowUpFromLine,
+  LifeBuoy
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
@@ -65,7 +66,7 @@ export default function ListingDetailPage() {
   if (vehicle.isOperational) mainFeatures.push({ icon: CircleCheck, label: 'Rueda actualmente' });
   if (!vehicle.hadMajorCrash) mainFeatures.push({ icon: ShieldCheck, label: 'Sin choques fuertes' });
   if (vehicle.isSignatory) mainFeatures.push({ icon: PenSquare, label: 'Dueño es firmante' });
-  if (vehicle.ownerCount) mainFeatures.push({ icon: FileText, label: `Título ${vehicle.ownerCount}-1` });
+  if (vehicle.tireLife > 80) mainFeatures.push({ icon: LifeBuoy, label: 'Cauchos > 80% vida' });
   if (vehicle.acceptsTradeIn) {
     mainFeatures.push({ icon: GitCompareArrows, label: 'Acepta cambios' });
     if (vehicle.tradeInForLowerValue) mainFeatures.push({ icon: ArrowDownToLine, label: 'Recibe menor valor' });
@@ -142,6 +143,7 @@ export default function ListingDetailPage() {
                   <div className="font-semibold flex items-center gap-1"><Gauge className="h-4 w-4 text-muted-foreground" /> Kilometraje</div><div className="text-muted-foreground">{vehicle.mileage.toLocaleString()} km</div>
                   <div className="font-semibold flex items-center gap-1"><Palette className="h-4 w-4 text-muted-foreground" /> Color</div><div className="text-muted-foreground">{vehicle.exteriorColor}</div>
                   <div className="font-semibold flex items-center gap-1"><Settings2 className="h-4 w-4 text-muted-foreground" /> Motor</div><div className="text-muted-foreground">{vehicle.engine}</div>
+                  <div className="font-semibold flex items-center gap-1"><FileText className="h-4 w-4 text-muted-foreground" /> Título</div><div className="text-muted-foreground">{vehicle.ownerCount}-1</div>
                   <div className="font-semibold flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 5h14v14H5V5z"/><path d="M12 5v14"/><path d="M19 12H5"/><path d="M12 12l5-5"/><path d="m7 12 5 5"/></svg> Transmisión</div><div className="text-muted-foreground">{vehicle.transmission}</div>
                 </div>
               </div>
