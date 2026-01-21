@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { AuthButton } from '@/components/auth-button';
 import { Car, PlusCircle } from 'lucide-react';
 import { useUser } from '@/firebase';
+import { ThemeToggle } from './theme-toggle';
 
 export function SiteHeader() {
   const { user } = useUser();
@@ -47,6 +48,7 @@ export function SiteHeader() {
               Publicar Vehículo
             </Button>
           {/* <AuthButton open={loginOpen} onOpenChange={setLoginOpen} /> */}
+          <ThemeToggle />
         </div>
       </div>
     </header>
