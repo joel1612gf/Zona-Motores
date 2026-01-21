@@ -4,10 +4,10 @@ import { notFound, useParams } from 'next/navigation';
 import Image from 'next/image';
 import { useVehicles } from '@/context/vehicle-context';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle as CardTitleComponent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { 
   Gauge, 
@@ -117,7 +117,7 @@ export default function ListingDetailPage() {
           </Carousel>
           <Card className="mt-8">
             <CardHeader>
-              <CardTitle>Descripción del Vendedor</CardTitle>
+              <CardTitleComponent>Descripción del Vendedor</CardTitleComponent>
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground">{vehicle.description}</p>
@@ -125,7 +125,7 @@ export default function ListingDetailPage() {
           </Card>
           <Card className="mt-8">
             <CardHeader>
-              <CardTitle>Características</CardTitle>
+              <CardTitleComponent>Características</CardTitleComponent>
             </CardHeader>
             <CardContent className="grid grid-cols-2 sm:grid-cols-3 gap-6">
               <div className="flex items-center gap-3">
@@ -164,7 +164,7 @@ export default function ListingDetailPage() {
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>Información del Vendedor</CardTitle>
+              <CardTitleComponent>Información del Vendedor</CardTitleComponent>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-3">
@@ -190,6 +190,10 @@ export default function ListingDetailPage() {
 
       <Dialog open={isLightboxOpen} onOpenChange={setIsLightboxOpen}>
         <DialogContent className="max-w-screen-xl w-full h-[90vh] bg-transparent backdrop-blur-sm border-none shadow-none p-2">
+          <DialogTitle className="sr-only">Galería de Imágenes del Vehículo</DialogTitle>
+          <DialogDescription className="sr-only">
+            Visor de imágenes para {`${vehicle.year} ${vehicle.make} ${vehicle.model}`}. Usa las flechas para navegar entre las fotos.
+          </DialogDescription>
           <Carousel 
             className="w-full h-full"
             opts={{
