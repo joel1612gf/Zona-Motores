@@ -51,7 +51,6 @@ export default function NewListingPage() {
     mileage: '',
     transmission: 'Automática',
     exteriorColor: '',
-    interiorColor: '',
     engine: '',
     hadMajorCrash: false,
     hasAC: true,
@@ -287,10 +286,6 @@ export default function NewListingPage() {
                 <div className="space-y-2">
                     <Label htmlFor="exteriorColor">Color Exterior</Label>
                     <Input id="exteriorColor" value={details.exteriorColor} onChange={(e) => handleDetailChange('exteriorColor', e.target.value)} placeholder="Ej: Blanco Perlado" />
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor="interiorColor">Color Interior</Label>
-                    <Input id="interiorColor" value={details.interiorColor} onChange={(e) => handleDetailChange('interiorColor', e.target.value)} placeholder="Ej: Cuero Negro" />
                 </div>
                 <div className="rounded-lg border p-4">
                     <Label className="mb-3 block">Transmisión</Label>

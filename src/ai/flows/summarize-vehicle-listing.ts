@@ -19,7 +19,6 @@ const SummarizeVehicleListingInputSchema = z.object({
   mileage: z.number().describe('El kilometraje del vehículo'),
   bodyType: z.string().describe('El tipo de carrocería del vehículo (ej: Sedan, SUV, Camioneta)'),
   exteriorColor: z.string().describe('El color exterior del vehículo'),
-  interiorColor: z.string().describe('El color interior del vehículo'),
   features: z.array(z.string()).describe('Un arreglo de características clave del vehículo'),
   description: z.string().describe('Una descripción de texto libre del vehículo por parte del vendedor'),
   referenceListing: z.string().optional().describe('Una URL de un anuncio de referencia para un vehículo similar para guiar el resumen.'),
@@ -50,7 +49,6 @@ const summarizeVehicleListingPrompt = ai.definePrompt({
   Kilometraje: {{{mileage}}}
   Tipo de Carrocería: {{{bodyType}}}
   Color Exterior: {{{exteriorColor}}}
-  Color Interior: {{{interiorColor}}}
   Características: {{#each features}}{{{this}}}, {{/each}}
   Descripción: {{{description}}}
   {{#if referenceListing}}

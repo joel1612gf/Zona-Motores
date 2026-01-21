@@ -22,7 +22,6 @@ export type Vehicle = {
   transmission: 'Automática' | 'Sincrónica';
   engine: string;
   exteriorColor: string;
-  interiorColor: string;
   doorCount?: '2' | '4';
   is4x4?: boolean;
   ownerCount: number;
