@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { notFound, useParams } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import { useVehicles } from '@/context/vehicle-context';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
@@ -29,6 +29,7 @@ import {
   LifeBuoy
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
+import { notFound } from 'next/navigation';
 
 export default function ListingDetailPage() {
   const params = useParams<{ id: string }>();
@@ -189,7 +190,7 @@ export default function ListingDetailPage() {
       </div>
 
       <Dialog open={isLightboxOpen} onOpenChange={setIsLightboxOpen}>
-        <DialogContent className="max-w-screen-xl w-full h-[90vh] bg-transparent backdrop-blur-sm border-none shadow-none p-2">
+        <DialogContent className="max-w-screen-xl w-full h-[90vh] p-2">
           <DialogTitle className="sr-only">Galería de Imágenes del Vehículo</DialogTitle>
           <DialogDescription className="sr-only">
             Visor de imágenes para {`${vehicle.year} ${vehicle.make} ${vehicle.model}`}. Usa las flechas para navegar entre las fotos.
