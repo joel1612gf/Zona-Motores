@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import * as React from 'react';
+import Autoplay from 'embla-carousel-autoplay';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useVehicles } from '@/context/vehicle-context';
@@ -16,6 +18,10 @@ export default function Home() {
   const featuredVehicles = initialVehicles.slice(0, 5);
   const latestVehicles = vehicles.slice(0, 8);
   const heroImage = PlaceHolderImages.find((p) => p.id === 'hero-car');
+
+  const autoplayPlugin = React.useRef(
+    Autoplay({ delay: 5000, stopOnInteraction: true })
+  );
 
   return (
     <div className="flex flex-col">
@@ -78,7 +84,10 @@ export default function Home() {
             </p>
           </div>
           <Carousel
-            opts={{ align: "start" }}
+            opts={{ align: "start", loop: true }}
+            plugins={[autoplayPlugin.current]}
+            onMouseEnter={autoplayPlugin.current.stop}
+            onMouseLeave={autoplayPlugin.current.reset}
             className="w-full"
           >
             <CarouselContent className="-ml-2 md:-ml-4">
@@ -108,7 +117,10 @@ export default function Home() {
                 </p>
             </div>
           <Carousel
-              opts={{ align: "start" }}
+              opts={{ align: "start", loop: true }}
+              plugins={[autoplayPlugin.current]}
+              onMouseEnter={autoplayPlugin.current.stop}
+              onMouseLeave={autoplayPlugin.current.reset}
               className="w-full"
             >
               <CarouselContent className="-ml-2 md:-ml-4">
