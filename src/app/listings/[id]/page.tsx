@@ -189,7 +189,7 @@ export default function ListingDetailPage() {
       </div>
 
       <Dialog open={isLightboxOpen} onOpenChange={setIsLightboxOpen}>
-        <DialogContent className="max-w-screen-xl w-full h-[90vh] bg-black/80 backdrop-blur-sm border-none shadow-none p-2 flex items-center justify-center">
+        <DialogContent className="max-w-screen-xl w-full h-[90vh] bg-transparent backdrop-blur-sm border-none shadow-none p-2">
           <Carousel 
             className="w-full h-full"
             opts={{
