@@ -14,11 +14,15 @@ export function SiteHeader() {
   const [loginOpen, setLoginOpen] = useState(false);
 
   const handleNewListingClick = () => {
+    // For now, let's go directly to the new listing page
+    router.push('/listings/new');
+    /*
     if (user) {
       router.push('/listings/new');
     } else {
       setLoginOpen(true);
     }
+    */
   };
 
   return (
@@ -38,7 +42,7 @@ export function SiteHeader() {
               <PlusCircle className="mr-2 h-4 w-4" />
               Publicar un Vehículo
             </Button>
-            <AuthButton open={loginOpen} onOpenChange={setLoginOpen} />
+            {/* <AuthButton open={loginOpen} onOpenChange={setLoginOpen} /> */}
           </nav>
         </div>
       </div>

@@ -43,10 +43,11 @@ type ListingFormValues = z.infer<typeof listingFormSchema>;
 export default function NewListingPage() {
   const { toast } = useToast();
   const router = useRouter();
-  const { user, loading: userLoading } = useUser();
+  // const { user, loading: userLoading } = useUser();
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [compressedImages, setCompressedImages] = useState<string[]>([]);
   
+  /*
   useEffect(() => {
     if (!userLoading && !user) {
       toast({
@@ -57,6 +58,7 @@ export default function NewListingPage() {
       router.push('/');
     }
   }, [user, userLoading, router, toast]);
+  */
 
   const form = useForm<ListingFormValues>({
     resolver: zodResolver(listingFormSchema),
@@ -164,6 +166,7 @@ export default function NewListingPage() {
     }, 1500)
   }
 
+  /*
   if (userLoading || !user) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
@@ -171,6 +174,7 @@ export default function NewListingPage() {
       </div>
     );
   }
+  */
 
   return (
     <div className="container max-w-4xl mx-auto py-12">
