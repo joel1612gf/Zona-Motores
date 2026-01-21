@@ -6,9 +6,10 @@ import { vehicles as allVehicles } from '@/lib/data';
 import { VehicleCard } from '@/components/vehicle-card';
 import { Filters, type FilterState } from '@/components/filters';
 import { Button } from '@/components/ui/button';
-import { Grid, List, Info } from 'lucide-react';
+import { Grid, List, Info, Search } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
 
 function ListingsPageContent() {
   const searchParams = useSearchParams();
@@ -74,7 +75,7 @@ function ListingsPageContent() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
         <div className="lg:col-span-1">
           <div className="sticky top-20">
-            <Filters filters={filters} onFilterChange={setFilters} initialSearchTerm={initialSearchTerm}/>
+            <Filters filters={filters} onFilterChange={setFilters} />
           </div>
         </div>
         <div className="lg:col-span-3">
@@ -88,6 +89,16 @@ function ListingsPageContent() {
                 <List className="h-4 w-4" />
               </Button>
             </div>
+          </div>
+          <div className="relative mb-8 max-w-xl mx-auto">
+            <Input
+                id="search-input"
+                placeholder="Busca por marca, modelo..."
+                value={filters.searchTerm}
+                onChange={(e) => setFilters(prev => ({...prev, searchTerm: e.target.value}))}
+                className="text-base"
+            />
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none" />
           </div>
           {averagePrice && (
             <div className="mb-6 p-4 border-l-4 border-primary bg-primary/10 rounded-r-lg" role="alert">
