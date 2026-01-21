@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 // import { useUser } from '@/firebase';
 import { Button } from '@/components/ui/button';
@@ -33,6 +33,15 @@ export default function NewListingPage() {
   const [selectedType, setSelectedType] = useState<VehicleType | null>(null);
   const [selectedBrand, setSelectedBrand] = useState<string>('');
   const [selectedModel, setSelectedModel] = useState<string>('');
+  const [selectedYear, setSelectedYear] = useState<string>('');
+
+  const modelsByMake = useMemo(() => {
+    if (!selectedBrand) return [];
+    const brandModels = vehicles
+        .filter(v => v.make === selectedBrand)
+        .map(v => v.model);
+    return [...new Set(brandModels)].map(model => ({ label: model, value: model }));
+  }, [selectedBrand]);
 
   const getWelcomeMessage = () => {
     // if (user) {
@@ -44,7 +53,7 @@ export default function NewListingPage() {
   const handleNext = () => {
     toast({
       title: "Información Guardada (Demo)",
-      description: `Vehículo: ${selectedType} ${selectedBrand} ${selectedModel}. El siguiente paso sería agregar más detalles.`,
+      description: `Vehículo: ${selectedYear} ${selectedBrand} ${selectedModel}. El siguiente paso sería agregar más detalles.`,
     });
     // En una aplicación real, esto llevaría a la siguiente parte del formulario.
     // Por ahora, redirigimos a la página principal.
@@ -55,6 +64,28 @@ export default function NewListingPage() {
     setSelectedType(type);
     setSelectedBrand('');
     setSelectedModel('');
+    setSelectedYear('');
+  };
+
+  const handleBrandChange = (brand: string) => {
+    setSelectedBrand(brand);
+    setSelectedModel('');
+    setSelectedYear('');
+  };
+
+  const handleModelChange = (model: string) => {
+    setSelectedModel(model);
+    setSelectedYear('');
+  };
+
+  const getPrompt = () => {
+    if (!selectedBrand) {
+      return `¿Qué marca es tu ${selectedType?.toLowerCase()}?`;
+    }
+    if (!selectedModel) {
+      return `¿Qué modelo es tu ${selectedBrand}?`;
+    }
+    return `¿De qué año es tu ${selectedModel}?`;
   };
 
   return (
@@ -94,27 +125,40 @@ export default function NewListingPage() {
                         <p className="font-semibold">{selectedBrand}</p>
                     </div>
                 )}
+                {selectedModel && (
+                    <div className="p-4 border rounded-md bg-muted transition-all animate-in fade-in-0 duration-300">
+                        <p className="text-sm text-muted-foreground">Modelo</p>
+                        <p className="font-semibold">{selectedModel}</p>
+                    </div>
+                )}
                 <div>
                     <h2 className="text-xl font-semibold mb-2 text-center">
-                        {!selectedBrand 
-                            ? `¿Qué marca es tu ${selectedType.toLowerCase()}?`
-                            : `¿Qué modelo es tu ${selectedBrand}?`
-                        }
+                        {getPrompt()}
                     </h2>
                     {!selectedBrand ? (
                         <Combobox
                             options={allMakes}
                             value={selectedBrand}
-                            onChange={setSelectedBrand}
+                            onChange={handleBrandChange}
                             placeholder="Selecciona una marca"
                             searchPlaceholder="Buscar marca..."
                             notFoundMessage="No se encontró la marca."
                         />
+                    ) : !selectedModel ? (
+                        <Combobox
+                            options={modelsByMake}
+                            value={selectedModel}
+                            onChange={handleModelChange}
+                            placeholder="Selecciona un modelo"
+                            searchPlaceholder="Buscar modelo..."
+                            notFoundMessage="No se encontró el modelo."
+                        />
                     ) : (
                         <Input 
-                            placeholder="Ej: Corolla"
-                            value={selectedModel}
-                            onChange={(e) => setSelectedModel(e.target.value)}
+                            type="number"
+                            placeholder="Ej: 2021"
+                            value={selectedYear}
+                            onChange={(e) => setSelectedYear(e.target.value)}
                             className="w-[200px]"
                             autoFocus
                         />
@@ -122,7 +166,7 @@ export default function NewListingPage() {
                 </div>
             </div>
 
-            {(selectedBrand && selectedModel.length > 1) && (
+            {(selectedBrand && selectedModel && selectedYear.length >= 4) && (
                 <Button onClick={handleNext} size="lg">
                     Siguiente
                 </Button>
