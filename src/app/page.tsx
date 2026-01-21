@@ -1,16 +1,20 @@
+'use client';
+
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { vehicles } from '@/lib/data';
+import { useVehicles } from '@/context/vehicle-context';
+import { vehicles as initialVehicles } from '@/lib/data';
 import { VehicleCard } from '@/components/vehicle-card';
 import { PlusCircle, Search } from 'lucide-react';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 
 export default function Home() {
-  const featuredVehicles = vehicles.slice(0, 5);
-  const latestVehicles = vehicles.slice(5, 13);
+  const { vehicles } = useVehicles();
+  const featuredVehicles = initialVehicles.slice(0, 5);
+  const latestVehicles = vehicles.slice(0, 8);
   const heroImage = PlaceHolderImages.find((p) => p.id === 'hero-car');
 
   return (

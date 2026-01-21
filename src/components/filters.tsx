@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { MapPin, X } from "lucide-react";
-import { vehicles } from '@/lib/data';
+import { useVehicles } from '@/context/vehicle-context';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
 
 export type FilterState = {
@@ -28,12 +28,14 @@ type FiltersProps = {
   onFilterChange: React.Dispatch<React.SetStateAction<FilterState>>;
 };
 
-const uniqueMakes = ['all', ...Array.from(new Set(vehicles.map(v => v.make)))];
-const uniqueBodyTypes = ['all', ...Array.from(new Set(vehicles.map(v => v.bodyType)))];
 const transmissionTypes = ['all', 'Automática', 'Sincrónica'];
 
 export function Filters({ filters, onFilterChange }: FiltersProps) {
+  const { vehicles } = useVehicles();
   const [models, setModels] = useState<string[]>([]);
+  
+  const uniqueMakes = useMemo(() => ['all', ...Array.from(new Set(vehicles.map(v => v.make)))], [vehicles]);
+  const uniqueBodyTypes = useMemo(() => ['all', ...Array.from(new Set(vehicles.map(v => v.bodyType)))], [vehicles]);
 
   useEffect(() => {
     if (filters.make && filters.make !== 'all') {
@@ -44,7 +46,7 @@ export function Filters({ filters, onFilterChange }: FiltersProps) {
     }
     onFilterChange(prev => ({...prev, model: 'all'}));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.make]);
+  }, [filters.make, vehicles]);
 
 
   const handleInputChange = (field: keyof FilterState, value: string) => {

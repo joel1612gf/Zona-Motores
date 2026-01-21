@@ -3,9 +3,9 @@
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-// import { useUser } from '@/firebase';
+import { useVehicles } from '@/context/vehicle-context';
+import { Vehicle } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { vehicles } from '@/lib/data';
 import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -30,12 +30,12 @@ const vehicleTypeOptions: {
   { id: 'Camioneta', name: 'Camioneta', icon: Truck },
 ];
 
-const allMakes = [...new Set(vehicles.map((v) => v.make))].map((make) => ({ label: make, value: make }));
-
 export default function NewListingPage() {
   const router = useRouter();
   const { toast } = useToast();
-  // const { user } = useUser(); // Descomentar cuando se reactive el login
+  const { addVehicle, vehicles } = useVehicles();
+
+  const allMakes = useMemo(() => [...new Set(vehicles.map((v) => v.make))].map((make) => ({ label: make, value: make })), [vehicles]);
 
   const [step, setStep] = useState<Step>('selection');
 
@@ -48,6 +48,7 @@ export default function NewListingPage() {
   const [mainPhotoIndex, setMainPhotoIndex] = useState<number | null>(null);
 
   const [details, setDetails] = useState({
+    price: '',
     mileage: '',
     transmission: 'Automática',
     exteriorColor: '',
@@ -79,12 +80,9 @@ export default function NewListingPage() {
         .filter(v => v.make === selectedBrand)
         .map(v => v.model);
     return [...new Set(brandModels)].map(model => ({ label: model, value: model }));
-  }, [selectedBrand]);
+  }, [selectedBrand, vehicles]);
 
   const getWelcomeMessage = () => {
-    // if (user) {
-    //   return `Bienvenido ${user.displayName}, ¿qué vehículo quieres publicar el día de hoy?`;
-    // }
     return '¿Qué vehículo quieres publicar el día de hoy?';
   };
 
@@ -123,29 +121,68 @@ export default function NewListingPage() {
       });
       
       if (mainPhotoIndex === index) {
-          // If the removed photo was the main one, select the first one as new main, or none if empty
           setMainPhotoIndex(photos.length > 1 ? 0 : null);
       } else if (mainPhotoIndex && mainPhotoIndex > index) {
-          // If a photo before the main one was removed, shift the index down
           setMainPhotoIndex(mainPhotoIndex - 1);
       }
   };
 
   const handlePublish = () => {
-     if (photos.length < 6) {
+     if (photos.length < 1) {
         toast({
             title: "Fotos insuficientes",
-            description: "Debes subir al menos 6 fotos.",
+            description: "Debes subir al menos 1 foto.",
             variant: "destructive",
         });
         return;
     }
+    if (!details.price || parseInt(details.price) <= 0) {
+      toast({
+          title: "Precio requerido",
+          description: "Por favor, ingresa un precio válido para el vehículo.",
+          variant: "destructive",
+      });
+      return;
+  }
+
+     const newVehicle: Vehicle = {
+        id: crypto.randomUUID(),
+        make: selectedBrand,
+        model: selectedModel,
+        year: parseInt(selectedYear, 10),
+        priceUSD: parseInt(details.price, 10),
+        mileage: parseInt(details.mileage, 10) || 0,
+        bodyType: selectedType as string,
+        transmission: details.transmission as 'Automática' | 'Sincrónica',
+        engine: details.engine,
+        exteriorColor: details.exteriorColor,
+        doorCount: selectedType === 'Carro' ? details.doorCount as '2' | '4' : undefined,
+        is4x4: selectedType === 'Camioneta' ? details.is4x4 : undefined,
+        ownerCount: parseInt(details.ownerCount, 10),
+        tireLife: parseInt(details.tireLife, 10),
+        hasAC: details.hasAC,
+        hasSoundSystem: details.hasSoundSystem,
+        hadMajorCrash: details.hadMajorCrash,
+        isOperational: details.isOperational,
+        operationalDetails: !details.isOperational ? details.operationalDetails : undefined,
+        isSignatory: details.isSignatory,
+        acceptsTradeIn: details.acceptsTradeIn,
+        tradeInDetails: details.acceptsTradeIn ? details.tradeInDetails : undefined,
+        tradeInForHigherValue: details.acceptsTradeIn ? details.tradeInForHigherValue : undefined,
+        tradeInForLowerValue: details.acceptsTradeIn ? details.tradeInForLowerValue : undefined,
+        description: details.moreDetails,
+        images: photos.length > 0 ? photos.map((p, i) => ({ url: p, alt: `Foto ${selectedBrand} ${selectedModel} ${i + 1}`, hint: 'car photo' })) : [{url: 'https://picsum.photos/seed/default/800/600', alt: 'placeholder', hint: 'car'}],
+        seller: { id: 'seller-new', name: 'Vendedor Demo', isVerified: false, phone: '+584121234567' },
+        location: { city: 'Caracas', state: 'Distrito Capital', lat: 10.4806, lon: -66.9036 },
+    };
+
+     addVehicle(newVehicle);
 
      toast({
-      title: "Publicación casi lista (Demo)",
-      description: `Los detalles de tu ${selectedBrand} ${selectedModel} con ${details.mileage}km han sido guardados.`,
+      title: "¡Publicación Creada!",
+      description: `Tu ${selectedBrand} ${selectedModel} ha sido publicado con éxito.`,
     });
-    // For now, redirect to home page.
+
     router.push('/');
   }
 
@@ -276,6 +313,10 @@ export default function NewListingPage() {
         <Card className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                 <div className="space-y-2">
+                    <Label htmlFor="price">Precio (USD)</Label>
+                    <Input id="price" type="number" min="0" value={details.price} onChange={(e) => handleDetailChange('price', e.target.value)} placeholder="Ej: 22000" />
+                </div>
+                <div className="space-y-2">
                     <Label htmlFor="mileage">Kilometraje</Label>
                     <Input id="mileage" type="number" min="0" value={details.mileage} onChange={(e) => handleDetailChange('mileage', e.target.value)} placeholder="Ej: 55000" />
                 </div>
@@ -398,7 +439,7 @@ export default function NewListingPage() {
             Vamos a seleccionar las mejores fotos de tu {selectedBrand} {selectedModel}
         </h2>
         <p className="text-center text-muted-foreground mb-6">
-            Sube entre 6 y 12 fotos. Selecciona una como la foto principal.
+            Sube entre 1 y 12 fotos. Selecciona una como la foto principal.
         </p>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
@@ -441,8 +482,8 @@ export default function NewListingPage() {
         </div>
         
         <div className="flex justify-end mt-8">
-            <Button onClick={handlePublish} size="lg" disabled={photos.length < 6}>
-                Publicar Anuncio ({photos.length < 6 ? `${photos.length}/6` : `${photos.length}/12`})
+            <Button onClick={handlePublish} size="lg" disabled={photos.length < 1}>
+                Publicar Anuncio ({photos.length < 1 ? `${photos.length}/1` : `${photos.length}/12`})
             </Button>
         </div>
     </div>

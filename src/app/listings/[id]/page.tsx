@@ -1,7 +1,7 @@
 'use client';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
-import { vehicles } from '@/lib/data';
+import { useVehicles } from '@/context/vehicle-context';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,7 @@ import {
 import { formatCurrency } from '@/lib/utils';
 
 export default function ListingDetailPage({ params }: { params: { id: string } }) {
+  const { vehicles } = useVehicles();
   const vehicle = vehicles.find(v => v.id === params.id);
 
   if (!vehicle) {

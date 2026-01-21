@@ -5,6 +5,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { SiteHeader } from '@/components/site-header';
 import { SiteFooter } from '@/components/site-footer';
 import { FirebaseClientProvider } from '@/firebase';
+import { VehicleProvider } from '@/context/vehicle-context';
 
 export const metadata: Metadata = {
   title: 'Zona Motores',
@@ -32,12 +33,14 @@ export default function RootLayout({
       </head>
       <body className={cn('min-h-screen bg-background font-body antialiased')}>
         <FirebaseClientProvider>
-          <div className="relative flex min-h-dvh flex-col">
-            <SiteHeader />
-            <main className="flex-1">{children}</main>
-            <SiteFooter />
-          </div>
-          <Toaster />
+          <VehicleProvider>
+            <div className="relative flex min-h-dvh flex-col">
+              <SiteHeader />
+              <main className="flex-1">{children}</main>
+              <SiteFooter />
+            </div>
+            <Toaster />
+          </VehicleProvider>
         </FirebaseClientProvider>
       </body>
     </html>

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { vehicles as allVehicles } from '@/lib/data';
+import { useVehicles } from '@/context/vehicle-context';
 import { VehicleCard } from '@/components/vehicle-card';
 import { Filters, type FilterState } from '@/components/filters';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import { formatCurrency } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 
 function ListingsPageContent() {
+  const { vehicles: allVehicles } = useVehicles();
   const searchParams = useSearchParams();
   const initialSearchTerm = searchParams.get('search') || '';
 
@@ -79,7 +80,7 @@ function ListingsPageContent() {
 
       return searchMatch && makeMatch && modelMatch && priceMatch && yearMatch && bodyTypeMatch && transmissionMatch;
     });
-  }, [filters]);
+  }, [filters, allVehicles]);
 
   const averagePrice = useMemo(() => {
     if (filteredVehicles.length < 2) {
