@@ -59,8 +59,8 @@ export function Filters({ filters, onFilterChange, initialSearchTerm }: FiltersP
   };
 
   const resetFilters = () => {
-    onFilterChange({
-      searchTerm: '',
+    onFilterChange(prev => ({
+      ...prev,
       make: 'all',
       model: 'all',
       minPrice: '',
@@ -70,7 +70,7 @@ export function Filters({ filters, onFilterChange, initialSearchTerm }: FiltersP
       bodyType: 'all',
       transmission: 'all',
       location: null,
-    });
+    }));
   };
 
   const handleLocationSearch = () => {
@@ -100,16 +100,6 @@ export function Filters({ filters, onFilterChange, initialSearchTerm }: FiltersP
           </Button>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="search">Buscar</Label>
-            <Input
-              id="search"
-              placeholder="Ej: Corolla, 2021..."
-              value={filters.searchTerm}
-              onChange={(e) => handleInputChange('searchTerm', e.target.value)}
-            />
-          </div>
-
           <Accordion type="multiple" defaultValue={['make', 'price', 'year']} className="w-full">
             <AccordionItem value="make">
               <AccordionTrigger className="py-2 text-base">Marca y Modelo</AccordionTrigger>

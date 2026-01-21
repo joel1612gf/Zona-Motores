@@ -6,8 +6,9 @@ import { vehicles as allVehicles } from '@/lib/data';
 import { VehicleCard } from '@/components/vehicle-card';
 import { Filters, type FilterState } from '@/components/filters';
 import { Button } from '@/components/ui/button';
-import { Grid, List } from 'lucide-react';
+import { Grid, List, Info } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { formatCurrency } from '@/lib/utils';
 
 function ListingsPageContent() {
   const searchParams = useSearchParams();
@@ -60,6 +61,14 @@ function ListingsPageContent() {
     });
   }, [filters]);
 
+  const averagePrice = useMemo(() => {
+    if (filteredVehicles.length < 2) {
+      return null;
+    }
+    const totalPrice = filteredVehicles.reduce((sum, vehicle) => sum + vehicle.priceUSD, 0);
+    return totalPrice / filteredVehicles.length;
+  }, [filteredVehicles]);
+
   return (
     <div className="container mx-auto py-8">
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
@@ -80,6 +89,22 @@ function ListingsPageContent() {
               </Button>
             </div>
           </div>
+          {averagePrice && (
+            <div className="mb-6 p-4 border-l-4 border-primary bg-primary/10 rounded-r-lg" role="alert">
+              <div className="flex">
+                <Info className="h-5 w-5 text-primary mr-3 mt-1 flex-shrink-0" />
+                <div>
+                    <p className="font-semibold">
+                        Precio Promedio de Referencia: 
+                        <span className="font-headline text-2xl font-bold text-primary ml-2">{formatCurrency(averagePrice)}</span>
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                        Basado en {filteredVehicles.length} vehículos que coinciden con tu búsqueda.
+                    </p>
+                </div>
+              </div>
+            </div>
+          )}
           {filteredVehicles.length > 0 ? (
             <div className={`gap-6 ${layout === 'grid' ? 'grid sm:grid-cols-2 xl:grid-cols-3' : 'flex flex-col'}`}>
               {filteredVehicles.map(vehicle => (
