@@ -1,5 +1,5 @@
 'use client';
-import { notFound } from 'next/navigation';
+import { notFound, useParams } from 'next/navigation';
 import Image from 'next/image';
 import { useVehicles } from '@/context/vehicle-context';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
@@ -27,7 +27,8 @@ import {
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
-export default function ListingDetailPage({ params }: { params: { id: string } }) {
+export default function ListingDetailPage() {
+  const params = useParams<{ id: string }>();
   const { vehicles } = useVehicles();
   const vehicle = vehicles.find(v => v.id === params.id);
 
