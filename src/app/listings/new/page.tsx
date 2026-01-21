@@ -370,7 +370,7 @@ export default function NewListingPage() {
                     )}
                 </div>
                 <div className="space-y-2">
-                    <Label htmlFor="ownerCount">Número de dueños (incluyéndote)</Label>
+                    <Label htmlFor="ownerCount">Título (Número de dueños)</Label>
                     <Input id="ownerCount" type="number" min="1" value={details.ownerCount} onChange={(e) => handleDetailChange('ownerCount', e.target.value)} />
                 </div>
                 <div className="space-y-2">
