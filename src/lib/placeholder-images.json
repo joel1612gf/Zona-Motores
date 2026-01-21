@@ -71,6 +71,42 @@
       "description": "Hyundai Elantra Azul",
       "imageUrl": "https://images.unsplash.com/photo-1621601628445-ff13122a9caf?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8Ymx1ZSUyMHNlZGFufGVufDB8fHx8MTc2ODgzNjY1MXww&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "blue sedan"
+    },
+    {
+      "id": "fiesta-main",
+      "description": "Ford Fiesta Rojo",
+      "imageUrl": "https://images.unsplash.com/photo-1572278144794-282a814f09d8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxyZWQlMjBmb3JkJTIwZmllc3RhfGVufDB8fHx8MTc2ODk1MjQwNnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "red car"
+    },
+    {
+      "id": "silverado-main",
+      "description": "Chevrolet Silverado Negra",
+      "imageUrl": "https://images.unsplash.com/photo-1573352215953-155a9b085521?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxibGFjayUyMGNoZXZyb2xldCUyMHNpbHZlcmFkb3xlbnwwfHx8fDE3Njg5NTI0MDZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "black truck"
+    },
+    {
+      "id": "explorer-main",
+      "description": "Ford Explorer Blanca",
+      "imageUrl": "https://images.unsplash.com/photo-1622080721393-903b10b05a76?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHx3aGl0ZSUyMGZvcmQlMjBleHBsb3JlcnxlbnwwfHx8fDE3Njg5NTI0MDZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "white suv"
+    },
+    {
+      "id": "civic-main",
+      "description": "Honda Civic Gris",
+      "imageUrl": "https://images.unsplash.com/photo-1596482649643-5f72a68e07b8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxncmF5JTIwaG9uZGEuY2l2aWN8ZW58MHx8fHwxNzY4OTUyNDA2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "gray sedan"
+    },
+    {
+      "id": "lancer-main",
+      "description": "Mitsubishi Lancer Plateado",
+      "imageUrl": "https://images.unsplash.com/photo-1619429408236-a86f7b31b402?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxzaWx2ZXIlMjBtaXRzdWJpc2hpJTIwbGFuY2VyfGVufDB8fHx8fDE3Njg5NTI0MDZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "silver sedan"
+    },
+    {
+      "id": "wrangler-main",
+      "description": "Jeep Wrangler Amarillo",
+      "imageUrl": "https://images.unsplash.com/photo-1550348792-c2889e409b33?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxlbGxvdyUyMGplZXAlMjB3cmFuZ2xlcnxlbnwwfHx8fDE3Njg5NTI0MDZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "yellow jeep"
     }
   ]
 }
