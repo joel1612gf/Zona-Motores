@@ -26,24 +26,33 @@ export function SiteHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b bg-background">
-      <div className="container flex h-16 items-center space-x-4 sm:justify-between sm:space-x-0">
-        <div className="flex gap-6 md:gap-10">
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container flex h-16 items-center">
+        <div className="mr-4 hidden md:flex">
           <Link href="/" className="flex items-center space-x-2">
-            <Car className="h-6 w-6 text-accent" />
-            <span className="inline-block font-headline text-xl font-bold">
+            <Car className="h-6 w-6 text-primary" />
+            <span className="hidden font-headline text-xl font-bold sm:inline-block">
               Zona Motores
             </span>
           </Link>
         </div>
-        <div className="flex flex-1 items-center justify-end space-x-4">
-          <nav className="flex items-center space-x-2">
-            <Button onClick={handleNewListingClick}>
+        <nav className="flex items-center gap-6 text-sm font-medium">
+          <Link href="/listings" className="text-foreground/60 transition-colors hover:text-foreground/80">
+            Anuncios
+          </Link>
+          <Link href="#" className="text-foreground/60 transition-colors hover:text-foreground/80">
+            Financiamiento
+          </Link>
+          <Link href="#" className="text-foreground/60 transition-colors hover:text-foreground/80">
+            Seguros
+          </Link>
+        </nav>
+        <div className="flex flex-1 items-center justify-end space-x-2">
+          <Button variant="outline" onClick={handleNewListingClick}>
               <PlusCircle className="mr-2 h-4 w-4" />
-              Publicar un Vehículo
+              Publicar Vehículo
             </Button>
-            {/* <AuthButton open={loginOpen} onOpenChange={setLoginOpen} /> */}
-          </nav>
+          {/* <AuthButton open={loginOpen} onOpenChange={setLoginOpen} /> */}
         </div>
       </div>
     </header>
