@@ -19,18 +19,36 @@ export type Vehicle = {
   priceUSD: number;
   mileage: number;
   bodyType: string;
+  transmission: 'Automática' | 'Sincrónica';
+  engine: string;
   exteriorColor: string;
   interiorColor: string;
-  transmission: 'Automatic' | 'Manual';
-  engine: string;
+  doorCount?: '2' | '4';
+  is4x4?: boolean;
+  ownerCount: number;
+  tireLife: number;
+  
+  hasAC: boolean;
+  hasSoundSystem: boolean;
+  
+  hadMajorCrash: boolean;
+  isOperational: boolean;
+  operationalDetails?: string;
+
+  isSignatory: boolean;
+
+  acceptsTradeIn: boolean;
+  tradeInDetails?: string;
+  tradeInForHigherValue?: boolean;
+  tradeInForLowerValue?: boolean;
+
+  description: string;
+  images: ImageInfo[];
+  seller: Seller;
   location: {
     city: string;
     state: string;
     lat: number;
     lon: number;
   };
-  features: string[];
-  description: string;
-  images: ImageInfo[];
-  seller: Seller;
 };

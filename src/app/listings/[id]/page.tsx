@@ -17,6 +17,26 @@ export default function ListingDetailPage({ params }: { params: { id: string } }
     notFound();
   }
 
+  const mainFeatures: string[] = [];
+  if (vehicle.hasAC) mainFeatures.push('Aire Acondicionado');
+  if (vehicle.hasSoundSystem) mainFeatures.push('Sistema de Sonido');
+  if (vehicle.is4x4) mainFeatures.push('Es 4x4');
+  if (vehicle.doorCount) mainFeatures.push(`${vehicle.doorCount} puertas`);
+  if (vehicle.isOperational) mainFeatures.push('Rueda actualmente');
+  if (!vehicle.hadMajorCrash) mainFeatures.push('Sin choques fuertes');
+  if (vehicle.isSignatory) mainFeatures.push('Dueño es firmante');
+  if (vehicle.ownerCount === 1) {
+    mainFeatures.push('Único dueño');
+  } else {
+    mainFeatures.push(`${vehicle.ownerCount} dueños`);
+  }
+  if (vehicle.acceptsTradeIn) {
+    mainFeatures.push('Acepta cambios');
+    if (vehicle.tradeInForLowerValue) mainFeatures.push('Recibe menor valor');
+    if (vehicle.tradeInForHigherValue) mainFeatures.push('Da como parte de pago');
+  }
+
+
   return (
     <div className="container mx-auto max-w-6xl py-8">
       <div className="grid md:grid-cols-3 gap-8 items-start">
@@ -50,7 +70,7 @@ export default function ListingDetailPage({ params }: { params: { id: string } }
           </Carousel>
           <Card className="mt-8">
             <CardHeader>
-              <CardTitle>Descripción</CardTitle>
+              <CardTitle>Descripción del Vendedor</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground">{vehicle.description}</p>
@@ -61,7 +81,7 @@ export default function ListingDetailPage({ params }: { params: { id: string } }
               <CardTitle>Características</CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {vehicle.features.map(feature => (
+              {mainFeatures.map(feature => (
                 <div key={feature} className="flex items-center gap-2">
                   <CheckCircle className="h-5 w-5 text-accent" />
                   <span className="text-sm">{feature}</span>
@@ -86,7 +106,7 @@ export default function ListingDetailPage({ params }: { params: { id: string } }
                   <div className="font-semibold flex items-center gap-1"><Gauge className="h-4 w-4 text-muted-foreground" /> Kilometraje</div><div className="text-muted-foreground">{vehicle.mileage.toLocaleString()} km</div>
                   <div className="font-semibold flex items-center gap-1"><Palette className="h-4 w-4 text-muted-foreground" /> Color</div><div className="text-muted-foreground">{vehicle.exteriorColor}</div>
                   <div className="font-semibold flex items-center gap-1"><Settings2 className="h-4 w-4 text-muted-foreground" /> Motor</div><div className="text-muted-foreground">{vehicle.engine}</div>
-                  <div className="font-semibold flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 5h14v14H5V5z"/><path d="M12 5v14"/><path d="M19 12H5"/><path d="M12 12l5-5"/><path d="m7 12 5 5"/></svg> Transmisión</div><div className="text-muted-foreground">{vehicle.transmission === 'Automatic' ? 'Automática' : 'Manual'}</div>
+                  <div className="font-semibold flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 5h14v14H5V5z"/><path d="M12 5v14"/><path d="M19 12H5"/><path d="M12 12l5-5"/><path d="m7 12 5 5"/></svg> Transmisión</div><div className="text-muted-foreground">{vehicle.transmission}</div>
                 </div>
               </div>
             </CardContent>

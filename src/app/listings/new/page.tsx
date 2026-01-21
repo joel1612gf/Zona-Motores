@@ -49,6 +49,10 @@ export default function NewListingPage() {
 
   const [details, setDetails] = useState({
     mileage: '',
+    transmission: 'Automática',
+    exteriorColor: '',
+    interiorColor: '',
+    engine: '',
     hadMajorCrash: false,
     hasAC: true,
     isOperational: true,
@@ -272,9 +276,34 @@ export default function NewListingPage() {
         </h2>
         <Card className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                <div className="md:col-span-2 space-y-2">
+                <div className="space-y-2">
                     <Label htmlFor="mileage">Kilometraje</Label>
                     <Input id="mileage" type="number" min="0" value={details.mileage} onChange={(e) => handleDetailChange('mileage', e.target.value)} placeholder="Ej: 55000" />
+                </div>
+                 <div className="space-y-2">
+                    <Label htmlFor="engine">Motor</Label>
+                    <Input id="engine" value={details.engine} onChange={(e) => handleDetailChange('engine', e.target.value)} placeholder="Ej: 1.8L 4 Cilindros" />
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="exteriorColor">Color Exterior</Label>
+                    <Input id="exteriorColor" value={details.exteriorColor} onChange={(e) => handleDetailChange('exteriorColor', e.target.value)} placeholder="Ej: Blanco Perlado" />
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="interiorColor">Color Interior</Label>
+                    <Input id="interiorColor" value={details.interiorColor} onChange={(e) => handleDetailChange('interiorColor', e.target.value)} placeholder="Ej: Cuero Negro" />
+                </div>
+                <div className="rounded-lg border p-4">
+                    <Label className="mb-3 block">Transmisión</Label>
+                    <RadioGroup value={details.transmission} onValueChange={(v) => handleDetailChange('transmission', v)} className="flex gap-4">
+                        <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="Automática" id="t_auto" />
+                            <Label htmlFor="t_auto">Automática</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="Sincrónica" id="t_sync" />
+                            <Label htmlFor="t_sync">Sincrónica</Label>
+                        </div>
+                    </RadioGroup>
                 </div>
                 <div className="flex items-center justify-between rounded-lg border p-4">
                     <Label htmlFor="hadMajorCrash" className="pr-4">¿Tuvo un choque fuerte o fue volteado?</Label>
@@ -346,8 +375,8 @@ export default function NewListingPage() {
                     )}
                 </div>
                 <div className="space-y-2">
-                    <Label htmlFor="ownerCount">Número de dueños anteriores</Label>
-                    <Input id="ownerCount" type="number" min="0" value={details.ownerCount} onChange={(e) => handleDetailChange('ownerCount', e.target.value)} />
+                    <Label htmlFor="ownerCount">Número de dueños (incluyéndote)</Label>
+                    <Input id="ownerCount" type="number" min="1" value={details.ownerCount} onChange={(e) => handleDetailChange('ownerCount', e.target.value)} />
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="tireLife">Porcentaje de vida de los cauchos</Label>
