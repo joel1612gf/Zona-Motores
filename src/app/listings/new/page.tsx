@@ -44,6 +44,7 @@ export default function NewListingPage() {
   const [selectedYear, setSelectedYear] = useState<string>('');
 
   const [details, setDetails] = useState({
+    mileage: '',
     hadMajorCrash: false,
     hasAC: true,
     isOperational: true,
@@ -55,6 +56,10 @@ export default function NewListingPage() {
     ownerCount: '1',
     tireLife: '75',
     moreDetails: '',
+    acceptsTradeIn: false,
+    tradeInDetails: '',
+    tradeInForHigherValue: false,
+    tradeInForLowerValue: false,
   });
 
   const handleDetailChange = (field: keyof typeof details, value: any) => {
@@ -83,7 +88,7 @@ export default function NewListingPage() {
   const handlePublish = () => {
      toast({
       title: "Publicación casi lista (Demo)",
-      description: `Los detalles de tu ${selectedBrand} ${selectedModel} han sido guardados.`,
+      description: `Los detalles de tu ${selectedBrand} ${selectedModel} con ${details.mileage}km han sido guardados.`,
     });
     // For now, redirect to home page.
     router.push('/');
@@ -215,6 +220,10 @@ export default function NewListingPage() {
         </h2>
         <Card className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                <div className="md:col-span-2 space-y-2">
+                    <Label htmlFor="mileage">Kilometraje</Label>
+                    <Input id="mileage" type="number" min="0" value={details.mileage} onChange={(e) => handleDetailChange('mileage', e.target.value)} placeholder="Ej: 55000" />
+                </div>
                 <div className="flex items-center justify-between rounded-lg border p-4">
                     <Label htmlFor="hadMajorCrash" className="pr-4">¿Tuvo un choque fuerte o fue volteado?</Label>
                     <Switch id="hadMajorCrash" checked={details.hadMajorCrash} onCheckedChange={(c) => handleDetailChange('hadMajorCrash', c)} />
@@ -262,6 +271,28 @@ export default function NewListingPage() {
                     <Label htmlFor="hasSoundSystem" className="pr-4">¿Tiene sistema de sonido?</Label>
                     <Switch id="hasSoundSystem" checked={details.hasSoundSystem} onCheckedChange={(c) => handleDetailChange('hasSoundSystem', c)} />
                 </div>
+                 <div className="md:col-span-2 space-y-4 rounded-lg border p-4">
+                    <div className="flex items-center justify-between">
+                        <Label htmlFor="acceptsTradeIn" className="pr-4">¿Aceptas vehículo como parte de pago?</Label>
+                        <Switch id="acceptsTradeIn" checked={details.acceptsTradeIn} onCheckedChange={(c) => handleDetailChange('acceptsTradeIn', c)} />
+                    </div>
+                    {details.acceptsTradeIn && (
+                        <div className="space-y-4 pt-4 border-t animate-in fade-in-50 duration-300">
+                            <div className="flex items-center justify-between rounded-lg border p-4">
+                                <Label htmlFor="tradeInForLowerValue" className="pr-4">¿Recibes vehículos de menor valor?</Label>
+                                <Switch id="tradeInForLowerValue" checked={details.tradeInForLowerValue} onCheckedChange={(c) => handleDetailChange('tradeInForLowerValue', c)} />
+                            </div>
+                            <div className="flex items-center justify-between rounded-lg border p-4">
+                                <Label htmlFor="tradeInForHigherValue" className="pr-4">¿Das tu vehículo como parte de pago por uno de mayor valor?</Label>
+                                <Switch id="tradeInForHigherValue" checked={details.tradeInForHigherValue} onCheckedChange={(c) => handleDetailChange('tradeInForHigherValue', c)} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="tradeInDetails">Modelos específicos que aceptarías (opcional)</Label>
+                                <Textarea id="tradeInDetails" value={details.tradeInDetails} onChange={(e) => handleDetailChange('tradeInDetails', e.target.value)} placeholder="Ej: Toyota Corolla 2020, Ford Explorer..."/>
+                            </div>
+                        </div>
+                    )}
+                </div>
                 <div className="space-y-2">
                     <Label htmlFor="ownerCount">Número de dueños anteriores</Label>
                     <Input id="ownerCount" type="number" min="0" value={details.ownerCount} onChange={(e) => handleDetailChange('ownerCount', e.target.value)} />
@@ -289,3 +320,5 @@ export default function NewListingPage() {
     </div>
   );
 }
+
+    
