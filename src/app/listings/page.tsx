@@ -33,11 +33,30 @@ function ListingsPageContent() {
     return allVehicles.filter(vehicle => {
       const { searchTerm, make, model, minPrice, maxPrice, minYear, maxYear, bodyType, transmission } = filters;
       
-      const searchMatch = searchTerm.trim() === '' ||
-        vehicle.make.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        vehicle.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        vehicle.year.toString().includes(searchTerm.toLowerCase()) ||
-        vehicle.description.toLowerCase().includes(searchTerm.toLowerCase());
+      const searchMatch = (() => {
+        const normalizedSearch = searchTerm.trim().toLowerCase();
+        if (normalizedSearch === '') return true;
+
+        const vehicleText = [
+            vehicle.make,
+            vehicle.model,
+            vehicle.year.toString(),
+            vehicle.description,
+            vehicle.bodyType,
+            vehicle.transmission,
+            vehicle.exteriorColor,
+            vehicle.engine,
+            vehicle.is4x4 ? '4x4' : '',
+            vehicle.hasAC ? 'aire acondicionado ac' : '',
+            vehicle.hasSoundSystem ? 'sonido' : '',
+            vehicle.acceptsTradeIn ? 'acepta cambio trueque' : '',
+            vehicle.isSignatory ? 'firmante dueño directo' : ''
+        ].join(' ').toLowerCase();
+        
+        const searchWords = normalizedSearch.split(' ').filter(w => w.length > 0);
+
+        return searchWords.every(word => vehicleText.includes(word));
+      })();
       
       const makeMatch = make === 'all' || vehicle.make === make;
       
