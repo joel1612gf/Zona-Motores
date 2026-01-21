@@ -2,13 +2,14 @@
 
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 // import { useUser } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { vehicles } from '@/lib/data';
 import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Bike, Car, Truck } from 'lucide-react';
+import { Bike, Car, Truck, UploadCloud, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -17,7 +18,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 type VehicleType = 'Moto' | 'Carro' | 'Camioneta';
-type Step = 'selection' | 'details';
+type Step = 'selection' | 'details' | 'photos';
 
 const vehicleTypeOptions: {
   id: VehicleType;
@@ -42,6 +43,9 @@ export default function NewListingPage() {
   const [selectedBrand, setSelectedBrand] = useState<string>('');
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [selectedYear, setSelectedYear] = useState<string>('');
+
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [mainPhotoIndex, setMainPhotoIndex] = useState<number | null>(null);
 
   const [details, setDetails] = useState({
     mileage: '',
@@ -84,8 +88,56 @@ export default function NewListingPage() {
   const handleNextToDetails = () => {
     setStep('details');
   }
+  
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    if (photos.length + files.length > 12) {
+        toast({
+            title: "Límite de fotos alcanzado",
+            description: "Puedes subir un máximo de 12 fotos.",
+            variant: "destructive",
+        });
+        return;
+    }
+
+    const newPhotoUrls = Array.from(files).map(file => URL.createObjectURL(file));
+    const updatedPhotos = [...photos, ...newPhotoUrls];
+    setPhotos(updatedPhotos);
+
+    if (mainPhotoIndex === null && updatedPhotos.length > 0) {
+        setMainPhotoIndex(0);
+    }
+  };
+
+  const removePhoto = (index: number) => {
+      setPhotos(prev => {
+        const newPhotos = prev.filter((_, i) => i !== index);
+        // Clean up object URL to prevent memory leaks
+        URL.revokeObjectURL(prev[index]);
+        return newPhotos;
+      });
+      
+      if (mainPhotoIndex === index) {
+          // If the removed photo was the main one, select the first one as new main, or none if empty
+          setMainPhotoIndex(photos.length > 1 ? 0 : null);
+      } else if (mainPhotoIndex && mainPhotoIndex > index) {
+          // If a photo before the main one was removed, shift the index down
+          setMainPhotoIndex(mainPhotoIndex - 1);
+      }
+  };
 
   const handlePublish = () => {
+     if (photos.length < 6) {
+        toast({
+            title: "Fotos insuficientes",
+            description: "Debes subir al menos 6 fotos.",
+            variant: "destructive",
+        });
+        return;
+    }
+
      toast({
       title: "Publicación casi lista (Demo)",
       description: `Los detalles de tu ${selectedBrand} ${selectedModel} con ${details.mileage}km han sido guardados.`,
@@ -307,18 +359,77 @@ export default function NewListingPage() {
                 </div>
             </div>
             <div className="flex justify-end mt-8">
-                <Button onClick={handlePublish} size="lg">Siguiente</Button>
+                <Button onClick={() => setStep('photos')} size="lg">Siguiente</Button>
             </div>
         </Card>
     </div>
   );
 
+ const renderPhotosStep = () => (
+    <div className="animate-in fade-in-50 duration-500">
+        <Button variant="ghost" onClick={() => setStep('details')} className="mb-4 pl-0">
+            &larr; Volver a detalles
+        </Button>
+        <h2 className="text-2xl font-bold font-headline mb-2 text-center">
+            Vamos a seleccionar las mejores fotos de tu {selectedBrand} {selectedModel}
+        </h2>
+        <p className="text-center text-muted-foreground mb-6">
+            Sube entre 6 y 12 fotos. Selecciona una como la foto principal.
+        </p>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
+            {photos.map((photoUrl, index) => (
+                <div
+                    key={index}
+                    className="relative aspect-square group"
+                    onClick={() => setMainPhotoIndex(index)}
+                >
+                    <Image
+                        src={photoUrl}
+                        alt={`Foto del vehículo ${index + 1}`}
+                        fill
+                        className="object-cover rounded-md cursor-pointer"
+                    />
+                    <button
+                        onClick={(e) => { e.stopPropagation(); removePhoto(index); }}
+                        className="absolute top-1 right-1 z-10 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                        aria-label="Eliminar foto"
+                    >
+                        <X className="h-4 w-4" />
+                    </button>
+                    {mainPhotoIndex === index && (
+                        <>
+                            <div className="absolute inset-0 rounded-md ring-4 ring-primary pointer-events-none" />
+                            <div className="absolute bottom-0 w-full bg-primary text-primary-foreground text-center text-xs py-1 pointer-events-none rounded-b-md">
+                                Foto principal
+                            </div>
+                        </>
+                    )}
+                </div>
+            ))}
+            {photos.length < 12 && (
+                <Label htmlFor="photo-upload" className="aspect-square flex flex-col items-center justify-center border-2 border-dashed rounded-md cursor-pointer hover:bg-muted transition-colors">
+                    <UploadCloud className="h-10 w-10 text-muted-foreground" />
+                    <span className="mt-2 text-sm text-muted-foreground">Subir fotos</span>
+                    <input id="photo-upload" type="file" multiple accept="image/*" className="hidden" onChange={handlePhotoSelect} />
+                </Label>
+            )}
+        </div>
+        
+        <div className="flex justify-end mt-8">
+            <Button onClick={handlePublish} size="lg" disabled={photos.length < 6}>
+                Publicar Anuncio ({photos.length < 6 ? `${photos.length}/6` : `${photos.length}/12`})
+            </Button>
+        </div>
+    </div>
+  );
+
+
   return (
-    <div className="container max-w-4xl mx-auto py-12">
+    <div className="container max-w-5xl mx-auto py-12">
         {step === 'selection' && renderSelectionStep()}
         {step === 'details' && renderDetailsStep()}
+        {step === 'photos' && renderPhotosStep()}
     </div>
   );
 }
-
-    
