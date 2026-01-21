@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { MapPin, X } from "lucide-react";
+import { MapPin, X, Search } from "lucide-react";
 import { vehicles } from '@/lib/data';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
 
@@ -31,7 +31,7 @@ type FiltersProps = {
 
 const uniqueMakes = ['all', ...Array.from(new Set(vehicles.map(v => v.make)))];
 const uniqueBodyTypes = ['all', ...Array.from(new Set(vehicles.map(v => v.bodyType)))];
-const transmissionTypes = ['all', 'Automatic', 'Manual'];
+const transmissionTypes = ['all', 'Automática', 'Sincrónica'];
 
 export function Filters({ filters, onFilterChange, initialSearchTerm }: FiltersProps) {
   const [models, setModels] = useState<string[]>([]);
@@ -59,8 +59,8 @@ export function Filters({ filters, onFilterChange, initialSearchTerm }: FiltersP
   };
 
   const resetFilters = () => {
-    onFilterChange(prev => ({
-      ...prev,
+    onFilterChange({
+      searchTerm: '',
       make: 'all',
       model: 'all',
       minPrice: '',
@@ -70,7 +70,7 @@ export function Filters({ filters, onFilterChange, initialSearchTerm }: FiltersP
       bodyType: 'all',
       transmission: 'all',
       location: null,
-    }));
+    });
   };
 
   const handleLocationSearch = () => {
@@ -100,6 +100,18 @@ export function Filters({ filters, onFilterChange, initialSearchTerm }: FiltersP
           </Button>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="search-input">Búsqueda</Label>
+            <div className="relative">
+                <Input
+                    id="search-input"
+                    placeholder="Busca por marca, modelo..."
+                    value={filters.searchTerm}
+                    onChange={(e) => handleInputChange('searchTerm', e.target.value)}
+                />
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            </div>
+          </div>
           <Accordion type="multiple" defaultValue={['make', 'price', 'year']} className="w-full">
             <AccordionItem value="make">
               <AccordionTrigger className="py-2 text-base">Marca y Modelo</AccordionTrigger>
@@ -229,7 +241,7 @@ export function Filters({ filters, onFilterChange, initialSearchTerm }: FiltersP
                     <SelectContent>
                       {transmissionTypes.map(type => (
                         <SelectItem key={type} value={type}>
-                          {type === 'all' ? 'Cualquiera' : (type === 'Automatic' ? 'Automática' : 'Manual')}
+                          {type === 'all' ? 'Cualquiera' : type}
                         </SelectItem>
                       ))}
                     </SelectContent>
