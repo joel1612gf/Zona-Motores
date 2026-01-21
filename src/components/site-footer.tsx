@@ -5,7 +5,7 @@ export function SiteFooter() {
   return (
     <footer className="border-t bg-card">
       <div className="container py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="space-y-4">
               <Link href="/" className="flex items-center space-x-2">
                 <Car className="h-6 w-6 text-primary" />
@@ -34,12 +34,6 @@ export function SiteFooter() {
               <li><Link href="#" className="text-sm text-muted-foreground hover:text-primary">Términos de Servicio</Link></li>
               <li><Link href="#" className="text-sm text-muted-foreground hover:text-primary">Política de Privacidad</Link></li>
             </ul>
-          </div>
-           <div className="space-y-2">
-            <h4 className="font-semibold">Creado con</h4>
-             <p className="text-sm text-muted-foreground">
-                Construido por tu amigable vecino IA.
-             </p>
           </div>
         </div>
         <div className="mt-8 pt-8 border-t text-center text-sm text-muted-foreground">
