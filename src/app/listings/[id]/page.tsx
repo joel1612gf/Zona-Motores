@@ -1,8 +1,10 @@
 'use client';
+import { useState } from 'react';
 import { notFound, useParams } from 'next/navigation';
 import Image from 'next/image';
 import { useVehicles } from '@/context/vehicle-context';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,9 +35,17 @@ export default function ListingDetailPage() {
   const { vehicles } = useVehicles();
   const vehicle = vehicles.find(v => v.id === params.id);
 
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [lightboxStartIndex, setLightboxStartIndex] = useState(0);
+
   if (!vehicle) {
     notFound();
   }
+
+  const handleImageClick = (index: number) => {
+    setLightboxStartIndex(index);
+    setIsLightboxOpen(true);
+  };
 
   const mainFeatures: { icon: React.FC<React.SVGProps<SVGSVGElement>>; label: string }[] = [];
 
@@ -81,7 +91,7 @@ export default function ListingDetailPage() {
           <Carousel className="w-full">
             <CarouselContent>
               {vehicle.images.map((image, index) => (
-                <CarouselItem key={index}>
+                <CarouselItem key={index} onClick={() => handleImageClick(index)} className="cursor-pointer">
                   <Card className="overflow-hidden">
                     <CardContent className="flex aspect-video items-center justify-center p-0">
                       <Image
@@ -118,6 +128,10 @@ export default function ListingDetailPage() {
               <CardTitle>Características</CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-2 sm:grid-cols-3 gap-6">
+              <div className="flex items-center gap-3">
+                  <FileText className="h-6 w-6 text-accent flex-shrink-0" />
+                  <span className="text-sm">{`Título ${vehicle.ownerCount}-1`}</span>
+              </div>
               {mainFeatures.map(({icon: Icon, label}) => (
                 <div key={label} className="flex items-center gap-3">
                   <Icon className="h-6 w-6 text-accent flex-shrink-0" />
@@ -143,7 +157,6 @@ export default function ListingDetailPage() {
                   <div className="font-semibold flex items-center gap-1"><Gauge className="h-4 w-4 text-muted-foreground" /> Kilometraje</div><div className="text-muted-foreground">{vehicle.mileage.toLocaleString()} km</div>
                   <div className="font-semibold flex items-center gap-1"><Palette className="h-4 w-4 text-muted-foreground" /> Color</div><div className="text-muted-foreground">{vehicle.exteriorColor}</div>
                   <div className="font-semibold flex items-center gap-1"><Settings2 className="h-4 w-4 text-muted-foreground" /> Motor</div><div className="text-muted-foreground">{vehicle.engine}</div>
-                  <div className="font-semibold flex items-center gap-1"><FileText className="h-4 w-4 text-muted-foreground" /> Título</div><div className="text-muted-foreground">{vehicle.ownerCount}-1</div>
                   <div className="font-semibold flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 5h14v14H5V5z"/><path d="M12 5v14"/><path d="M19 12H5"/><path d="M12 12l5-5"/><path d="m7 12 5 5"/></svg> Transmisión</div><div className="text-muted-foreground">{vehicle.transmission}</div>
                 </div>
               </div>
@@ -174,6 +187,41 @@ export default function ListingDetailPage() {
           </Card>
         </div>
       </div>
+
+      <Dialog open={isLightboxOpen} onOpenChange={setIsLightboxOpen}>
+        <DialogContent className="max-w-screen-xl w-full h-[90vh] bg-black/80 backdrop-blur-sm border-none shadow-none p-2 flex items-center justify-center">
+          <Carousel 
+            className="w-full h-full"
+            opts={{
+              startIndex: lightboxStartIndex,
+              loop: vehicle.images.length > 1,
+            }}
+          >
+            <CarouselContent className="h-full">
+              {vehicle.images.map((image, index) => (
+                <CarouselItem key={index} className="flex items-center justify-center">
+                  <div className="relative w-full h-full max-w-6xl">
+                    <Image
+                      src={image.url}
+                      alt={image.alt}
+                      fill
+                      className="object-contain"
+                      data-ai-hint={image.hint}
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    />
+                  </div>
+                </CarouselItem>
+              ))}
+            </CarouselContent>
+            {vehicle.images.length > 1 && (
+              <>
+                <CarouselPrevious className="absolute left-4 top-1/2 -translate-y-1/2 text-white bg-black/50 hover:bg-black/80 hover:text-white" />
+                <CarouselNext className="absolute right-4 top-1/2 -translate-y-1/2 text-white bg-black/50 hover:bg-black/80 hover:text-white" />
+              </>
+            )}
+          </Carousel>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
