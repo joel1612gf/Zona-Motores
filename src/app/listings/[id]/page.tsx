@@ -190,12 +190,12 @@ export default function ListingDetailPage() {
       </div>
 
       <Dialog open={isLightboxOpen} onOpenChange={setIsLightboxOpen}>
-        <DialogContent className="max-w-screen-xl w-full h-[90vh] p-2">
+        <DialogContent className="max-w-screen-xl w-full h-[90vh] p-0 border-none bg-background/95">
           <DialogTitle className="sr-only">Galería de Imágenes del Vehículo</DialogTitle>
           <DialogDescription className="sr-only">
             Visor de imágenes para {`${vehicle.year} ${vehicle.make} ${vehicle.model}`}. Usa las flechas para navegar entre las fotos.
           </DialogDescription>
-          <Carousel 
+          <Carousel
             className="w-full h-full"
             opts={{
               startIndex: lightboxStartIndex,
@@ -204,24 +204,24 @@ export default function ListingDetailPage() {
           >
             <CarouselContent className="h-full">
               {vehicle.images.map((image, index) => (
-                <CarouselItem key={index} className="flex items-center justify-center">
-                  <div className="relative w-full h-full max-w-6xl">
-                    <Image
-                      src={image.url}
-                      alt={image.alt}
-                      fill
-                      className="object-contain"
-                      data-ai-hint={image.hint}
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                    />
+                <CarouselItem key={index} className="h-full">
+                  <div className="relative w-full h-full flex items-center justify-center p-4">
+                      <Image
+                        src={image.url}
+                        alt={image.alt}
+                        fill
+                        className="object-contain"
+                        data-ai-hint={image.hint}
+                        sizes="(max-width: 1280px) 90vw, 80vw"
+                      />
                   </div>
                 </CarouselItem>
               ))}
             </CarouselContent>
             {vehicle.images.length > 1 && (
               <>
-                <CarouselPrevious className="absolute left-4 top-1/2 -translate-y-1/2 text-white bg-black/50 hover:bg-black/80 hover:text-white" />
-                <CarouselNext className="absolute right-4 top-1/2 -translate-y-1/2 text-white bg-black/50 hover:bg-black/80 hover:text-white" />
+                <CarouselPrevious className="absolute left-4 top-1/2 -translate-y-1/2 text-white bg-black/50 hover:bg-black/80 hover:text-white z-20" />
+                <CarouselNext className="absolute right-4 top-1/2 -translate-y-1/2 text-white bg-black/50 hover:bg-black/80 hover:text-white z-20" />
               </>
             )}
           </Carousel>
