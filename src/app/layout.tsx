@@ -7,7 +7,7 @@ import { SiteFooter } from '@/components/site-footer';
 import { FirebaseClientProvider } from '@/firebase';
 
 export const metadata: Metadata = {
-  title: 'Motores Zone',
+  title: 'Zona Motores',
   description: 'Encuentra tu próximo vehículo en Venezuela',
 };
 

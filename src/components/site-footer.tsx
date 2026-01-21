@@ -6,7 +6,7 @@ export function SiteFooter() {
           Construido por tu amigable vecino IA.
         </p>
         <p className="text-center text-sm leading-loose text-muted-foreground md:text-left">
-          © {new Date().getFullYear()} Motores Zone. Todos los Derechos Reservados.
+          © {new Date().getFullYear()} Zona Motores. Todos los Derechos Reservados.
         </p>
       </div>
     </footer>

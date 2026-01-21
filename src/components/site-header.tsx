@@ -28,7 +28,7 @@ export function SiteHeader() {
           <Link href="/" className="flex items-center space-x-2">
             <Car className="h-6 w-6 text-accent" />
             <span className="inline-block font-headline text-xl font-bold">
-              Motores Zone
+              Zona Motores
             </span>
           </Link>
         </div>

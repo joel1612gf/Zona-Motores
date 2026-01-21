@@ -125,7 +125,7 @@ export function AuthButton({ open, onOpenChange }: AuthButtonProps) {
               Iniciar Sesión
             </DialogTitle>
             <DialogDescription>
-              Para continuar, inicia sesión en tu cuenta de Motores Zone.
+              Para continuar, inicia sesión en tu cuenta de Zona Motores.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
