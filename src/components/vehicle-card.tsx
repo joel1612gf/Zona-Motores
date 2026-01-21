@@ -28,9 +28,6 @@ export function VehicleCard({ vehicle, isFeatured = false }: { vehicle: Vehicle;
            <div className="absolute top-0 left-0 right-0 p-3 flex justify-between items-start">
               <div className="flex flex-col gap-2">
                 {isFeatured && <Badge>Destacado</Badge>}
-                <Badge variant="secondary" className="border-transparent bg-background/80 text-foreground hover:bg-background/90">
-                  {vehicle.bodyType}
-                </Badge>
               </div>
               <Badge className="flex items-center gap-1">
                 <Gauge className="h-3 w-3" />
