@@ -7,7 +7,24 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { CheckCircle, Gauge, MapPin, Phone, ShieldCheck, User, Settings2, Palette } from 'lucide-react';
+import { 
+  Gauge, 
+  MapPin, 
+  Phone, 
+  ShieldCheck, 
+  User, 
+  Settings2, 
+  Palette,
+  Snowflake,
+  Speaker,
+  DoorOpen,
+  CircleCheck,
+  FileText,
+  PenSquare,
+  GitCompareArrows,
+  ArrowDownToLine,
+  ArrowUpFromLine
+} from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
 export default function ListingDetailPage({ params }: { params: { id: string } }) {
@@ -17,19 +34,40 @@ export default function ListingDetailPage({ params }: { params: { id: string } }
     notFound();
   }
 
-  const mainFeatures: string[] = [];
-  if (vehicle.hasAC) mainFeatures.push('Aire Acondicionado');
-  if (vehicle.hasSoundSystem) mainFeatures.push('Sistema de Sonido');
-  if (vehicle.is4x4) mainFeatures.push('Es 4x4');
-  if (vehicle.doorCount) mainFeatures.push(`${vehicle.doorCount} puertas`);
-  if (vehicle.isOperational) mainFeatures.push('Rueda actualmente');
-  if (!vehicle.hadMajorCrash) mainFeatures.push('Sin choques fuertes');
-  if (vehicle.isSignatory) mainFeatures.push('Dueño es firmante');
-  if (vehicle.ownerCount) mainFeatures.push(`Título ${vehicle.ownerCount}-1`);
+  const mainFeatures: { icon: React.FC<React.SVGProps<SVGSVGElement>>; label: string }[] = [];
+
+  if (vehicle.hasAC) mainFeatures.push({ icon: Snowflake, label: 'Aire Acondicionado' });
+  if (vehicle.hasSoundSystem) mainFeatures.push({ icon: Speaker, label: 'Sistema de Sonido' });
+  if (vehicle.is4x4) {
+    const FourByFourIcon = (props: React.SVGProps<SVGSVGElement>) => (
+      <svg
+        {...props}
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M10 12h4" />
+        <path d="M12 10v4" />
+        <path d="M16 12h1.5a1.5 1.5 0 0 0 0-3H16v3Z" />
+        <path d="M7 9v6" />
+        <path d="m4 12 3-3v6l-3-3" />
+      </svg>
+    );
+    mainFeatures.push({ icon: FourByFourIcon, label: 'Es 4x4' });
+  }
+  if (vehicle.doorCount) mainFeatures.push({ icon: DoorOpen, label: `${vehicle.doorCount} puertas` });
+  if (vehicle.isOperational) mainFeatures.push({ icon: CircleCheck, label: 'Rueda actualmente' });
+  if (!vehicle.hadMajorCrash) mainFeatures.push({ icon: ShieldCheck, label: 'Sin choques fuertes' });
+  if (vehicle.isSignatory) mainFeatures.push({ icon: PenSquare, label: 'Dueño es firmante' });
+  if (vehicle.ownerCount) mainFeatures.push({ icon: FileText, label: `Título ${vehicle.ownerCount}-1` });
   if (vehicle.acceptsTradeIn) {
-    mainFeatures.push('Acepta cambios');
-    if (vehicle.tradeInForLowerValue) mainFeatures.push('Recibe menor valor');
-    if (vehicle.tradeInForHigherValue) mainFeatures.push('Da como parte de pago');
+    mainFeatures.push({ icon: GitCompareArrows, label: 'Acepta cambios' });
+    if (vehicle.tradeInForLowerValue) mainFeatures.push({ icon: ArrowDownToLine, label: 'Recibe menor valor' });
+    if (vehicle.tradeInForHigherValue) mainFeatures.push({ icon: ArrowUpFromLine, label: 'Da como parte de pago' });
   }
 
 
@@ -76,11 +114,11 @@ export default function ListingDetailPage({ params }: { params: { id: string } }
             <CardHeader>
               <CardTitle>Características</CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {mainFeatures.map(feature => (
-                <div key={feature} className="flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5 text-accent" />
-                  <span className="text-sm">{feature}</span>
+            <CardContent className="grid grid-cols-2 sm:grid-cols-3 gap-6">
+              {mainFeatures.map(({icon: Icon, label}) => (
+                <div key={label} className="flex items-center gap-3">
+                  <Icon className="h-6 w-6 text-accent flex-shrink-0" />
+                  <span className="text-sm">{label}</span>
                 </div>
               ))}
             </CardContent>
