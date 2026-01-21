@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect } from 'react';
-// @ts-ignore
 import { errorEmitter } from '@/firebase/error-emitter';
 
 export function FirebaseErrorListener() {
