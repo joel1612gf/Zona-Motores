@@ -1,27 +1,26 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 // import { useUser } from '@/firebase';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { vehicles } from '@/lib/data';
 import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
+import { Motorcycle, Car, Truck } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 type VehicleType = 'Moto' | 'Carro' | 'Camioneta';
 
 const vehicleTypeOptions: {
   id: VehicleType;
   name: string;
-  imageId: string;
+  icon: React.ComponentType<{ className?: string }>;
 }[] = [
-  { id: 'Moto', name: 'Moto', imageId: 'motorcycle-new' },
-  { id: 'Carro', name: 'Carro', imageId: 'car-new' },
-  { id: 'Camioneta', name: 'Camioneta', imageId: 'truck-new' },
+  { id: 'Moto', name: 'Moto', icon: Motorcycle },
+  { id: 'Carro', name: 'Carro', icon: Car },
+  { id: 'Camioneta', name: 'Camioneta', icon: Truck },
 ];
 
 const allMakes = [...new Set(vehicles.map((v) => v.make))].map((make) => ({ label: make, value: make }));
@@ -52,41 +51,41 @@ export default function NewListingPage() {
     router.push('/');
   }
 
+  const handleTypeSelect = (type: VehicleType) => {
+    setSelectedType(type);
+    setSelectedBrand('');
+    setSelectedModel('');
+  };
+
   return (
     <div className="container max-w-4xl mx-auto py-12">
       <div className="text-center mb-12">
         <h1 className="font-headline text-3xl font-bold">{getWelcomeMessage()}</h1>
       </div>
 
-      {!selectedType ? (
-        <div className="grid md:grid-cols-3 gap-8">
-          {vehicleTypeOptions.map((type) => {
-            const image = PlaceHolderImages.find((p) => p.id === type.imageId);
-            return (
-              <Card
-                key={type.id}
-                className="overflow-hidden cursor-pointer transition-all hover:shadow-lg hover:ring-2 hover:ring-ring"
-                onClick={() => setSelectedType(type.id)}
-                tabIndex={0}
-                onKeyDown={(e) => e.key === 'Enter' && setSelectedType(type.id)}
-              >
-                <CardContent className="p-0 flex items-center">
-                  {image && (
-                    <Image
-                      src={image.imageUrl}
-                      alt={image.description}
-                      width={100}
-                      height={100}
-                      className="object-cover h-24 w-24"
-                    />
-                  )}
-                  <span className="font-headline text-xl font-semibold p-4">{type.name}</span>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      ) : (
+      <div className="flex justify-center gap-4 mb-12">
+        {vehicleTypeOptions.map((type) => {
+          const Icon = type.icon;
+          return (
+            <Button
+              key={type.id}
+              variant="outline"
+              className={cn(
+                "h-28 w-40 flex flex-col gap-2 justify-center text-lg font-semibold",
+                selectedType === type.id
+                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                  : "bg-muted text-muted-foreground hover:bg-muted/90"
+              )}
+              onClick={() => handleTypeSelect(type.id)}
+            >
+              <Icon className="h-10 w-10" />
+              <span>{type.name}</span>
+            </Button>
+          );
+        })}
+      </div>
+
+      {selectedType && (
         <div className="flex flex-col items-center space-y-8 animate-in fade-in-50 duration-500">
             <div className='flex items-end gap-4'>
                 {selectedBrand && (
@@ -96,7 +95,7 @@ export default function NewListingPage() {
                     </div>
                 )}
                 <div>
-                    <h2 className="text-xl font-semibold mb-2">
+                    <h2 className="text-xl font-semibold mb-2 text-center">
                         {!selectedBrand 
                             ? `¿Qué marca es tu ${selectedType.toLowerCase()}?`
                             : `¿Qué modelo es tu ${selectedBrand}?`
