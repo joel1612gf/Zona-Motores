@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect, Suspense } from 'react';
+import { useState, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { vehicles as allVehicles } from '@/lib/data';
 import { VehicleCard } from '@/components/vehicle-card';
@@ -16,29 +16,47 @@ function ListingsPageContent() {
   const [filters, setFilters] = useState<FilterState>({
     searchTerm: initialSearchTerm,
     make: 'all',
-    minPrice: 0,
-    maxPrice: 100000,
+    model: 'all',
+    minPrice: '',
+    maxPrice: '',
+    minYear: '',
+    maxYear: '',
+    bodyType: 'all',
+    transmission: 'all',
     location: null,
   });
   const [layout, setLayout] = useState<'grid' | 'list'>('grid');
   
   const filteredVehicles = useMemo(() => {
     return allVehicles.filter(vehicle => {
-      const { searchTerm, make, minPrice, maxPrice } = filters;
+      const { searchTerm, make, model, minPrice, maxPrice, minYear, maxYear, bodyType, transmission } = filters;
       
       const searchMatch = searchTerm.trim() === '' ||
         vehicle.make.toLowerCase().includes(searchTerm.toLowerCase()) ||
         vehicle.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        vehicle.year.toString().includes(searchTerm.toLowerCase()) ||
         vehicle.description.toLowerCase().includes(searchTerm.toLowerCase());
       
       const makeMatch = make === 'all' || vehicle.make === make;
       
-      const priceMatch = vehicle.priceUSD >= minPrice && (maxPrice >= 100000 ? true : vehicle.priceUSD <= maxPrice);
+      const modelMatch = model === 'all' || vehicle.model === model;
+
+      const minPriceNum = minPrice ? parseInt(minPrice, 10) : 0;
+      const maxPriceNum = maxPrice ? parseInt(maxPrice, 10) : Infinity;
+      const priceMatch = vehicle.priceUSD >= minPriceNum && vehicle.priceUSD <= maxPriceNum;
+      
+      const minYearNum = minYear ? parseInt(minYear, 10) : 0;
+      const maxYearNum = maxYear ? parseInt(maxYear, 10) : Infinity;
+      const yearMatch = vehicle.year >= minYearNum && vehicle.year <= maxYearNum;
+
+      const bodyTypeMatch = bodyType === 'all' || vehicle.bodyType === bodyType;
+
+      const transmissionMatch = transmission === 'all' || vehicle.transmission === transmission;
 
       // A real implementation would use the location filter to sort or filter by distance.
       // This is a placeholder for that functionality.
 
-      return searchMatch && makeMatch && priceMatch;
+      return searchMatch && makeMatch && modelMatch && priceMatch && yearMatch && bodyTypeMatch && transmissionMatch;
     });
   }, [filters]);
 
