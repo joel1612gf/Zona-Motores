@@ -7,6 +7,24 @@
       "imageHint": "modern car"
     },
     {
+      "id": "motorcycle-new",
+      "description": "Una motocicleta moderna en una carretera",
+      "imageUrl": "https://images.unsplash.com/photo-1558981403-c5f9899a28bc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3wzNzEyODF8MHwxfHNlYXJjaHwyfHxtb3RvcmN5Y2xlfGVufDB8fHx8MTY5OTU2MDk4N3ww&ixlib=rb-4.0.3&q=80&w=1080",
+      "imageHint": "motorcycle road"
+    },
+    {
+      "id": "car-new",
+      "description": "Un carro deportivo rojo",
+      "imageUrl": "https://images.unsplash.com/photo-1511919884226-fd3cad34687c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3wzNzEyODF8MHwxfHNlYXJjaHw0fHxjYXJ8ZW58MHx8fHwxNzAwNjA3MjY4fDA&ixlib=rb-4.0.3&q=80&w=1080",
+      "imageHint": "red car"
+    },
+    {
+      "id": "truck-new",
+      "description": "Una camioneta en un camino de tierra",
+      "imageUrl": "https://images.unsplash.com/photo-1543462879-a1723469c07a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3wzNzEyODF8MHwxfHNlYXJjaHwxfHx0cnVja3xlbnwwfHx8fDE3MDA2MDczMDR8MA&ixlib=rb-4.0.3&q=80&w=1080",
+      "imageHint": "truck dirt"
+    },
+    {
       "id": "corolla-main",
       "description": "Toyota Corolla Blanco",
       "imageUrl": "https://images.unsplash.com/photo-1620882788693-cd891b20837d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHx3aGl0ZSUyMGNhcnxlbnwwfHx8fDE3Njg4OTY3NjZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
