@@ -8,7 +8,7 @@ import { vehicles } from '@/lib/data';
 import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Motorcycle, Car, Truck } from 'lucide-react';
+import { Bike, Car, Truck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type VehicleType = 'Moto' | 'Carro' | 'Camioneta';
@@ -18,7 +18,7 @@ const vehicleTypeOptions: {
   name: string;
   icon: React.ComponentType<{ className?: string }>;
 }[] = [
-  { id: 'Moto', name: 'Moto', icon: Motorcycle },
+  { id: 'Moto', name: 'Moto', icon: Bike },
   { id: 'Carro', name: 'Carro', icon: Car },
   { id: 'Camioneta', name: 'Camioneta', icon: Truck },
 ];
