@@ -176,7 +176,7 @@ export default function NewListingPage() {
         newImages.push({url: 'https://picsum.photos/seed/default/800/600', alt: 'placeholder', hint: 'car'});
     }
 
-     const newVehicleData = {
+    const newVehicleData = {
         make: selectedBrand,
         model: selectedModel,
         year: parseInt(selectedYear, 10),
@@ -186,20 +186,14 @@ export default function NewListingPage() {
         transmission: details.transmission as 'Automática' | 'Sincrónica',
         engine: details.engine,
         exteriorColor: details.exteriorColor,
-        doorCount: selectedType === 'Carro' ? details.doorCount as '2' | '4' : undefined,
-        is4x4: selectedType === 'Camioneta' ? details.is4x4 : undefined,
         ownerCount: parseInt(details.ownerCount, 10),
         tireLife: parseInt(details.tireLife, 10),
         hasAC: details.hasAC,
         hasSoundSystem: details.hasSoundSystem,
         hadMajorCrash: details.hadMajorCrash,
         isOperational: details.isOperational,
-        operationalDetails: !details.isOperational ? details.operationalDetails : undefined,
         isSignatory: details.isSignatory,
         acceptsTradeIn: details.acceptsTradeIn,
-        tradeInDetails: details.acceptsTradeIn ? details.tradeInDetails : undefined,
-        tradeInForHigherValue: details.acceptsTradeIn ? details.tradeInForHigherValue : undefined,
-        tradeInForLowerValue: details.acceptsTradeIn ? details.tradeInForLowerValue : undefined,
         description: details.moreDetails,
         images: newImages,
         sellerId: user.uid,
@@ -211,6 +205,15 @@ export default function NewListingPage() {
         },
         location: { city: 'Caracas', state: 'Distrito Capital', lat: 10.4806, lon: -66.9036 },
         createdAt: serverTimestamp(),
+        // Conditionally add fields to avoid 'undefined' values in Firestore
+        ...(selectedType === 'Carro' && { doorCount: details.doorCount as '2' | '4' }),
+        ...(selectedType === 'Camioneta' && { is4x4: details.is4x4 }),
+        ...(!details.isOperational && { operationalDetails: details.operationalDetails }),
+        ...(details.acceptsTradeIn && {
+            tradeInDetails: details.tradeInDetails,
+            tradeInForHigherValue: details.tradeInForHigherValue,
+            tradeInForLowerValue: details.tradeInForLowerValue,
+        }),
     };
 
     try {
