@@ -47,7 +47,11 @@
         },
         "sellerId": {
           "type": "string",
-          "description": "Reference to the UserProfile. (Relationship: UserProfile 1:N VehicleListing)"
+          "description": "The UID of the user who is selling the vehicle."
+        },
+        "seller": {
+          "$ref": "#/entities/UserProfile",
+          "description": "Denormalized seller information for display purposes."
         },
         "make": {
           "type": "string",
@@ -83,18 +87,25 @@
         "summary": {
           "type": "string",
           "description": "AI-generated summary of the vehicle listing."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp when the listing was created."
         }
       },
       "required": [
         "id",
         "sellerId",
+        "seller",
         "make",
         "model",
         "year",
         "priceUSD",
         "location",
         "description",
-        "imageUrls"
+        "imageUrls",
+        "createdAt"
       ]
     },
     "ExchangeRate": {

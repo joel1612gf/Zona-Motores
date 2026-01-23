@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, Suspense } from 'react';
+import { useState, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useVehicles } from '@/context/vehicle-context';
 import { VehicleCard } from '@/components/vehicle-card';
@@ -12,7 +12,7 @@ import { formatCurrency } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 
 function ListingsPageContent() {
-  const { vehicles: allVehicles } = useVehicles();
+  const { vehicles: allVehicles, isLoading } = useVehicles();
   const searchParams = useSearchParams();
   const initialSearchTerm = searchParams.get('search') || '';
 
@@ -89,6 +89,10 @@ function ListingsPageContent() {
     const totalPrice = filteredVehicles.reduce((sum, vehicle) => sum + vehicle.priceUSD, 0);
     return totalPrice / filteredVehicles.length;
   }, [filteredVehicles]);
+
+  if (isLoading) {
+    return <LoadingSkeleton />;
+  }
 
   return (
     <div className="container mx-auto py-8">
@@ -172,7 +176,7 @@ function LoadingSkeleton() {
             </div>
           </div>
            <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-6">
-             {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-72 w-full" />)}
+             {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-[380px] w-full" />)}
            </div>
         </div>
       </div>
@@ -182,8 +186,7 @@ function LoadingSkeleton() {
 
 export default function ListingsPage() {
   return (
-    <Suspense fallback={<LoadingSkeleton />}>
-      <ListingsPageContent />
-    </Suspense>
+    // Suspense is no longer needed as we handle loading state inside
+    <ListingsPageContent />
   )
 }

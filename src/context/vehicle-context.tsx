@@ -1,26 +1,38 @@
 'use client';
 
-import { createContext, useContext, useState, ReactNode, useCallback } from 'react';
+import { createContext, useContext, ReactNode, useMemo } from 'react';
 import { Vehicle } from '@/lib/types';
-import { vehicles as initialVehicles } from '@/lib/data';
+import { useCollection } from '@/firebase/firestore/use-collection';
+import { collection, query, orderBy } from 'firebase/firestore';
+import { useFirestore, useMemoFirebase } from '@/firebase';
 
 type VehicleContextType = {
   vehicles: Vehicle[];
-  addVehicle: (vehicle: Vehicle) => void;
+  isLoading: boolean;
 };
 
 const VehicleContext = createContext<VehicleContextType | undefined>(undefined);
 
 export function VehicleProvider({ children }: { children: ReactNode }) {
-  const [vehicles, setVehicles] = useState<Vehicle[]>(initialVehicles);
+  const firestore = useFirestore();
 
-  const addVehicle = useCallback((vehicle: Vehicle) => {
-    // Add to the beginning of the list to see it first
-    setVehicles(prevVehicles => [vehicle, ...prevVehicles]);
-  }, []);
+  const vehiclesQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'vehicle_listings'), orderBy('createdAt', 'desc'));
+  }, [firestore]);
+
+  const { data, isLoading, error } = useCollection<Vehicle>(vehiclesQuery);
+  
+  if (error) {
+      console.error("Error fetching vehicles:", error);
+  }
+
+  const vehicles = useMemo(() => (data || []).map(v => ({...v, id: v.id})), [data]);
+
+  const value = useMemo(() => ({ vehicles, isLoading }), [vehicles, isLoading]);
 
   return (
-    <VehicleContext.Provider value={{ vehicles, addVehicle }}>
+    <VehicleContext.Provider value={value}>
       {children}
     </VehicleContext.Provider>
   );

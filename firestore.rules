@@ -111,7 +111,10 @@ service cloud.firestore {
      */
     match /vehicle_listings/{vehicleListingId} {
       allow get, list: if true;
-      allow create: if isSignedIn() && request.resource.data.sellerId == request.auth.uid;
+      allow create: if isSignedIn() 
+                    && request.resource.data.sellerId == request.auth.uid
+                    && request.resource.data.seller.uid == request.auth.uid
+                    && request.resource.data.createdAt == request.time;
       allow update: if resource != null && isOwner(resource.data.sellerId) && request.resource.data.sellerId == resource.data.sellerId;
       allow delete: if resource != null && isOwner(resource.data.sellerId);
     }

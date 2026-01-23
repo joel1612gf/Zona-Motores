@@ -12,9 +12,10 @@ import { VehicleCard } from '@/components/vehicle-card';
 import { PlusCircle, Search } from 'lucide-react';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function Home() {
-  const { vehicles } = useVehicles();
+  const { vehicles, isLoading } = useVehicles();
   const featuredVehicles = initialVehicles.slice(0, 5);
   const latestVehicles = vehicles.slice(0, 8);
   const heroImage = PlaceHolderImages.find((p) => p.id === 'hero-car');
@@ -124,13 +125,22 @@ export default function Home() {
               className="w-full"
             >
               <CarouselContent className="-ml-2 md:-ml-4">
-                {latestVehicles.map((vehicle) => (
-                  <CarouselItem key={vehicle.id} className="pl-2 md:pl-4 basis-full sm:basis-1/2 lg:basis-1/3 xl:basis-1/4">
-                    <div className="p-1 h-full">
-                      <VehicleCard vehicle={vehicle} />
-                    </div>
-                  </CarouselItem>
-                ))}
+                {isLoading 
+                  ? [...Array(4)].map((_, i) => (
+                      <CarouselItem key={i} className="pl-2 md:pl-4 basis-full sm:basis-1/2 lg:basis-1/3 xl:basis-1/4">
+                        <div className="p-1 h-full">
+                          <Skeleton className="h-[380px] w-full" />
+                        </div>
+                      </CarouselItem>
+                    ))
+                  : latestVehicles.map((vehicle) => (
+                      <CarouselItem key={vehicle.id} className="pl-2 md:pl-4 basis-full sm:basis-1/2 lg:basis-1/3 xl:basis-1/4">
+                        <div className="p-1 h-full">
+                          <VehicleCard vehicle={vehicle} />
+                        </div>
+                      </CarouselItem>
+                    ))
+                }
               </CarouselContent>
               <CarouselPrevious className="hidden sm:flex left-4 bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-primary/50" />
               <CarouselNext className="hidden sm:flex right-4 bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-primary/50" />

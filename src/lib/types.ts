@@ -1,3 +1,5 @@
+import type { Timestamp } from 'firebase/firestore';
+
 export type UserProfile = {
   uid: string;
   displayName: string;
@@ -13,6 +15,7 @@ export type ImageInfo = {
 
 export type Vehicle = {
   id: string;
+  sellerId: string;
   make: string;
   model: string;
   year: number;
@@ -50,4 +53,5 @@ export type Vehicle = {
     lat: number;
     lon: number;
   };
+  createdAt: Timestamp;
 };

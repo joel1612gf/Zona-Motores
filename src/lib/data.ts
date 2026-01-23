@@ -1,5 +1,6 @@
 import type { Vehicle, UserProfile, ImageInfo } from './types';
 import { PlaceHolderImages } from './placeholder-images';
+import { Timestamp } from 'firebase/firestore';
 
 const userProfiles: Record<string, UserProfile> = {
   user1: { uid: 'user1', displayName: 'Juan Perez', isVerified: true, phone: '+584141234567' },
@@ -16,6 +17,7 @@ const getImage = (id: string): ImageInfo => {
 export const vehicles: Vehicle[] = [
   {
     id: '1',
+    sellerId: 'user1',
     make: 'Toyota',
     model: 'Corolla',
     year: 2021,
@@ -38,9 +40,11 @@ export const vehicles: Vehicle[] = [
     images: [ getImage('corolla-main'), getImage('corolla-interior'), getImage('corolla-side') ],
     seller: userProfiles.user1,
     location: { city: 'Caracas', state: 'Distrito Capital', lat: 10.4806, lon: -66.9036 },
+    createdAt: Timestamp.now(),
   },
   {
     id: '2',
+    sellerId: 'user2',
     make: 'Toyota',
     model: 'Fortuner',
     year: 2022,
@@ -64,9 +68,11 @@ export const vehicles: Vehicle[] = [
     images: [ getImage('fortuner-main'), getImage('fortuner-interior') ],
     seller: userProfiles.user2,
     location: { city: 'Maracaibo', state: 'Zulia', lat: 10.6421, lon: -71.6125 },
+    createdAt: Timestamp.now(),
   },
   {
     id: '3',
+    sellerId: 'user3',
     make: 'Toyota',
     model: 'Land Cruiser',
     year: 2018,
@@ -91,9 +97,11 @@ export const vehicles: Vehicle[] = [
     images: [ getImage('machito-main') ],
     seller: userProfiles.user3,
     location: { city: 'Valencia', state: 'Carabobo', lat: 10.162, lon: -68.0076 },
+    createdAt: Timestamp.now(),
   },
   {
     id: '4',
+    sellerId: 'user1',
     make: 'Jeep',
     model: 'Grand Cherokee',
     year: 2020,
@@ -116,9 +124,11 @@ export const vehicles: Vehicle[] = [
     images: [ getImage('cherokee-main') ],
     seller: userProfiles.user1,
     location: { city: 'Caracas', state: 'Distrito Capital', lat: 10.5000, lon: -66.9167 },
+    createdAt: Timestamp.now(),
   },
   {
     id: '5',
+    sellerId: 'user2',
     make: 'Hyundai',
     model: 'Elantra',
     year: 2019,
@@ -141,9 +151,11 @@ export const vehicles: Vehicle[] = [
     images: [ getImage('elantra-main') ],
     seller: userProfiles.user2,
     location: { city: 'Barquisimeto', state: 'Lara', lat: 10.0678, lon: -69.3572 },
+    createdAt: Timestamp.now(),
   },
   {
     id: '6',
+    sellerId: 'user1',
     make: 'Kawasaki',
     model: 'Ninja 400',
     year: 2023,
@@ -165,9 +177,11 @@ export const vehicles: Vehicle[] = [
     images: [ getImage('motorcycle-new') ],
     seller: userProfiles.user1,
     location: { city: 'Caracas', state: 'Distrito Capital', lat: 10.4806, lon: -66.9036 },
+    createdAt: Timestamp.now(),
   },
   {
     id: '7',
+    sellerId: 'user3',
     make: 'Ford',
     model: 'Fiesta',
     year: 2016,
@@ -191,9 +205,11 @@ export const vehicles: Vehicle[] = [
     images: [getImage('fiesta-main')],
     seller: userProfiles.user3,
     location: { city: 'Maracay', state: 'Aragua', lat: 10.2464, lon: -67.5957 },
+    createdAt: Timestamp.now(),
   },
   {
     id: '8',
+    sellerId: 'user1',
     make: 'Chevrolet',
     model: 'Silverado',
     year: 2019,
@@ -216,9 +232,11 @@ export const vehicles: Vehicle[] = [
     images: [getImage('silverado-main')],
     seller: userProfiles.user1,
     location: { city: 'Puerto La Cruz', state: 'Anzoátegui', lat: 10.224, lon: -64.6394 },
+    createdAt: Timestamp.now(),
   },
   {
     id: '9',
+    sellerId: 'user2',
     make: 'Ford',
     model: 'Explorer',
     year: 2021,
@@ -241,9 +259,11 @@ export const vehicles: Vehicle[] = [
     images: [getImage('explorer-main')],
     seller: userProfiles.user2,
     location: { city: 'Lechería', state: 'Anzoátegui', lat: 10.1983, lon: -64.6931 },
+    createdAt: Timestamp.now(),
   },
   {
     id: '10',
+    sellerId: 'user3',
     make: 'Honda',
     model: 'Civic',
     year: 2017,
@@ -266,9 +286,11 @@ export const vehicles: Vehicle[] = [
     images: [getImage('civic-main')],
     seller: userProfiles.user3,
     location: { city: 'Valencia', state: 'Carabobo', lat: 10.162, lon: -68.0076 },
+    createdAt: Timestamp.now(),
   },
   {
     id: '11',
+    sellerId: 'user1',
     make: 'Mitsubishi',
     model: 'Lancer',
     year: 2015,
@@ -290,9 +312,11 @@ export const vehicles: Vehicle[] = [
     images: [getImage('lancer-main')],
     seller: userProfiles.user1,
     location: { city: 'Caracas', state: 'Distrito Capital', lat: 10.4806, lon: -66.9036 },
+    createdAt: Timestamp.now(),
   },
   {
     id: '12',
+    sellerId: 'user2',
     make: 'Jeep',
     model: 'Wrangler',
     year: 2019,
@@ -317,5 +341,6 @@ export const vehicles: Vehicle[] = [
     images: [getImage('wrangler-main')],
     seller: userProfiles.user2,
     location: { city: 'Mérida', state: 'Mérida', lat: 8.5925, lon: -71.1444 },
+    createdAt: Timestamp.now(),
   }
 ];

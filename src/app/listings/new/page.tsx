@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useVehicles } from '@/context/vehicle-context';
-import { Vehicle } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
@@ -16,7 +15,9 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { useUser } from '@/firebase';
+import { useFirestore, useUser, useMemoFirebase } from '@/firebase';
+import { useDoc } from '@/firebase/firestore/use-doc';
+import { addDoc, collection, doc, serverTimestamp } from 'firebase/firestore';
 
 type VehicleType = 'Moto' | 'Carro' | 'Camioneta';
 type Step = 'selection' | 'details' | 'photos';
@@ -35,7 +36,15 @@ export default function NewListingPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { user } = useUser();
-  const { addVehicle, vehicles } = useVehicles();
+  const firestore = useFirestore();
+  const { vehicles } = useVehicles();
+
+  const profileRef = useMemoFirebase(() => {
+    if (!user) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [firestore, user]);
+
+  const { data: profileData } = useDoc(profileRef);
 
   const allMakes = useMemo(() => [...new Set(vehicles.map((v) => v.make))].map((make) => ({ label: make, value: make })), [vehicles]);
 
@@ -129,7 +138,7 @@ export default function NewListingPage() {
       }
   };
 
-  const handlePublish = () => {
+  const handlePublish = async () => {
      if (!user) {
         toast({
             title: "Necesitas iniciar sesión",
@@ -154,10 +163,19 @@ export default function NewListingPage() {
           variant: "destructive",
       });
       return;
-  }
+    }
+    
+    const newImages = photos.map((_, index) => ({
+        url: `https://picsum.photos/seed/${crypto.randomUUID()}/800/600`,
+        alt: `Foto ${selectedBrand} ${selectedModel} ${index + 1}`,
+        hint: 'car photo'
+    }));
 
-     const newVehicle: Vehicle = {
-        id: crypto.randomUUID(),
+    if (newImages.length === 0) {
+        newImages.push({url: 'https://picsum.photos/seed/default/800/600', alt: 'placeholder', hint: 'car'});
+    }
+
+     const newVehicleData = {
         make: selectedBrand,
         model: selectedModel,
         year: parseInt(selectedYear, 10),
@@ -182,19 +200,37 @@ export default function NewListingPage() {
         tradeInForHigherValue: details.acceptsTradeIn ? details.tradeInForHigherValue : undefined,
         tradeInForLowerValue: details.acceptsTradeIn ? details.tradeInForLowerValue : undefined,
         description: details.moreDetails,
-        images: photos.length > 0 ? photos.map((p, i) => ({ url: p, alt: `Foto ${selectedBrand} ${selectedModel} ${i + 1}`, hint: 'car photo' })) : [{url: 'https://picsum.photos/seed/default/800/600', alt: 'placeholder', hint: 'car'}],
-        seller: { uid: user.uid, displayName: user.displayName || 'Vendedor', isVerified: false, phone: user.phoneNumber || undefined },
+        images: newImages,
+        sellerId: user.uid,
+        seller: {
+            uid: user.uid,
+            displayName: user.displayName || 'Vendedor Anónimo',
+            isVerified: (profileData as any)?.isVerified || false,
+            phone: user.phoneNumber || ''
+        },
         location: { city: 'Caracas', state: 'Distrito Capital', lat: 10.4806, lon: -66.9036 },
+        createdAt: serverTimestamp(),
     };
 
-     addVehicle(newVehicle);
+    try {
+        const vehicleCollection = collection(firestore, 'vehicle_listings');
+        await addDoc(vehicleCollection, newVehicleData);
 
-     toast({
-      title: "¡Publicación Creada!",
-      description: `Tu ${selectedBrand} ${selectedModel} ha sido publicado con éxito.`,
-    });
+        toast({
+            title: "¡Publicación Creada!",
+            description: `Tu ${selectedBrand} ${selectedModel} ha sido publicado con éxito.`,
+        });
 
-    router.push('/');
+        router.push('/');
+
+    } catch(e) {
+        console.error("Error adding document: ", e);
+        toast({
+            variant: "destructive",
+            title: "Error al publicar",
+            description: "No se pudo guardar el vehículo en la base de datos.",
+        });
+    }
   }
 
   const handleTypeSelect = (type: VehicleType) => {
