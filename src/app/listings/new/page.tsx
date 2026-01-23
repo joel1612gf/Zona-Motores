@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { useUser } from '@/firebase';
 
 type VehicleType = 'Moto' | 'Carro' | 'Camioneta';
 type Step = 'selection' | 'details' | 'photos';
@@ -33,6 +34,7 @@ const vehicleTypeOptions: {
 export default function NewListingPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { user } = useUser();
   const { addVehicle, vehicles } = useVehicles();
 
   const allMakes = useMemo(() => [...new Set(vehicles.map((v) => v.make))].map((make) => ({ label: make, value: make })), [vehicles]);
@@ -128,6 +130,15 @@ export default function NewListingPage() {
   };
 
   const handlePublish = () => {
+     if (!user) {
+        toast({
+            title: "Necesitas iniciar sesión",
+            description: "Para publicar un anuncio, primero debes iniciar sesión.",
+            variant: "destructive",
+        });
+        return;
+     }
+
      if (photos.length < 1) {
         toast({
             title: "Fotos insuficientes",
@@ -172,7 +183,7 @@ export default function NewListingPage() {
         tradeInForLowerValue: details.acceptsTradeIn ? details.tradeInForLowerValue : undefined,
         description: details.moreDetails,
         images: photos.length > 0 ? photos.map((p, i) => ({ url: p, alt: `Foto ${selectedBrand} ${selectedModel} ${i + 1}`, hint: 'car photo' })) : [{url: 'https://picsum.photos/seed/default/800/600', alt: 'placeholder', hint: 'car'}],
-        seller: { id: 'seller-new', name: 'Vendedor Demo', isVerified: false, phone: '+584121234567' },
+        seller: { uid: user.uid, displayName: user.displayName || 'Vendedor', isVerified: false, phone: user.phoneNumber || undefined },
         location: { city: 'Caracas', state: 'Distrito Capital', lat: 10.4806, lon: -66.9036 },
     };
 

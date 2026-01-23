@@ -1,5 +1,40 @@
+
 {
   "entities": {
+    "UserProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User Profile",
+      "type": "object",
+      "description": "Represents a user's profile information.",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "The user's unique ID, matches auth UID."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "The user's display name."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The user's email address."
+        },
+        "phoneNumber": {
+          "type": "string",
+          "description": "The user's phone number."
+        },
+        "isVerified": {
+          "type": "boolean",
+          "description": "Indicates if the user is a verified seller."
+        }
+      },
+      "required": [
+        "uid",
+        "displayName",
+        "email"
+      ]
+    },
     "VehicleListing": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "VehicleListing",
@@ -12,7 +47,7 @@
         },
         "sellerId": {
           "type": "string",
-          "description": "Reference to the Seller. (Relationship: Seller 1:N VehicleListing)"
+          "description": "Reference to the UserProfile. (Relationship: UserProfile 1:N VehicleListing)"
         },
         "make": {
           "type": "string",
@@ -62,31 +97,6 @@
         "imageUrls"
       ]
     },
-    "Seller": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Seller",
-      "type": "object",
-      "description": "Represents a seller on the Motores Zone application.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the seller."
-        },
-        "phoneNumber": {
-          "type": "string",
-          "description": "The seller's phone number (for verification purposes)."
-        },
-        "isVerified": {
-          "type": "boolean",
-          "description": "Indicates whether the seller has been verified."
-        }
-      },
-      "required": [
-        "id",
-        "phoneNumber",
-        "isVerified"
-      ]
-    },
     "ExchangeRate": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "ExchangeRate",
@@ -123,17 +133,17 @@
   "firestore": {
     "structure": [
       {
-        "path": "/users/{userId}/seller_profile",
+        "path": "/users/{userId}",
         "definition": {
-          "entityName": "Seller",
+          "entityName": "UserProfile",
           "schema": {
-            "$ref": "#/backend/entities/Seller"
+            "$ref": "#/backend/entities/UserProfile"
           },
-          "description": "Stores seller profiles. Each seller profile is stored under the user's ID. This supports path-based ownership.",
+          "description": "Stores user profile information. Each profile is a document keyed by the user's UID.",
           "params": [
             {
               "name": "userId",
-              "description": "The ID of the user who owns this seller profile."
+              "description": "The ID of the user who owns this profile."
             }
           ]
         }
@@ -145,7 +155,7 @@
           "schema": {
             "$ref": "#/backend/entities/VehicleListing"
           },
-          "description": "Stores vehicle listings.  Includes 'sellerId' for authorization independence.",
+          "description": "Stores vehicle listings. Includes 'sellerId' for authorization independence.",
           "params": [
             {
               "name": "vehicleListingId",
@@ -171,6 +181,6 @@
         }
       }
     ],
-    "reasoning": "The Firestore structure is designed to securely manage vehicle listings, seller information, and currency exchange rates for the Motores Zone application. The structure prioritizes authorization independence and supports efficient querying.\n\n*   **/users/{userId}/seller_profile:** Stores seller profiles, ensuring ownership-based access control.\n*   **/vehicle_listings/{vehicleListingId}:** Stores vehicle listings. The `sellerId` field enables querying listings by seller.\n*   **/exchange_rates/{exchangeRateId}:** Stores exchange rates. As there are no access restrictions in the prompt, and these are global values, no access control is implemented.\n\n**Authorization Independence (CRITICAL):** The structure is designed to minimize the need for `get()` calls in security rules, thus ensuring authorization independence.\n\n*   Vehicle listings have a `sellerId` field that directly links to the user who owns the listing. This removes the need to perform a `get()` operation to fetch the seller's ID from a parent document. This satisfies the requirement of denormalization for authorization.\n\n**QAPs (Rules are not Filters):** The structure enables secure `list` operations by segregating data with different access needs.\n\n*   Path-based ownership for seller profiles (`/users/{userId}/seller_profile`).\n\nThis structure ensures a secure, scalable, and debuggable Firestore database for the Motores Zone application."
+    "reasoning": "The Firestore structure is designed to securely manage user profiles, vehicle listings, and currency exchange rates. The structure prioritizes authorization independence and supports efficient querying.\n\n*   **/users/{userId}:** Stores user profiles, keyed by the user's UID, ensuring strict ownership-based access control.\n*   **/vehicle_listings/{vehicleListingId}:** Stores vehicle listings. The `sellerId` field enables querying listings by seller and enforcing ownership rules.\n*   **/exchange_rates/{exchangeRateId}:** Stores global, read-only exchange rates.\n\n**Authorization Independence (CRITICAL):** The structure is designed to minimize the need for `get()` calls in security rules, thus ensuring authorization independence.\n\n*   Vehicle listings have a `sellerId` field that directly links to the user who owns the listing. This removes the need to perform a `get()` operation to fetch the seller's ID from a separate document, satisfying denormalization for authorization."
   }
 }

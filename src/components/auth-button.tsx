@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -13,7 +14,7 @@ import {
   signInWithEmailAndPassword,
   updateProfile,
 } from 'firebase/auth';
-import { LogIn, LogOut, User as UserIcon, Loader2 } from 'lucide-react';
+import { LogIn, LogOut, User as UserIcon, Loader2, ShieldCheck } from 'lucide-react';
 
 import { useAuth, useUser } from '@/firebase';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -200,6 +201,13 @@ export function AuthButton({ open, onOpenChange }: AuthButtonProps) {
               </p>
             </div>
           </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem asChild>
+            <Link href="/profile">
+              <UserIcon className="mr-2 h-4 w-4" />
+              <span>Mi Perfil</span>
+            </Link>
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleSignOut}>
             <LogOut className="mr-2 h-4 w-4" />

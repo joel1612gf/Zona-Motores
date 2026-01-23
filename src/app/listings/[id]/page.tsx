@@ -172,7 +172,7 @@ export default function ListingDetailPage() {
                 <User className="h-8 w-8 text-muted-foreground" />
                 <div>
                   <div className="font-semibold flex items-center gap-2">
-                    {vehicle.seller.name}
+                    {vehicle.seller.displayName}
                     {vehicle.seller.isVerified && <Badge variant="secondary" className="border-green-300 bg-green-100 text-green-800 dark:border-green-700 dark:bg-green-900/50 dark:text-green-300"><ShieldCheck className="h-3 w-3 mr-1" />Verificado</Badge>}
                   </div>
                   {!vehicle.seller.isVerified && <Badge variant="destructive">No Verificado</Badge>}
@@ -204,8 +204,8 @@ export default function ListingDetailPage() {
           >
             <CarouselContent className="h-full">
               {vehicle.images.map((image, index) => (
-                <CarouselItem key={index} className="h-full">
-                  <div className="relative w-full h-full flex items-center justify-center p-4">
+                <CarouselItem key={index} className="h-full p-0">
+                  <div className="relative w-full h-full flex items-center justify-center">
                       <Image
                         src={image.url}
                         alt={image.alt}

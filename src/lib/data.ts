@@ -1,10 +1,10 @@
-import type { Vehicle, Seller, ImageInfo } from './types';
+import type { Vehicle, UserProfile, ImageInfo } from './types';
 import { PlaceHolderImages } from './placeholder-images';
 
-const sellers: Record<string, Seller> = {
-  seller1: { id: 'seller1', name: 'Juan Perez', isVerified: true, phone: '+584141234567' },
-  seller2: { id: 'seller2', name: 'Maria Rodriguez', isVerified: false, phone: '+584129876543' },
-  seller3: { id: 'seller3', name: 'Carlos Gomez', isVerified: true, phone: '+584241122334' },
+const userProfiles: Record<string, UserProfile> = {
+  user1: { uid: 'user1', displayName: 'Juan Perez', isVerified: true, phone: '+584141234567' },
+  user2: { uid: 'user2', displayName: 'Maria Rodriguez', isVerified: false, phone: '+584129876543' },
+  user3: { uid: 'user3', displayName: 'Carlos Gomez', isVerified: true, phone: '+584241122334' },
 };
 
 const getImage = (id: string): ImageInfo => {
@@ -36,7 +36,7 @@ export const vehicles: Vehicle[] = [
     acceptsTradeIn: false,
     description: 'Impecable Toyota Corolla, como nuevo. Único dueño, todos los servicios realizados en el concesionario. Un auto confiable y económico para la ciudad.',
     images: [ getImage('corolla-main'), getImage('corolla-interior'), getImage('corolla-side') ],
-    seller: sellers.seller1,
+    seller: userProfiles.user1,
     location: { city: 'Caracas', state: 'Distrito Capital', lat: 10.4806, lon: -66.9036 },
   },
   {
@@ -62,7 +62,7 @@ export const vehicles: Vehicle[] = [
     tradeInForLowerValue: true,
     description: 'Potente y lujosa Toyota Fortuner 4x4. Perfecta para la familia y la aventura. Muy poco kilometraje, prácticamente nueva. Lista para cualquier terreno.',
     images: [ getImage('fortuner-main'), getImage('fortuner-interior') ],
-    seller: sellers.seller2,
+    seller: userProfiles.user2,
     location: { city: 'Maracaibo', state: 'Zulia', lat: 10.6421, lon: -71.6125 },
   },
   {
@@ -89,7 +89,7 @@ export const vehicles: Vehicle[] = [
     tradeInForHigherValue: true,
     description: 'El legendario "Machito". Una bestia preparada para el off-road más exigente. Muchos extras incluidos. Un verdadero caballo de batalla que nunca se rinde.',
     images: [ getImage('machito-main') ],
-    seller: sellers.seller3,
+    seller: userProfiles.user3,
     location: { city: 'Valencia', state: 'Carabobo', lat: 10.162, lon: -68.0076 },
   },
   {
@@ -114,7 +114,7 @@ export const vehicles: Vehicle[] = [
     acceptsTradeIn: false,
     description: 'Elegante y capaz Jeep Grand Cherokee Limited. Una combinación perfecta de lujo y capacidad todoterreno. Excelente estado.',
     images: [ getImage('cherokee-main') ],
-    seller: sellers.seller1,
+    seller: userProfiles.user1,
     location: { city: 'Caracas', state: 'Distrito Capital', lat: 10.5000, lon: -66.9167 },
   },
   {
@@ -139,7 +139,7 @@ export const vehicles: Vehicle[] = [
     acceptsTradeIn: false,
     description: 'Moderno y eficiente Hyundai Elantra. Ideal para el uso diario. Espacioso y cómodo, con bajo consumo de combustible.',
     images: [ getImage('elantra-main') ],
-    seller: sellers.seller2,
+    seller: userProfiles.user2,
     location: { city: 'Barquisimeto', state: 'Lara', lat: 10.0678, lon: -69.3572 },
   },
   {
@@ -163,7 +163,7 @@ export const vehicles: Vehicle[] = [
     acceptsTradeIn: false,
     description: 'Motocicleta deportiva casi nueva, perfecta para la ciudad y carretera.',
     images: [ getImage('motorcycle-new') ],
-    seller: sellers.seller1,
+    seller: userProfiles.user1,
     location: { city: 'Caracas', state: 'Distrito Capital', lat: 10.4806, lon: -66.9036 },
   },
   {
@@ -189,7 +189,7 @@ export const vehicles: Vehicle[] = [
     tradeInForLowerValue: true,
     description: 'Ford Fiesta confiable y económico. Perfecto como primer carro o para el día a día. Detalles de pintura por el uso.',
     images: [getImage('fiesta-main')],
-    seller: sellers.seller3,
+    seller: userProfiles.user3,
     location: { city: 'Maracay', state: 'Aragua', lat: 10.2464, lon: -67.5957 },
   },
   {
@@ -214,7 +214,7 @@ export const vehicles: Vehicle[] = [
     acceptsTradeIn: false,
     description: 'Imponente Chevrolet Silverado, lista para el trabajo duro. Único dueño, excelentes condiciones. Incluye carpa para el cajón.',
     images: [getImage('silverado-main')],
-    seller: sellers.seller1,
+    seller: userProfiles.user1,
     location: { city: 'Puerto La Cruz', state: 'Anzoátegui', lat: 10.224, lon: -64.6394 },
   },
   {
@@ -239,7 +239,7 @@ export const vehicles: Vehicle[] = [
     acceptsTradeIn: false,
     description: 'Ford Explorer XLT espaciosa y familiar. Tres filas de asientos. Mantenimiento al día. Perfecta para viajes largos.',
     images: [getImage('explorer-main')],
-    seller: sellers.seller2,
+    seller: userProfiles.user2,
     location: { city: 'Lechería', state: 'Anzoátegui', lat: 10.1983, lon: -64.6931 },
   },
   {
@@ -264,7 +264,7 @@ export const vehicles: Vehicle[] = [
     acceptsTradeIn: false,
     description: 'Honda Civic Turbo, una combinación de deportividad y eficiencia. Muy bien cuidado. Nunca chocado.',
     images: [getImage('civic-main')],
-    seller: sellers.seller3,
+    seller: userProfiles.user3,
     location: { city: 'Valencia', state: 'Carabobo', lat: 10.162, lon: -68.0076 },
   },
   {
@@ -288,7 +288,7 @@ export const vehicles: Vehicle[] = [
     isSignatory: false,
     description: 'Mitsubishi Lancer confiable y duradero. Buen estado mecánico. Detalles de uso normal por los años. Papeles en regla.',
     images: [getImage('lancer-main')],
-    seller: sellers.seller1,
+    seller: userProfiles.user1,
     location: { city: 'Caracas', state: 'Distrito Capital', lat: 10.4806, lon: -66.9036 },
   },
   {
@@ -315,7 +315,7 @@ export const vehicles: Vehicle[] = [
     tradeInForHigherValue: true,
     description: 'Jeep Wrangler Rubicon, el rey del 4x4. Equipado con todo para la aventura. Techo y puertas desmontables. Como nuevo.',
     images: [getImage('wrangler-main')],
-    seller: sellers.seller2,
+    seller: userProfiles.user2,
     location: { city: 'Mérida', state: 'Mérida', lat: 8.5925, lon: -71.1444 },
   }
 ];

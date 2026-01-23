@@ -12,20 +12,20 @@
  *
  * Core Philosophy:
  * This ruleset implements a flexible yet secure model suitable for rapid application
- * development. It enforces a strict ownership model for private user data while allowing
+ * development. It enforces a strict ownership model for user profiles while allowing
  * public read access for shared content like vehicle listings. Writes are always
  * restricted to authenticated owners.
  *
  * Data Structure:
  * The data is organized into three main collections:
- * 1. /users/{userId}/seller_profile: A specific document storing private seller information,
- *    nested under the user's unique ID to enforce path-based security.
+ * 1. /users/{userId}: A document storing public and private profile information for each user,
+ *    keyed by the user's unique ID to enforce path-based security.
  * 2. /vehicle_listings/{listingId}: A top-level collection for all vehicle ads. These
  *    are publicly readable.
  * 3. /exchange_rates/{rateId}: A top-level collection for global, read-only data.
  *
  * Key Security Decisions:
- * - Seller Profiles (/users/{userId}/seller_profile): Are strictly private. Only the user
+ * - User Profiles (/users/{userId}): Are strictly private. Only the user
  *   identified by {userId} can read or write their own profile.
  * - Vehicle Listings (/vehicle_listings): Are public for anyone to read (`get`, `list`).
  *   However, creating, updating, or deleting a listing is restricted to the seller who owns it.
@@ -40,8 +40,8 @@
  * cross-document `get()` calls.
  *
  * Structural Segregation:
- * Private data (Seller profiles) and public data (Vehicle listings) are stored in
- * separate collections. This is a secure and performant pattern that prevents accidental
+ * Private data (User profiles) and public data (Vehicle listings) are stored in
+ * separate top-level collections. This is a secure and performant pattern that prevents accidental
  * exposure of private data in public queries and simplifies list operation rules.
  */
 rules_version = '2';
@@ -78,32 +78,21 @@ service cloud.firestore {
     // ------------------------------------------------------------------------
     // User Data Rules
     // ------------------------------------------------------------------------
-
+    
     /**
-     * @description Secures a user's seller profile. Only the owner can access or modify it.
-     * @path /users/{userId}/seller_profile
-     * @allow (get) An authenticated user with UID 'user123' reading their own profile at /users/user123/seller_profile.
-     * @deny (get) User 'user456' trying to read /users/user123/seller_profile.
+     * @description Secures a user's profile document. Only the owner can read or modify it.
+     * @path /users/{userId}
+     * @allow (get) An authenticated user 'user123' reading their own profile at /users/user123.
+     * @deny (get) User 'user456' trying to read /users/user123.
      * @deny (create) An anonymous user trying to create a profile.
-     * @principle Restricts access to a user's own data tree (Ownership).
+     * @principle Restricts access to a user's own data (Ownership).
      */
-    match /users/{userId}/seller_profile {
+    match /users/{userId} {
       allow get: if isOwner(userId);
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if isExistingOwner(userId);
-      allow list: if false; // This is a specific document, not a listable collection.
-    }
-
-    /**
-     * @description Prevents any other documents from being created in a user's space.
-     * @path /users/{userId}/{otherDoc=**}
-     * @allow None. This is a catch-all to lock down the user's namespace.
-     * @deny Any read or write to a path like /users/user123/some_other_doc.
-     * @principle Enforces a strict schema by default-denying unknown paths.
-     */
-    match /users/{userId}/{otherDoc=**} {
-        allow read, write: if false;
+      allow create: if isOwner(userId) && request.resource.data.uid == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.uid == resource.data.uid;
+      // Listing a single document is not applicable. Deleting user profiles from client is disabled for safety.
+      allow list, delete: if false; 
     }
 
     // ------------------------------------------------------------------------

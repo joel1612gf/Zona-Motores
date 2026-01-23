@@ -1,8 +1,8 @@
-export type Seller = {
-  id: string;
-  name: string;
+export type UserProfile = {
+  uid: string;
+  displayName: string;
   isVerified: boolean;
-  phone: string;
+  phone?: string;
 };
 
 export type ImageInfo = {
@@ -43,7 +43,7 @@ export type Vehicle = {
 
   description: string;
   images: ImageInfo[];
-  seller: Seller;
+  seller: UserProfile;
   location: {
     city: string;
     state: string;
