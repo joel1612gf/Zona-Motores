@@ -1,0 +1,144 @@
+/**
+ * Firestore Security Rules for Motores Zone
+ *
+ * NOTE FOR DEVELOPER: The error you are seeing, "FirebaseError: (auth/configuration-not-found)",
+ * is an environment configuration issue, not a problem with Security Rules. This error means
+ * that the "Email/Password" sign-in provider has not been enabled in the Firebase Console
+ * for your project. To fix this, please go to the Firebase Console -> Authentication -> Sign-in method,
+ * and enable the "Email/Password" provider. These rules are correctly configured to work
+ * once Authentication is set up.
+ *
+ * ---
+ *
+ * Core Philosophy:
+ * This ruleset implements a flexible yet secure model suitable for rapid application
+ * development. It enforces a strict ownership model for private user data while allowing
+ * public read access for shared content like vehicle listings. Writes are always
+ * restricted to authenticated owners.
+ *
+ * Data Structure:
+ * The data is organized into three main collections:
+ * 1. /users/{userId}/seller_profile: A specific document storing private seller information,
+ *    nested under the user's unique ID to enforce path-based security.
+ * 2. /vehicle_listings/{listingId}: A top-level collection for all vehicle ads. These
+ *    are publicly readable.
+ * 3. /exchange_rates/{rateId}: A top-level collection for global, read-only data.
+ *
+ * Key Security Decisions:
+ * - Seller Profiles (/users/{userId}/seller_profile): Are strictly private. Only the user
+ *   identified by {userId} can read or write their own profile.
+ * - Vehicle Listings (/vehicle_listings): Are public for anyone to read (`get`, `list`).
+ *   However, creating, updating, or deleting a listing is restricted to the seller who owns it.
+ * - Exchange Rates (/exchange_rates): Are public and read-only for all clients. No write
+ *   operations are permitted from the client-side.
+ * - Default Deny: Access is denied by default. Any path not explicitly matched is inaccessible.
+ *
+ * Denormalization for Authorization:
+ * To ensure high performance and strong security, we use denormalization. Each document
+ * in the `/vehicle_listings` collection contains a `sellerId` field. This allows security
+ * rules to verify ownership directly from the document itself, avoiding slow and costly
+ * cross-document `get()` calls.
+ *
+ * Structural Segregation:
+ * Private data (Seller profiles) and public data (Vehicle listings) are stored in
+ * separate collections. This is a secure and performant pattern that prevents accidental
+ * exposure of private data in public queries and simplifies list operation rules.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------------------------------------------------------
+    // Helper Functions
+    // ------------------------------------------------------------------------
+
+    /**
+     * Checks if a user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if the currently authenticated user's UID matches the provided userId.
+     * This is the primary function for verifying resource ownership.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * Verifies ownership for an existing document. Used for update and delete
+     * operations to prevent actions on non-existent documents.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    // ------------------------------------------------------------------------
+    // User Data Rules
+    // ------------------------------------------------------------------------
+
+    /**
+     * @description Secures a user's seller profile. Only the owner can access or modify it.
+     * @path /users/{userId}/seller_profile
+     * @allow (get) An authenticated user with UID 'user123' reading their own profile at /users/user123/seller_profile.
+     * @deny (get) User 'user456' trying to read /users/user123/seller_profile.
+     * @deny (create) An anonymous user trying to create a profile.
+     * @principle Restricts access to a user's own data tree (Ownership).
+     */
+    match /users/{userId}/seller_profile {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
+      allow list: if false; // This is a specific document, not a listable collection.
+    }
+
+    /**
+     * @description Prevents any other documents from being created in a user's space.
+     * @path /users/{userId}/{otherDoc=**}
+     * @allow None. This is a catch-all to lock down the user's namespace.
+     * @deny Any read or write to a path like /users/user123/some_other_doc.
+     * @principle Enforces a strict schema by default-denying unknown paths.
+     */
+    match /users/{userId}/{otherDoc=**} {
+        allow read, write: if false;
+    }
+
+    // ------------------------------------------------------------------------
+    // Public Collection Rules
+    // ------------------------------------------------------------------------
+
+    /**
+     * @description Manages vehicle listings. Listings are public to read, but only the
+     *              owning seller can create, update, or delete them.
+     * @path /vehicle_listings/{vehicleListingId}
+     * @allow (list) Any user, signed in or not, can list all vehicle listings.
+     * @allow (create) An authenticated user 'seller123' creating a new listing where the document's 'sellerId' field is also 'seller123'.
+     * @deny (update) User 'seller456' trying to update a listing owned by 'seller123'.
+     * @deny (create) User 'seller123' trying to create a listing and set the 'sellerId' to 'anotherUser'.
+     * @principle Implements a "Public Read, Owner-Only Write" pattern using a denormalized `sellerId` field for authorization.
+     */
+    match /vehicle_listings/{vehicleListingId} {
+      allow get, list: if true;
+      allow create: if isSignedIn() && request.resource.data.sellerId == request.auth.uid;
+      allow update: if resource != null && isOwner(resource.data.sellerId) && request.resource.data.sellerId == resource.data.sellerId;
+      allow delete: if resource != null && isOwner(resource.data.sellerId);
+    }
+
+    /**
+     * @description Manages global exchange rates. This data is public and read-only for all clients.
+     * @path /exchange_rates/{exchangeRateId}
+     * @allow (get) Any user, signed in or not, can read an exchange rate.
+     * @deny (create) Any client attempting to create a new exchange rate.
+     * @principle Secures global configuration data as client-side read-only.
+     */
+    match /exchange_rates/{exchangeRateId} {
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}

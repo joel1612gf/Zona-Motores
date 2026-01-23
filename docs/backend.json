@@ -1,0 +1,176 @@
+{
+  "entities": {
+    "VehicleListing": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "VehicleListing",
+      "type": "object",
+      "description": "Represents a vehicle listing in the Motores Zone application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the vehicle listing."
+        },
+        "sellerId": {
+          "type": "string",
+          "description": "Reference to the Seller. (Relationship: Seller 1:N VehicleListing)"
+        },
+        "make": {
+          "type": "string",
+          "description": "The make of the vehicle (e.g., Toyota)."
+        },
+        "model": {
+          "type": "string",
+          "description": "The model of the vehicle (e.g., Corolla)."
+        },
+        "year": {
+          "type": "number",
+          "description": "The year the vehicle was manufactured."
+        },
+        "priceUSD": {
+          "type": "number",
+          "description": "The price of the vehicle in USD."
+        },
+        "location": {
+          "type": "string",
+          "description": "The location of the vehicle."
+        },
+        "description": {
+          "type": "string",
+          "description": "A detailed description of the vehicle."
+        },
+        "imageUrls": {
+          "type": "array",
+          "description": "URLs of the images associated with the vehicle listing.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "summary": {
+          "type": "string",
+          "description": "AI-generated summary of the vehicle listing."
+        }
+      },
+      "required": [
+        "id",
+        "sellerId",
+        "make",
+        "model",
+        "year",
+        "priceUSD",
+        "location",
+        "description",
+        "imageUrls"
+      ]
+    },
+    "Seller": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Seller",
+      "type": "object",
+      "description": "Represents a seller on the Motores Zone application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the seller."
+        },
+        "phoneNumber": {
+          "type": "string",
+          "description": "The seller's phone number (for verification purposes)."
+        },
+        "isVerified": {
+          "type": "boolean",
+          "description": "Indicates whether the seller has been verified."
+        }
+      },
+      "required": [
+        "id",
+        "phoneNumber",
+        "isVerified"
+      ]
+    },
+    "ExchangeRate": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ExchangeRate",
+      "type": "object",
+      "description": "Represents the official BCV exchange rate between USD and VES.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the exchange rate entry."
+        },
+        "rate": {
+          "type": "number",
+          "description": "The exchange rate of USD to VES."
+        },
+        "effectiveDate": {
+          "type": "string",
+          "description": "The date when this exchange rate became effective.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "rate",
+        "effectiveDate"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}/seller_profile",
+        "definition": {
+          "entityName": "Seller",
+          "schema": {
+            "$ref": "#/backend/entities/Seller"
+          },
+          "description": "Stores seller profiles. Each seller profile is stored under the user's ID. This supports path-based ownership.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The ID of the user who owns this seller profile."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/vehicle_listings/{vehicleListingId}",
+        "definition": {
+          "entityName": "VehicleListing",
+          "schema": {
+            "$ref": "#/backend/entities/VehicleListing"
+          },
+          "description": "Stores vehicle listings.  Includes 'sellerId' for authorization independence.",
+          "params": [
+            {
+              "name": "vehicleListingId",
+              "description": "The unique ID of the vehicle listing."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/exchange_rates/{exchangeRateId}",
+        "definition": {
+          "entityName": "ExchangeRate",
+          "schema": {
+            "$ref": "#/backend/entities/ExchangeRate"
+          },
+          "description": "Stores exchange rates. No access control constraints specified, so no additional fields are required.",
+          "params": [
+            {
+              "name": "exchangeRateId",
+              "description": "The unique ID of the exchange rate entry."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to securely manage vehicle listings, seller information, and currency exchange rates for the Motores Zone application. The structure prioritizes authorization independence and supports efficient querying.\n\n*   **/users/{userId}/seller_profile:** Stores seller profiles, ensuring ownership-based access control.\n*   **/vehicle_listings/{vehicleListingId}:** Stores vehicle listings. The `sellerId` field enables querying listings by seller.\n*   **/exchange_rates/{exchangeRateId}:** Stores exchange rates. As there are no access restrictions in the prompt, and these are global values, no access control is implemented.\n\n**Authorization Independence (CRITICAL):** The structure is designed to minimize the need for `get()` calls in security rules, thus ensuring authorization independence.\n\n*   Vehicle listings have a `sellerId` field that directly links to the user who owns the listing. This removes the need to perform a `get()` operation to fetch the seller's ID from a parent document. This satisfies the requirement of denormalization for authorization.\n\n**QAPs (Rules are not Filters):** The structure enables secure `list` operations by segregating data with different access needs.\n\n*   Path-based ownership for seller profiles (`/users/{userId}/seller_profile`).\n\nThis structure ensures a secure, scalable, and debuggable Firestore database for the Motores Zone application."
+  }
+}
