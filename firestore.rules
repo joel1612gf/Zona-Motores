@@ -132,5 +132,17 @@ service cloud.firestore {
       allow update: if false;
       allow delete: if false;
     }
+
+    /**
+     * @description Manages global vehicle metadata like makes and models. Publicly readable.
+     * @path /vehicle_meta/{metaId}
+     * @allow (get, list) Any user can read the vehicle metadata.
+     * @deny (create, update, delete) Only backend processes should modify this data.
+     * @principle Secures global configuration data as client-side read-only.
+     */
+    match /vehicle_meta/{metaId} {
+      allow get, list: if true;
+      allow create, update, delete: if false;
+    }
   }
 }

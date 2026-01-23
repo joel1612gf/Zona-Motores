@@ -7,6 +7,7 @@ import { SiteFooter } from '@/components/site-footer';
 import { FirebaseClientProvider } from '@/firebase';
 import { VehicleProvider } from '@/context/vehicle-context';
 import { ThemeProvider } from '@/components/theme-provider';
+import { MakesProvider } from '@/context/makes-context';
 
 export const metadata: Metadata = {
   title: 'Zona Motores',
@@ -44,14 +45,16 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <FirebaseClientProvider>
-            <VehicleProvider>
-              <div className="relative flex min-h-dvh flex-col">
-                <SiteHeader />
-                <main className="flex-1">{children}</main>
-                <SiteFooter />
-              </div>
-              <Toaster />
-            </VehicleProvider>
+            <MakesProvider>
+              <VehicleProvider>
+                <div className="relative flex min-h-dvh flex-col">
+                  <SiteHeader />
+                  <main className="flex-1">{children}</main>
+                  <SiteFooter />
+                </div>
+                <Toaster />
+              </VehicleProvider>
+            </MakesProvider>
           </FirebaseClientProvider>
         </ThemeProvider>
       </body>

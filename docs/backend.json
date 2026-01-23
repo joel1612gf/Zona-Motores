@@ -133,6 +133,23 @@
         "rate",
         "effectiveDate"
       ]
+    },
+    "VehicleMeta": {
+      "title": "Vehicle Metadata",
+      "description": "Stores metadata for vehicle listings, such as available makes and models.",
+      "type": "object",
+      "properties": {
+        "makes": {
+          "type": "object",
+          "description": "A map of vehicle makes to an array of their models.",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
     }
   },
   "auth": {
@@ -190,8 +207,24 @@
             }
           ]
         }
+      },
+      {
+        "path": "/vehicle_meta/{metaId}",
+        "definition": {
+          "entityName": "VehicleMeta",
+          "schema": {
+            "$ref": "#/backend/entities/VehicleMeta"
+          },
+          "description": "Stores global metadata for vehicle listings. Should contain a single document, e.g., 'makes_and_models'.",
+          "params": [
+            {
+              "name": "metaId",
+              "description": "The unique ID for the metadata document, e.g. 'makes_and_models'"
+            }
+          ]
+        }
       }
     ],
-    "reasoning": "The Firestore structure is designed to securely manage user profiles, vehicle listings, and currency exchange rates. The structure prioritizes authorization independence and supports efficient querying.\n\n*   **/users/{userId}:** Stores user profiles, keyed by the user's UID, ensuring strict ownership-based access control.\n*   **/vehicle_listings/{vehicleListingId}:** Stores vehicle listings. The `sellerId` field enables querying listings by seller and enforcing ownership rules.\n*   **/exchange_rates/{exchangeRateId}:** Stores global, read-only exchange rates.\n\n**Authorization Independence (CRITICAL):** The structure is designed to minimize the need for `get()` calls in security rules, thus ensuring authorization independence.\n\n*   Vehicle listings have a `sellerId` field that directly links to the user who owns the listing. This removes the need to perform a `get()` operation to fetch the seller's ID from a separate document, satisfying denormalization for authorization."
+    "reasoning": "The Firestore structure is designed to securely manage user profiles, vehicle listings, and currency exchange rates. The structure prioritizes authorization independence and supports efficient querying.\n\n*   **/users/{userId}:** Stores user profiles, keyed by the user's UID, ensuring strict ownership-based access control.\n*   **/vehicle_listings/{vehicleListingId}:** Stores vehicle listings. The `sellerId` field enables querying listings by seller and enforcing ownership rules.\n*   **/exchange_rates/{exchangeRateId}:** Stores global, read-only exchange rates.\n*   **/vehicle_meta/{metaId}:** Stores global, read-only vehicle metadata like makes and models.\n\n**Authorization Independence (CRITICAL):** The structure is designed to minimize the need for `get()` calls in security rules, thus ensuring authorization independence.\n\n*   Vehicle listings have a `sellerId` field that directly links to the user who owns the listing. This removes the need to perform a `get()` operation to fetch the seller's ID from a separate document, satisfying denormalization for authorization."
   }
 }

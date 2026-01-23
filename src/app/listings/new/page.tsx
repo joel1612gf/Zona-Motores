@@ -3,7 +3,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { vehicles as initialVehicles } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
@@ -18,6 +17,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { useDoc } from '@/firebase/firestore/use-doc';
 import { addDoc, collection, doc, serverTimestamp } from 'firebase/firestore';
+import { useMakes } from '@/context/makes-context';
 
 type VehicleType = 'Moto' | 'Carro' | 'Camioneta';
 type Step = 'selection' | 'details' | 'photos';
@@ -45,7 +45,12 @@ export default function NewListingPage() {
 
   const { data: profileData } = useDoc(profileRef);
 
-  const allMakes = useMemo(() => [...new Set(initialVehicles.map((v) => v.make))].map((make) => ({ label: make, value: make })), []);
+  const { makesAndModels, isLoading: areMakesLoading } = useMakes();
+
+  const allMakes = useMemo(() => {
+    if (!makesAndModels) return [];
+    return Object.keys(makesAndModels).sort().map(make => ({ label: make, value: make }));
+  }, [makesAndModels]);
 
   const [step, setStep] = useState<Step>('selection');
 
@@ -85,12 +90,9 @@ export default function NewListingPage() {
   };
 
   const modelsByMake = useMemo(() => {
-    if (!selectedBrand) return [];
-    const brandModels = initialVehicles
-        .filter(v => v.make === selectedBrand)
-        .map(v => v.model);
-    return [...new Set(brandModels)].map(model => ({ label: model, value: model }));
-  }, [selectedBrand]);
+    if (!selectedBrand || !makesAndModels) return [];
+    return (makesAndModels[selectedBrand] || []).map(model => ({ label: model, value: model }));
+  }, [selectedBrand, makesAndModels]);
 
   const getWelcomeMessage = () => {
     return '¿Qué vehículo quieres publicar el día de hoy?';
@@ -312,9 +314,10 @@ export default function NewListingPage() {
                                 options={allMakes}
                                 value={selectedBrand}
                                 onChange={handleBrandChange}
-                                placeholder="Selecciona una marca"
+                                placeholder={areMakesLoading ? 'Cargando...' : 'Selecciona una marca'}
                                 searchPlaceholder="Buscar marca..."
                                 notFoundMessage="No se encontró la marca."
+                                disabled={areMakesLoading || !selectedType}
                             />
                         ) : !selectedModel ? (
                             <Combobox
@@ -324,6 +327,7 @@ export default function NewListingPage() {
                                 placeholder="Selecciona un modelo"
                                 searchPlaceholder="Buscar modelo..."
                                 notFoundMessage="No se encontró el modelo."
+                                disabled={!selectedBrand}
                             />
                         ) : (
                             <Input 
