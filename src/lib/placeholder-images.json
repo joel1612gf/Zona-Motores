@@ -107,6 +107,18 @@
       "description": "Jeep Wrangler Amarillo",
       "imageUrl": "https://images.unsplash.com/photo-1550348792-c2889e409b33?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxlbGxvdyUyMGplZXAlMjB3cmFuZ2xlcnxlbnwwfHx8fDE3Njg5NTI0MDZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "yellow jeep"
+    },
+    {
+      "id": "montero-main",
+      "description": "Mitsubishi Montero Gris Oscuro",
+      "imageUrl": "https://images.unsplash.com/photo-1603584883318-243202901968?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3wzNzEyODF8MHwxfHNlYXJjaHwxfHxncmF5JTIwTVRTVE9SRVQlMjBzdXZ8ZW58MHx8fHwxNzA4NTQzNTM4fDA&ixlib=rb-4.0.3&q=80&w=1080",
+      "imageHint": "gray suv"
+    },
+    {
+      "id": "fiat-uno-main",
+      "description": "Fiat Uno Rojo",
+      "imageUrl": "https://images.unsplash.com/photo-1631129323725-54b9b9423630?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3wzNzEyODF8MHwxfHNlYXJjaHwyfHxyZWQlMjBzbWFsbCUyMGNhcnxlbnwwfHx8fDE3MDYxOTU1MDV8MA&ixlib=rb-4.0.3&q=80&w=1080",
+      "imageHint": "red car"
     }
   ]
 }
