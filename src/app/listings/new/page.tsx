@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { useVehicles } from '@/context/vehicle-context';
+import { vehicles as initialVehicles } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
@@ -37,7 +37,6 @@ export default function NewListingPage() {
   const { toast } = useToast();
   const { user } = useUser();
   const firestore = useFirestore();
-  const { vehicles } = useVehicles();
 
   const profileRef = useMemoFirebase(() => {
     if (!user) return null;
@@ -46,7 +45,7 @@ export default function NewListingPage() {
 
   const { data: profileData } = useDoc(profileRef);
 
-  const allMakes = useMemo(() => [...new Set(vehicles.map((v) => v.make))].map((make) => ({ label: make, value: make })), [vehicles]);
+  const allMakes = useMemo(() => [...new Set(initialVehicles.map((v) => v.make))].map((make) => ({ label: make, value: make })), []);
 
   const [step, setStep] = useState<Step>('selection');
 
@@ -87,11 +86,11 @@ export default function NewListingPage() {
 
   const modelsByMake = useMemo(() => {
     if (!selectedBrand) return [];
-    const brandModels = vehicles
+    const brandModels = initialVehicles
         .filter(v => v.make === selectedBrand)
         .map(v => v.model);
     return [...new Set(brandModels)].map(model => ({ label: model, value: model }));
-  }, [selectedBrand, vehicles]);
+  }, [selectedBrand]);
 
   const getWelcomeMessage = () => {
     return '¿Qué vehículo quieres publicar el día de hoy?';
