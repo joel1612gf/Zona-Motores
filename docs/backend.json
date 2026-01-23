@@ -136,16 +136,20 @@
     },
     "VehicleMeta": {
       "title": "Vehicle Metadata",
-      "description": "Stores metadata for vehicle listings, such as available makes and models.",
+      "description": "Stores metadata for vehicle listings, such as available makes and models, categorized by vehicle type.",
       "type": "object",
       "properties": {
-        "makes": {
+        "makesByType": {
           "type": "object",
-          "description": "A map of vehicle makes to an array of their models.",
+          "description": "An object where keys are vehicle types (e.g., 'Carro', 'Moto', 'Camioneta') and values are maps of makes to their models.",
           "additionalProperties": {
-            "type": "array",
-            "items": {
-              "type": "string"
+            "type": "object",
+            "description": "A map of vehicle makes to an array of their models.",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           }
         }

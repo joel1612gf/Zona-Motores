@@ -45,12 +45,7 @@ export default function NewListingPage() {
 
   const { data: profileData } = useDoc(profileRef);
 
-  const { makesAndModels, isLoading: areMakesLoading } = useMakes();
-
-  const allMakes = useMemo(() => {
-    if (!makesAndModels) return [];
-    return Object.keys(makesAndModels).sort().map(make => ({ label: make, value: make }));
-  }, [makesAndModels]);
+  const { makesByType, isLoading: areMakesLoading } = useMakes();
 
   const [step, setStep] = useState<Step>('selection');
 
@@ -85,14 +80,19 @@ export default function NewListingPage() {
     tradeInForLowerValue: false,
   });
 
+  const allMakesForSelectedType = useMemo(() => {
+    if (!makesByType || !selectedType || !makesByType[selectedType]) return [];
+    return Object.keys(makesByType[selectedType]).sort().map(make => ({ label: make, value: make }));
+  }, [makesByType, selectedType]);
+
+  const modelsByMake = useMemo(() => {
+    if (!selectedBrand || !selectedType || !makesByType || !makesByType[selectedType] || !makesByType[selectedType][selectedBrand]) return [];
+    return (makesByType[selectedType][selectedBrand] || []).map(model => ({ label: model, value: model }));
+  }, [selectedBrand, selectedType, makesByType]);
+
   const handleDetailChange = (field: keyof typeof details, value: any) => {
     setDetails(prev => ({ ...prev, [field]: value }));
   };
-
-  const modelsByMake = useMemo(() => {
-    if (!selectedBrand || !makesAndModels) return [];
-    return (makesAndModels[selectedBrand] || []).map(model => ({ label: model, value: model }));
-  }, [selectedBrand, makesAndModels]);
 
   const getWelcomeMessage = () => {
     return '¿Qué vehículo quieres publicar el día de hoy?';
@@ -311,7 +311,7 @@ export default function NewListingPage() {
                         </h2>
                         {!selectedBrand ? (
                             <Combobox
-                                options={allMakes}
+                                options={allMakesForSelectedType}
                                 value={selectedBrand}
                                 onChange={handleBrandChange}
                                 placeholder={areMakesLoading ? 'Cargando...' : 'Selecciona una marca'}
