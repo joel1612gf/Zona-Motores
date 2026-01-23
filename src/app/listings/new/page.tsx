@@ -1,23 +1,25 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Bike, Car, Truck, UploadCloud, X } from 'lucide-react';
+import { Bike, Car, Truck, UploadCloud, X, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { useFirestore, useUser, useMemoFirebase } from '@/firebase';
+import { useFirestore, useUser, useMemoFirebase, useStorage } from '@/firebase';
 import { useDoc } from '@/firebase/firestore/use-doc';
-import { addDoc, collection, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { useMakes } from '@/context/makes-context';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import imageCompression from 'browser-image-compression';
 
 type VehicleType = 'Moto' | 'Carro' | 'Camioneta';
 type Step = 'selection' | 'details' | 'photos';
@@ -37,6 +39,7 @@ export default function NewListingPage() {
   const { toast } = useToast();
   const { user } = useUser();
   const firestore = useFirestore();
+  const storage = useStorage();
 
   const profileRef = useMemoFirebase(() => {
     if (!user) return null;
@@ -54,8 +57,9 @@ export default function NewListingPage() {
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [selectedYear, setSelectedYear] = useState<string>('');
 
-  const [photos, setPhotos] = useState<string[]>([]);
+  const [photos, setPhotos] = useState<{ file: File; previewUrl: string }[]>([]);
   const [mainPhotoIndex, setMainPhotoIndex] = useState<number | null>(null);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   const [details, setDetails] = useState({
     price: '',
@@ -115,8 +119,12 @@ export default function NewListingPage() {
         return;
     }
 
-    const newPhotoUrls = Array.from(files).map(file => URL.createObjectURL(file));
-    const updatedPhotos = [...photos, ...newPhotoUrls];
+    const newPhotos = Array.from(files).map(file => ({
+      file: file,
+      previewUrl: URL.createObjectURL(file)
+    }));
+
+    const updatedPhotos = [...photos, ...newPhotos];
     setPhotos(updatedPhotos);
 
     if (mainPhotoIndex === null && updatedPhotos.length > 0) {
@@ -126,9 +134,9 @@ export default function NewListingPage() {
 
   const removePhoto = (index: number) => {
       setPhotos(prev => {
+        const photoToRemove = prev[index];
+        URL.revokeObjectURL(photoToRemove.previewUrl);
         const newPhotos = prev.filter((_, i) => i !== index);
-        // Clean up object URL to prevent memory leaks
-        URL.revokeObjectURL(prev[index]);
         return newPhotos;
       });
       
@@ -166,59 +174,79 @@ export default function NewListingPage() {
       return;
     }
     
-    const newImages = photos.map((_, index) => ({
-        url: `https://picsum.photos/seed/${crypto.randomUUID()}/800/600`,
-        alt: `Foto ${selectedBrand} ${selectedModel} ${index + 1}`,
-        hint: 'car photo'
-    }));
-
-    if (newImages.length === 0) {
-        newImages.push({url: 'https://picsum.photos/seed/default/800/600', alt: 'placeholder', hint: 'car'});
-    }
-
-    const newVehicleData = {
-        make: selectedBrand,
-        model: selectedModel,
-        year: parseInt(selectedYear, 10),
-        priceUSD: parseInt(details.price, 10),
-        mileage: parseInt(details.mileage, 10) || 0,
-        bodyType: selectedType as string,
-        transmission: details.transmission as 'Automática' | 'Sincrónica',
-        engine: details.engine,
-        exteriorColor: details.exteriorColor,
-        ownerCount: parseInt(details.ownerCount, 10),
-        tireLife: parseInt(details.tireLife, 10),
-        hasAC: details.hasAC,
-        hasSoundSystem: details.hasSoundSystem,
-        hadMajorCrash: details.hadMajorCrash,
-        isOperational: details.isOperational,
-        isSignatory: details.isSignatory,
-        acceptsTradeIn: details.acceptsTradeIn,
-        description: details.moreDetails,
-        images: newImages,
-        sellerId: user.uid,
-        seller: {
-            uid: user.uid,
-            displayName: user.displayName || 'Vendedor Anónimo',
-            isVerified: (profileData as any)?.isVerified || false,
-            phone: user.phoneNumber || ''
-        },
-        location: { city: 'Caracas', state: 'Distrito Capital', lat: 10.4806, lon: -66.9036 },
-        createdAt: serverTimestamp(),
-        // Conditionally add fields to avoid 'undefined' values in Firestore
-        ...(selectedType === 'Carro' && { doorCount: details.doorCount as '2' | '4' }),
-        ...(selectedType === 'Camioneta' && { is4x4: details.is4x4 }),
-        ...(!details.isOperational && { operationalDetails: details.operationalDetails }),
-        ...(details.acceptsTradeIn && {
-            tradeInDetails: details.tradeInDetails,
-            tradeInForHigherValue: details.tradeInForHigherValue,
-            tradeInForLowerValue: details.tradeInForLowerValue,
-        }),
-    };
+    setIsPublishing(true);
 
     try {
         const vehicleCollection = collection(firestore, 'vehicle_listings');
-        await addDoc(vehicleCollection, newVehicleData);
+        const newVehicleRef = doc(vehicleCollection);
+        const newVehicleId = newVehicleRef.id;
+
+        const uploadPromises = photos.map(async (photo, index) => {
+            const compressionOptions = {
+                maxSizeMB: 1,
+                maxWidthOrHeight: 1200,
+                useWebWorker: true,
+                fileType: 'image/webp'
+            };
+            const compressedFile = await imageCompression(photo.file, compressionOptions);
+            
+            const imageRef = ref(storage, `listings/${user.uid}/${newVehicleId}/${newVehicleId}-${index}.webp`);
+            await uploadBytes(imageRef, compressedFile);
+            const downloadURL = await getDownloadURL(imageRef);
+            
+            return {
+                url: downloadURL,
+                alt: `Foto ${selectedBrand} ${selectedModel} ${index + 1}`,
+                hint: 'car photo'
+            };
+        });
+
+        const uploadedImages = await Promise.all(uploadPromises);
+
+        if (uploadedImages.length === 0) {
+            uploadedImages.push({url: 'https://picsum.photos/seed/default/800/600', alt: 'placeholder', hint: 'car'});
+        }
+
+        const newVehicleData = {
+            make: selectedBrand,
+            model: selectedModel,
+            year: parseInt(selectedYear, 10),
+            priceUSD: parseInt(details.price, 10),
+            mileage: parseInt(details.mileage, 10) || 0,
+            bodyType: selectedType as string,
+            transmission: details.transmission as 'Automática' | 'Sincrónica',
+            engine: details.engine,
+            exteriorColor: details.exteriorColor,
+            ownerCount: parseInt(details.ownerCount, 10),
+            tireLife: parseInt(details.tireLife, 10),
+            hasAC: details.hasAC,
+            hasSoundSystem: details.hasSoundSystem,
+            hadMajorCrash: details.hadMajorCrash,
+            isOperational: details.isOperational,
+            isSignatory: details.isSignatory,
+            acceptsTradeIn: details.acceptsTradeIn,
+            description: details.moreDetails,
+            images: uploadedImages,
+            sellerId: user.uid,
+            seller: {
+                uid: user.uid,
+                displayName: user.displayName || 'Vendedor Anónimo',
+                isVerified: (profileData as any)?.isVerified || false,
+                phone: user.phoneNumber || ''
+            },
+            location: { city: 'Caracas', state: 'Distrito Capital', lat: 10.4806, lon: -66.9036 },
+            createdAt: serverTimestamp(),
+            ...(selectedType === 'Carro' && { doorCount: details.doorCount as '2' | '4' }),
+            ...(selectedType === 'Camioneta' && { is4x4: details.is4x4 }),
+            ...(!details.isOperational && { operationalDetails: details.operationalDetails }),
+            ...(details.acceptsTradeIn && {
+                tradeInDetails: details.tradeInDetails,
+                tradeInForHigherValue: details.tradeInForHigherValue,
+                tradeInForLowerValue: details.tradeInForLowerValue,
+            }),
+        };
+
+        await setDoc(newVehicleRef, newVehicleData);
 
         toast({
             title: "¡Publicación Creada!",
@@ -234,6 +262,8 @@ export default function NewListingPage() {
             title: "Error al publicar",
             description: "No se pudo guardar el vehículo en la base de datos.",
         });
+    } finally {
+        setIsPublishing(false);
     }
   }
 
@@ -496,14 +526,14 @@ export default function NewListingPage() {
         </p>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
-            {photos.map((photoUrl, index) => (
+            {photos.map((photo, index) => (
                 <div
                     key={index}
                     className="relative aspect-square group"
                     onClick={() => setMainPhotoIndex(index)}
                 >
                     <Image
-                        src={photoUrl}
+                        src={photo.previewUrl}
                         alt={`Foto del vehículo ${index + 1}`}
                         fill
                         className="object-cover rounded-md cursor-pointer"
@@ -535,8 +565,9 @@ export default function NewListingPage() {
         </div>
         
         <div className="flex justify-end mt-8">
-            <Button onClick={handlePublish} size="lg" disabled={photos.length < 1}>
-                Publicar Anuncio ({photos.length < 1 ? `${photos.length}/1` : `${photos.length}/12`})
+            <Button onClick={handlePublish} size="lg" disabled={photos.length < 1 || isPublishing}>
+                {isPublishing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isPublishing ? 'Publicando...' : `Publicar Anuncio (${photos.length < 1 ? '1 foto mín.' : `${photos.length}/12`})`}
             </Button>
         </div>
     </div>
