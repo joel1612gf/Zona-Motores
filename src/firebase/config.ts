@@ -1,12 +1,12 @@
 import { initializeApp, getApp, getApps } from 'firebase/app';
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  "projectId": "studio-2511212328-1383b",
+  "appId": "1:342387466922:web:bf7822eb0655ddbeb1e6d3",
+  "apiKey": "AIzaSyCL7i8XybBWeCXkATh4aiw9IgIeN0yFaFM",
+  "authDomain": "studio-2511212328-1383b.firebaseapp.com",
+  "measurementId": "",
+  "messagingSenderId": "342387466922"
 };
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
