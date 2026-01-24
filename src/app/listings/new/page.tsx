@@ -19,7 +19,6 @@ import { useDoc } from '@/firebase/firestore/use-doc';
 import { collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { useMakes } from '@/context/makes-context';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import imageCompression from 'browser-image-compression';
 
 type VehicleType = 'Moto' | 'Carro' | 'Camioneta';
 type Step = 'selection' | 'details' | 'photos';
@@ -179,29 +178,19 @@ export default function NewListingPage() {
     try {
         const vehicleCollection = collection(firestore, 'vehicle_listings');
         const newVehicleRef = doc(vehicleCollection);
-        const newVehicleId = newVehicleRef.id;
 
-        const uploadPromises = photos.map(async (photo, index) => {
-            const originalFile = photo.file;
-            const fileExtension = originalFile.name.split('.').pop() || 'jpg';
-            const fileName = `${newVehicleId}-${index}.${fileExtension}`;
-
-            const imageRef = ref(storage, `vehicle-images/${user.uid}/${fileName}`);
-            await uploadBytes(imageRef, originalFile);
-            const downloadURL = await getDownloadURL(imageRef);
-            
-            return {
-                url: downloadURL,
-                alt: `Foto ${selectedBrand} ${selectedModel} ${index + 1}`,
-                hint: 'car photo'
-            };
-        });
-
-        const uploadedImages = await Promise.all(uploadPromises);
+        // --- DIAGNOSTIC: BYPASS UPLOAD ---
+        // Create placeholder image URLs instead of uploading to Storage.
+        const uploadedImages = photos.map((photo, index) => ({
+            url: `https://picsum.photos/seed/${newVehicleRef.id}/${index}/800/600`,
+            alt: `Placeholder foto ${index + 1}`,
+            hint: 'car photo'
+        }));
 
         if (uploadedImages.length === 0) {
-            uploadedImages.push({url: 'https://picsum.photos/seed/default/800/600', alt: 'placeholder', hint: 'car'});
+            uploadedImages.push({url: `https://picsum.photos/seed/${newVehicleRef.id}/default/800/600`, alt: 'placeholder', hint: 'car'});
         }
+        // --- END DIAGNOSTIC ---
 
         const newVehicleData = {
             make: selectedBrand,
@@ -245,8 +234,8 @@ export default function NewListingPage() {
         await setDoc(newVehicleRef, newVehicleData);
 
         toast({
-            title: "¡Publicación Creada!",
-            description: `Tu ${selectedBrand} ${selectedModel} ha sido publicado con éxito.`,
+            title: "¡Publicación Creada (Modo Diagnóstico)!",
+            description: `Tu ${selectedBrand} ${selectedModel} se publicó con imágenes de prueba.`,
         });
 
         router.push('/');
