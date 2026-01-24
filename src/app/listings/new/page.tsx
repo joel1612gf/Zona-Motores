@@ -18,7 +18,8 @@ import { useFirestore, useUser, useMemoFirebase, useStorage } from '@/firebase';
 import { useDoc } from '@/firebase/firestore/use-doc';
 import { collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { useMakes } from '@/context/makes-context';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
+import { Progress } from '@/components/ui/progress';
 
 type VehicleType = 'Moto' | 'Carro' | 'Camioneta';
 type Step = 'selection' | 'details' | 'photos';
@@ -59,6 +60,7 @@ export default function NewListingPage() {
   const [photos, setPhotos] = useState<{ file: File; previewUrl: string }[]>([]);
   const [mainPhotoIndex, setMainPhotoIndex] = useState<number | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
   const [details, setDetails] = useState({
     price: '',
@@ -174,29 +176,51 @@ export default function NewListingPage() {
     }
     
     setIsPublishing(true);
+    setUploadProgress(0);
 
     try {
         const vehicleCollection = collection(firestore, 'vehicle_listings');
         const newVehicleRef = doc(vehicleCollection);
 
         const uploadedImages: { url: string; alt: string; hint: string }[] = [];
+        
         for (let i = 0; i < photos.length; i++) {
           const photo = photos[i];
           const fileName = `${newVehicleRef.id}-${i}-${photo.file.name}`;
           const imageRef = ref(storage, `vehicle-images/${user.uid}/${fileName}`);
           
-          await uploadBytes(imageRef, photo.file);
-          const downloadURL = await getDownloadURL(imageRef);
-          
-          uploadedImages.push({
-            url: downloadURL,
-            alt: `Foto ${i + 1} de ${selectedBrand} ${selectedModel}`,
-            hint: 'car photo'
+          const uploadTask = uploadBytesResumable(imageRef, photo.file);
+
+          await new Promise<void>((resolve, reject) => {
+            uploadTask.on('state_changed',
+              (snapshot) => {
+                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                const totalProgress = ((i * 100) + progress) / photos.length;
+                setUploadProgress(totalProgress);
+              },
+              (error) => {
+                console.error("Fallo en la subida de imagen:", error);
+                reject(error);
+              },
+              async () => {
+                try {
+                  const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                  uploadedImages.push({
+                    url: downloadURL,
+                    alt: `Foto ${i + 1} de ${selectedBrand} ${selectedModel}`,
+                    hint: 'car photo'
+                  });
+                  resolve();
+                } catch (error) {
+                  reject(error);
+                }
+              }
+            );
           });
         }
         
-        if (uploadedImages.length === 0 && photos.length > 0) {
-            throw new Error("Image upload failed silently.");
+        if (uploadedImages.length !== photos.length) {
+            throw new Error("No todas las imágenes se subieron correctamente.");
         }
 
         const newVehicleData = {
@@ -248,7 +272,7 @@ export default function NewListingPage() {
         router.push('/');
 
     } catch(e) {
-        console.error("Error adding document: ", e);
+        console.error("Error al publicar el anuncio: ", e);
         toast({
             variant: "destructive",
             title: "Error al publicar",
@@ -256,6 +280,7 @@ export default function NewListingPage() {
         });
     } finally {
         setIsPublishing(false);
+        setUploadProgress(null);
     }
   }
 
@@ -556,7 +581,13 @@ export default function NewListingPage() {
             )}
         </div>
         
-        <div className="flex justify-end mt-8">
+        <div className="flex justify-end mt-8 items-center gap-4">
+            {isPublishing && uploadProgress !== null && (
+                <div className="w-full max-w-xs text-right">
+                    <Progress value={uploadProgress} className="h-2" />
+                    <p className="text-sm text-muted-foreground mt-1">Subiendo fotos... {uploadProgress.toFixed(0)}%</p>
+                </div>
+            )}
             <Button onClick={handlePublish} size="lg" disabled={photos.length < 1 || isPublishing}>
                 {isPublishing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {isPublishing ? 'Publicando...' : `Publicar Anuncio (${photos.length < 1 ? '1 foto mín.' : `${photos.length}/12`})`}
