@@ -179,18 +179,31 @@ export default function NewListingPage() {
         const vehicleCollection = collection(firestore, 'vehicle_listings');
         const newVehicleRef = doc(vehicleCollection);
 
-        // --- DIAGNOSTIC: BYPASS UPLOAD ---
-        // Create placeholder image URLs instead of uploading to Storage.
-        const uploadedImages = photos.map((photo, index) => ({
-            url: `https://picsum.photos/seed/${newVehicleRef.id}/${index}/800/600`,
-            alt: `Placeholder foto ${index + 1}`,
-            hint: 'car photo'
-        }));
-
+        const uploadedImages = await Promise.all(
+          photos.map(async (photo, index) => {
+            const fileName = `${newVehicleRef.id}-${index}-${photo.file.name}`;
+            const imageRef = ref(storage, `vehicle-images/${user.uid}/${fileName}`);
+            
+            await uploadBytes(imageRef, photo.file);
+            const downloadURL = await getDownloadURL(imageRef);
+            
+            return {
+              url: downloadURL,
+              alt: `Foto ${index + 1} de ${selectedBrand} ${selectedModel}`,
+              hint: 'car photo'
+            };
+          })
+        );
+        
         if (uploadedImages.length === 0) {
-            uploadedImages.push({url: `https://picsum.photos/seed/${newVehicleRef.id}/default/800/600`, alt: 'placeholder', hint: 'car'});
+            toast({
+                title: "Fotos requeridas",
+                description: "Debes subir al menos una foto.",
+                variant: "destructive",
+            });
+            setIsPublishing(false);
+            return;
         }
-        // --- END DIAGNOSTIC ---
 
         const newVehicleData = {
             make: selectedBrand,
@@ -234,8 +247,8 @@ export default function NewListingPage() {
         await setDoc(newVehicleRef, newVehicleData);
 
         toast({
-            title: "¡Publicación Creada (Modo Diagnóstico)!",
-            description: `Tu ${selectedBrand} ${selectedModel} se publicó con imágenes de prueba.`,
+            title: "¡Publicación Creada!",
+            description: `Tu ${selectedBrand} ${selectedModel} se publicó con éxito.`,
         });
 
         router.push('/');
@@ -245,7 +258,7 @@ export default function NewListingPage() {
         toast({
             variant: "destructive",
             title: "Error al publicar",
-            description: "No se pudo guardar el vehículo en la base de datos.",
+            description: "No se pudo guardar el vehículo. Revisa tu conexión y los permisos de almacenamiento.",
         });
     } finally {
         setIsPublishing(false);
