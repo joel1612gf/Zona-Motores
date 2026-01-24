@@ -19,5 +19,9 @@ service cloud.firestore {
       allow create: if isSignedIn();
       allow update, delete: if isSignedIn() && resource.data.sellerId == request.auth.uid;
     }
+
+    match /vehicle_meta/{docId} {
+      allow get, list: if true;
+    }
   }
 }
