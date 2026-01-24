@@ -179,30 +179,24 @@ export default function NewListingPage() {
         const vehicleCollection = collection(firestore, 'vehicle_listings');
         const newVehicleRef = doc(vehicleCollection);
 
-        const uploadedImages = await Promise.all(
-          photos.map(async (photo, index) => {
-            const fileName = `${newVehicleRef.id}-${index}-${photo.file.name}`;
-            const imageRef = ref(storage, `vehicle-images/${user.uid}/${fileName}`);
-            
-            await uploadBytes(imageRef, photo.file);
-            const downloadURL = await getDownloadURL(imageRef);
-            
-            return {
-              url: downloadURL,
-              alt: `Foto ${index + 1} de ${selectedBrand} ${selectedModel}`,
-              hint: 'car photo'
-            };
-          })
-        );
+        const uploadedImages: { url: string; alt: string; hint: string }[] = [];
+        for (let i = 0; i < photos.length; i++) {
+          const photo = photos[i];
+          const fileName = `${newVehicleRef.id}-${i}-${photo.file.name}`;
+          const imageRef = ref(storage, `vehicle-images/${user.uid}/${fileName}`);
+          
+          await uploadBytes(imageRef, photo.file);
+          const downloadURL = await getDownloadURL(imageRef);
+          
+          uploadedImages.push({
+            url: downloadURL,
+            alt: `Foto ${i + 1} de ${selectedBrand} ${selectedModel}`,
+            hint: 'car photo'
+          });
+        }
         
-        if (uploadedImages.length === 0) {
-            toast({
-                title: "Fotos requeridas",
-                description: "Debes subir al menos una foto.",
-                variant: "destructive",
-            });
-            setIsPublishing(false);
-            return;
+        if (uploadedImages.length === 0 && photos.length > 0) {
+            throw new Error("Image upload failed silently.");
         }
 
         const newVehicleData = {
