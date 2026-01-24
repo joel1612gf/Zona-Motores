@@ -1,40 +1,5 @@
-
 {
   "entities": {
-    "UserProfile": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "User Profile",
-      "type": "object",
-      "description": "Represents a user's profile information.",
-      "properties": {
-        "uid": {
-          "type": "string",
-          "description": "The user's unique ID, matches auth UID."
-        },
-        "displayName": {
-          "type": "string",
-          "description": "The user's display name."
-        },
-        "email": {
-          "type": "string",
-          "format": "email",
-          "description": "The user's email address."
-        },
-        "phoneNumber": {
-          "type": "string",
-          "description": "The user's phone number."
-        },
-        "isVerified": {
-          "type": "boolean",
-          "description": "Indicates if the user is a verified seller."
-        }
-      },
-      "required": [
-        "uid",
-        "displayName",
-        "email"
-      ]
-    },
     "VehicleListing": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "VehicleListing",
@@ -43,15 +8,11 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the vehicle listing."
+          "description": "Unique identifier for the VehicleListing entity."
         },
         "sellerId": {
           "type": "string",
-          "description": "The UID of the user who is selling the vehicle."
-        },
-        "seller": {
-          "$ref": "#/entities/UserProfile",
-          "description": "Denormalized seller information for display purposes."
+          "description": "Reference to Seller. (Relationship: Seller 1:N VehicleListing)"
         },
         "make": {
           "type": "string",
@@ -67,15 +28,11 @@
         },
         "priceUSD": {
           "type": "number",
-          "description": "The price of the vehicle in USD."
-        },
-        "location": {
-          "type": "string",
-          "description": "The location of the vehicle."
+          "description": "The price of the vehicle in US dollars."
         },
         "description": {
           "type": "string",
-          "description": "A detailed description of the vehicle."
+          "description": "Detailed description of the vehicle listing."
         },
         "imageUrls": {
           "type": "array",
@@ -84,76 +41,82 @@
             "type": "string"
           }
         },
+        "locationLatitude": {
+          "type": "number",
+          "description": "Latitude coordinate of the vehicle's location."
+        },
+        "locationLongitude": {
+          "type": "number",
+          "description": "Longitude coordinate of the vehicle's location."
+        },
         "summary": {
           "type": "string",
-          "description": "AI-generated summary of the vehicle listing."
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time",
-          "description": "The timestamp when the listing was created."
+          "description": "AI generated summary of the listing."
         }
       },
       "required": [
         "id",
         "sellerId",
-        "seller",
         "make",
         "model",
         "year",
         "priceUSD",
-        "location",
         "description",
         "imageUrls",
-        "createdAt"
+        "locationLatitude",
+        "locationLongitude"
+      ]
+    },
+    "Seller": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Seller",
+      "type": "object",
+      "description": "Represents a seller of vehicles in the Motores Zone application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Seller entity."
+        },
+        "phoneNumber": {
+          "type": "string",
+          "description": "The seller's phone number used for verification via WhatsApp API."
+        },
+        "isVerified": {
+          "type": "boolean",
+          "description": "Indicates whether the seller has been verified."
+        }
+      },
+      "required": [
+        "id",
+        "phoneNumber",
+        "isVerified"
       ]
     },
     "ExchangeRate": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "ExchangeRate",
       "type": "object",
-      "description": "Represents the official BCV exchange rate between USD and VES.",
+      "description": "Represents the exchange rate between USD and VES (Bolivares).",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the exchange rate entry."
+          "description": "Unique identifier for the ExchangeRate entity."
         },
         "rate": {
           "type": "number",
-          "description": "The exchange rate of USD to VES."
+          "description": "The current exchange rate (VES per USD)."
         },
-        "effectiveDate": {
+        "lastUpdated": {
           "type": "string",
-          "description": "The date when this exchange rate became effective.",
+          "description": "The date and time when the exchange rate was last updated.",
           "format": "date-time"
         }
       },
       "required": [
         "id",
         "rate",
-        "effectiveDate"
+        "lastUpdated"
       ]
-    },
-    "VehicleMeta": {
-      "title": "Vehicle Metadata",
-      "description": "Stores metadata for vehicle listings, such as available makes and models, categorized by vehicle type.",
-      "type": "object",
-      "properties": {
-        "makesByType": {
-          "type": "object",
-          "description": "An object where keys are vehicle types (e.g., 'Carro', 'Moto', 'Camioneta') and values are maps of makes to their models.",
-          "additionalProperties": {
-            "type": "object",
-            "description": "A map of vehicle makes to an array of their models.",
-            "additionalProperties": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          }
-        }
-      }
     }
   },
   "auth": {
@@ -165,70 +128,58 @@
   "firestore": {
     "structure": [
       {
-        "path": "/users/{userId}",
+        "path": "/sellers/{sellerId}",
         "definition": {
-          "entityName": "UserProfile",
+          "entityName": "Seller",
           "schema": {
-            "$ref": "#/backend/entities/UserProfile"
+            "$ref": "#/backend/entities/Seller"
           },
-          "description": "Stores user profile information. Each profile is a document keyed by the user's UID.",
+          "description": "Stores seller profiles. 'sellerId' corresponds to the user's auth.uid.",
           "params": [
             {
-              "name": "userId",
-              "description": "The ID of the user who owns this profile."
+              "name": "sellerId",
+              "description": "The unique identifier for the seller, which is the same as the user's auth.uid.  This enforces path-based ownership."
             }
           ]
         }
       },
       {
-        "path": "/vehicle_listings/{vehicleListingId}",
+        "path": "/sellers/{sellerId}/vehicleListings/{vehicleListingId}",
         "definition": {
           "entityName": "VehicleListing",
           "schema": {
             "$ref": "#/backend/entities/VehicleListing"
           },
-          "description": "Stores vehicle listings. Includes 'sellerId' for authorization independence.",
+          "description": "Stores vehicle listings associated with a specific seller. Leverages path-based ownership.",
           "params": [
             {
+              "name": "sellerId",
+              "description": "The unique identifier for the seller, corresponding to the user's auth.uid."
+            },
+            {
               "name": "vehicleListingId",
-              "description": "The unique ID of the vehicle listing."
+              "description": "The unique identifier for the vehicle listing."
             }
           ]
         }
       },
       {
-        "path": "/exchange_rates/{exchangeRateId}",
+        "path": "/exchangeRates/{exchangeRateId}",
         "definition": {
           "entityName": "ExchangeRate",
           "schema": {
             "$ref": "#/backend/entities/ExchangeRate"
           },
-          "description": "Stores exchange rates. No access control constraints specified, so no additional fields are required.",
+          "description": "Stores exchange rate data. This is likely an admin-managed collection.",
           "params": [
             {
               "name": "exchangeRateId",
-              "description": "The unique ID of the exchange rate entry."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/vehicle_meta/{metaId}",
-        "definition": {
-          "entityName": "VehicleMeta",
-          "schema": {
-            "$ref": "#/backend/entities/VehicleMeta"
-          },
-          "description": "Stores global metadata for vehicle listings. Should contain a single document, e.g., 'makes_and_models'.",
-          "params": [
-            {
-              "name": "metaId",
-              "description": "The unique ID for the metadata document, e.g. 'makes_and_models'"
+              "description": "The unique identifier for the exchange rate entry."
             }
           ]
         }
       }
     ],
-    "reasoning": "The Firestore structure is designed to securely manage user profiles, vehicle listings, and currency exchange rates. The structure prioritizes authorization independence and supports efficient querying.\n\n*   **/users/{userId}:** Stores user profiles, keyed by the user's UID, ensuring strict ownership-based access control.\n*   **/vehicle_listings/{vehicleListingId}:** Stores vehicle listings. The `sellerId` field enables querying listings by seller and enforcing ownership rules.\n*   **/exchange_rates/{exchangeRateId}:** Stores global, read-only exchange rates.\n*   **/vehicle_meta/{metaId}:** Stores global, read-only vehicle metadata like makes and models.\n\n**Authorization Independence (CRITICAL):** The structure is designed to minimize the need for `get()` calls in security rules, thus ensuring authorization independence.\n\n*   Vehicle listings have a `sellerId` field that directly links to the user who owns the listing. This removes the need to perform a `get()` operation to fetch the seller's ID from a separate document, satisfying denormalization for authorization."
+    "reasoning": "The Firestore structure is designed to support the Motores Zone application's core features, including vehicle listings, currency conversion, seller verification, and advanced search capabilities. Authorization Independence is achieved by leveraging path-based ownership for seller data and their listings, eliminating the need for `get()` calls in security rules.  The structure facilitates secure `list` operations via Structural Segregation. All documents within a collection share the same security posture.  By separating user profiles and vehicle listings, we avoid mixing data with different access requirements within the same collection, this strategy simplifies rules and enhances security.\n\nSpecifically:\n\n*   **/sellers/{sellerId}**: Stores seller profiles, owned by the user (seller) identified by `sellerId`.  The `sellerId` matches the `auth.uid` of the authenticated user, ensuring that only the seller can read or write their own profile.  This leverages Path-Based Ownership.\n*   **/sellers/{sellerId}/vehicleListings/{vehicleListingId}**: Stores vehicle listings associated with a specific seller.  The listings are nested under the seller's document, continuing the path-based ownership model. This eliminates the need for complex authorization logic and allows for secure and efficient `list` operations of a seller's listings.\n*   **/exchangeRates/{exchangeRateId}**: Stores exchange rate data.  Given that the app will use the official BCV exchange rate, this collection is designed for admin-level management.\n"
   }
 }
