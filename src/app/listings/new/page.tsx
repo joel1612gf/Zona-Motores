@@ -190,7 +190,7 @@ export default function NewListingPage() {
             };
             const compressedFile = await imageCompression(photo.file, compressionOptions);
             
-            const imageRef = ref(storage, `listings/${user.uid}/${newVehicleId}/${newVehicleId}-${index}.webp`);
+            const imageRef = ref(storage, `vehicle-images/${user.uid}/${newVehicleId}-${index}.webp`);
             await uploadBytes(imageRef, compressedFile);
             const downloadURL = await getDownloadURL(imageRef);
             

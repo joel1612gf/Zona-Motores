@@ -1,165 +1,23 @@
-/**
- * Core Philosophy: This ruleset enforces a strict, path-based user-ownership model.
- * All user-generated content (seller profiles, vehicle listings) is nested under a
- * path that includes the user's unique ID, making authorization checks simple,
- * fast, and secure. This approach avoids costly and slow `get()` calls in rules.
- *
- * Data Structure: The data is organized hierarchically. All data related to a
- * specific seller is located under the `/sellers/{sellerId}` path, where `sellerId`
- * is the user's authentication UID. Global, public data like exchange rates is
- * stored in a separate top-level collection.
- *
- * Key Security Decisions:
- * - User Privacy: Listing all sellers is explicitly disallowed to protect user privacy.
- * - Ownership: A user has full control over their own seller profile and all vehicle
- *   listings nested underneath it. They cannot read, write, or list any other user's data.
- * - Public Data: The `exchangeRates` collection is publicly readable by anyone but
- *   is not writable by any client. This is designed for admin-managed data.
- *
- * Denormalization for Authorization: This ruleset relies on path-based security.
- * The user's UID is part of the document path (e.g., `/sellers/{auth.uid}`), which is
- * the most performant way to check for ownership. For documents in subcollections,
- * such as a `VehicleListing`, an internal `sellerId` field is required upon creation
- * to match the path, ensuring a permanent and verifiable link to the owner.
- *
- * Structural Segregation: User-private data (`/sellers`) is structurally
- * separated from global, public-read data (`/exchangeRates`). This clear
- * separation simplifies security rules and makes collection-level queries safe
- * and efficient, as all documents within a given collection share the same
- * security posture.
- */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ------------------------------------------------------------------------
-    // Helper Functions
-    // ------------------------------------------------------------------------
-
-    /**
-     * Returns true if the user is authenticated.
-     */
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /**
-     * Returns true if the authenticated user's UID matches the provided userId.
-     * This is the foundation of the ownership model.
-     */
     function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+      return request.auth.uid == userId;
     }
 
-    /**
-     * Returns true if the document being accessed already exists in Firestore.
-     * Crucial for protecting against writes on non-existent documents.
-     */
-    function isExistingDocument() {
-      return resource != null;
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
     }
 
-    /**
-     * Validates that a user is creating their own seller profile and that the
-     * document data is correctly linked to their user ID.
-     */
-    function isCreatingSelf(userId) {
-      return isOwner(userId) && request.resource.data.id == userId;
-    }
-
-    /**
-     * Enforces immutability of the ownership link (`id`) on a seller profile
-     * during an update operation.
-     */
-    function isUpdatingOwnProfile(userId) {
-      return isOwner(userId) && isExistingDocument() && request.resource.data.id == resource.data.id;
-    }
-
-    /**
-     * Validates that a seller is creating a listing under their own profile and
-     * that the listing data is correctly linked to their seller ID.
-     */
-    function isCreatingOwnedListing(sellerId) {
-      return isOwner(sellerId) && request.resource.data.sellerId == sellerId;
-    }
-
-    /**
-     * Enforces immutability of the ownership link (`sellerId`) on a listing
-     * during an update operation.
-     */
-    function isUpdatingOwnListing(sellerId) {
-      return isOwner(sellerId) && isExistingDocument() && request.resource.data.sellerId == resource.data.sellerId;
-    }
-
-    /**
-     * Ensures a user can only delete documents that they own and that already exist.
-     */
-    function isDeletingOwnDocument(userId) {
-      return isOwner(userId) && isExistingDocument();
-    }
-
-    // ------------------------------------------------------------------------
-    // Collection Rules
-    // ------------------------------------------------------------------------
-
-    /**
-     * @description Disallows listing all sellers to protect user privacy.
-     * @path /sellers
-     * @allow N/A - All operations are denied at the collection level.
-     * @deny (list) An authenticated user trying to get a list of all sellers.
-     * @principle Prevents data leakage by explicitly denying collection-level reads on sensitive data.
-     */
-    match /sellers {
-      allow get: if false;
-      allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
-    }
-
-    /**
-     * @description A seller can create, read, update, and delete their own profile.
-     * @path /sellers/{sellerId}
-     * @allow (create) A new user (auth.uid: 'user123') creating their profile at `/sellers/user123`.
-     * @deny (update) A user ('user123') trying to update another user's profile at `/sellers/user456`.
-     * @principle Enforces strict data ownership using the document's path as the source of truth.
-     */
-    match /sellers/{sellerId} {
-      allow get: if isOwner(sellerId);
-      allow list: if false; // List is denied on the parent collection
-      allow create: if isCreatingSelf(sellerId);
-      allow update: if isUpdatingOwnProfile(sellerId);
-      allow delete: if isDeletingOwnDocument(sellerId);
-    }
-
-    /**
-     * @description A seller can manage the vehicle listings under their own profile.
-     * @path /sellers/{sellerId}/vehicleListings/{vehicleListingId}
-     * @allow (create) An authenticated seller ('user123') creating a new listing at `/sellers/user123/vehicleListings/listingABC`.
-     * @deny (list) A user ('user456') trying to list vehicles for another seller from `/sellers/user123/vehicleListings`.
-     * @principle Inherits ownership from the parent document path, ensuring strict data segregation.
-     */
-    match /sellers/{sellerId}/vehicleListings/{vehicleListingId} {
-      allow get: if isOwner(sellerId);
-      allow list: if isOwner(sellerId);
-      allow create: if isCreatingOwnedListing(sellerId);
-      allow update: if isUpdatingOwnListing(sellerId);
-      allow delete: if isDeletingOwnDocument(sellerId);
-    }
-
-    /**
-     * @description Exchange rates are public for all users to read, but are not writable by clients.
-     * @path /exchangeRates/{exchangeRateId}
-     * @allow (get) Any user, authenticated or not, reading an exchange rate.
-     * @deny (create) Any user trying to create a new exchange rate entry.
-     * @principle Secures global configuration data by making it read-only for clients, assuming admin-only writes from a trusted server environment.
-     */
-    match /exchangeRates/{exchangeRateId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false; // TODO: Implement admin-only write access via custom claims or a trusted server.
-      allow update: if false; // TODO: Implement admin-only write access via custom claims or a trusted server.
-      allow delete: if false; // TODO: Implement admin-only write access via custom claims or a trusted server.
+    match /vehicle_listings/{listingId} {
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && resource.data.sellerId == request.auth.uid;
     }
   }
 }
