@@ -182,16 +182,12 @@ export default function NewListingPage() {
         const newVehicleId = newVehicleRef.id;
 
         const uploadPromises = photos.map(async (photo, index) => {
-            const compressionOptions = {
-                maxSizeMB: 1,
-                maxWidthOrHeight: 1200,
-                useWebWorker: true,
-                fileType: 'image/webp'
-            };
-            const compressedFile = await imageCompression(photo.file, compressionOptions);
-            
-            const imageRef = ref(storage, `vehicle-images/${user.uid}/${newVehicleId}-${index}.webp`);
-            await uploadBytes(imageRef, compressedFile);
+            const originalFile = photo.file;
+            const fileExtension = originalFile.name.split('.').pop() || 'jpg';
+            const fileName = `${newVehicleId}-${index}.${fileExtension}`;
+
+            const imageRef = ref(storage, `vehicle-images/${user.uid}/${fileName}`);
+            await uploadBytes(imageRef, originalFile);
             const downloadURL = await getDownloadURL(imageRef);
             
             return {
