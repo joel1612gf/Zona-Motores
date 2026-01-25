@@ -193,9 +193,7 @@ export default function NewListingPage() {
             contentType: photo.file.type,
           };
 
-          const fileBuffer = await photo.file.arrayBuffer();
-          
-          const uploadTask = uploadBytesResumable(imageRef, fileBuffer, metadata);
+          const uploadTask = uploadBytesResumable(imageRef, photo.file, metadata);
 
           await new Promise<void>((resolve, reject) => {
             uploadTask.on('state_changed',
