@@ -20,6 +20,7 @@ import { collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { useMakes } from '@/context/makes-context';
 import { ref, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import { Progress } from '@/components/ui/progress';
+import imageCompression from 'browser-image-compression';
 
 type VehicleType = 'Moto' | 'Carro' | 'Camioneta';
 type Step = 'selection' | 'details' | 'photos';
@@ -107,7 +108,7 @@ export default function NewListingPage() {
     setStep('details');
   }
   
-  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
@@ -119,17 +120,50 @@ export default function NewListingPage() {
         });
         return;
     }
+    
+    const compressionToast = toast({
+      title: 'Comprimiendo imágenes...',
+      description: 'Por favor, espera un momento.',
+    });
 
-    const newPhotos = Array.from(files).map(file => ({
-      file: file,
-      previewUrl: URL.createObjectURL(file)
-    }));
+    const newPhotosPromises = Array.from(files).map(async (file) => {
+      try {
+        const options = {
+          maxSizeMB: 1,
+          maxWidthOrHeight: 1920,
+          useWebWorker: true,
+        };
+        const compressedFile = await imageCompression(file, options);
+        return {
+          file: compressedFile,
+          previewUrl: URL.createObjectURL(compressedFile)
+        };
+      } catch (error) {
+        console.error('Error al comprimir la imagen:', error);
+        toast({
+          title: 'Error de compresión',
+          description: `No se pudo comprimir la imagen ${file.name}.`,
+          variant: 'destructive',
+        });
+        return null;
+      }
+    });
 
-    const updatedPhotos = [...photos, ...newPhotos];
-    setPhotos(updatedPhotos);
+    const newPhotos = (await Promise.all(newPhotosPromises)).filter((p): p is { file: File; previewUrl: string } => p !== null);
+    
+    compressionToast.dismiss();
 
-    if (mainPhotoIndex === null && updatedPhotos.length > 0) {
-        setMainPhotoIndex(0);
+    if (newPhotos.length > 0) {
+        const updatedPhotos = [...photos, ...newPhotos];
+        setPhotos(updatedPhotos);
+
+        if (mainPhotoIndex === null && updatedPhotos.length > 0) {
+            setMainPhotoIndex(0);
+        }
+        toast({
+            title: 'Imágenes listas',
+            description: `${newPhotos.length} foto(s) se han comprimido y añadido.`,
+        });
     }
   };
 
