@@ -15,8 +15,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useFirestore, useUser, useMemoFirebase, useStorage } from '@/firebase';
-import { useDoc } from '@/firebase/firestore/use-doc';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { ref, getDownloadURL, uploadBytesResumable, deleteObject } from 'firebase/storage';
 import { Progress } from '@/components/ui/progress';
 import imageCompression from 'browser-image-compression';
@@ -37,12 +36,38 @@ export default function EditListingPage() {
   const firestore = useFirestore();
   const storage = useStorage();
 
+  const [vehicleData, setVehicleData] = useState<Vehicle | null>(null);
+  const [isVehicleLoading, setIsVehicleLoading] = useState(true);
+
   const vehicleRef = useMemoFirebase(() => {
     if (!user || !params.id) return null;
     return doc(firestore, 'users', user.uid, 'vehicleListings', params.id as string);
   }, [firestore, user, params.id]);
 
-  const { data: vehicleData, isLoading: isVehicleLoading } = useDoc<Vehicle>(vehicleRef);
+  useEffect(() => {
+    if (vehicleRef) {
+        const getVehicle = async () => {
+            setIsVehicleLoading(true);
+            try {
+                const docSnap = await getDoc(vehicleRef);
+                if (docSnap.exists()) {
+                    setVehicleData({ id: docSnap.id, ...docSnap.data() } as Vehicle);
+                } else {
+                    setVehicleData(null);
+                }
+            } catch (e) {
+                console.error("Error fetching vehicle for edit:", e);
+                setVehicleData(null);
+            } finally {
+                setIsVehicleLoading(false);
+            }
+        };
+        getVehicle();
+    } else if (!isUserLoading) { // If there's no user, we can stop loading
+        setIsVehicleLoading(false);
+    }
+  }, [vehicleRef, isUserLoading]);
+
 
   const [photos, setPhotos] = useState<PhotoState[]>([]);
   const [photosToDelete, setPhotosToDelete] = useState<string[]>([]);
