@@ -212,17 +212,15 @@ export default function ListingDetailPage() {
           >
             <CarouselContent className="h-full">
               {vehicle.images.map((image, index) => (
-                <CarouselItem key={index} className="h-full p-0">
-                  <div className="relative w-full h-full flex items-center justify-center">
-                      <Image
-                        src={image.url}
-                        alt={image.alt}
-                        fill
-                        className="object-contain"
-                        data-ai-hint={image.hint}
-                        sizes="(max-width: 1280px) 90vw, 80vw"
-                      />
-                  </div>
+                <CarouselItem key={index} className="h-full p-0 relative">
+                  <Image
+                    src={image.url}
+                    alt={image.alt}
+                    fill
+                    className="object-contain"
+                    data-ai-hint={image.hint}
+                    sizes="(max-width: 1280px) 90vw, 80vw"
+                  />
                 </CarouselItem>
               ))}
             </CarouselContent>
