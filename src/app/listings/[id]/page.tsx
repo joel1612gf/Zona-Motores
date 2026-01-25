@@ -210,9 +210,9 @@ export default function ListingDetailPage() {
               loop: vehicle.images.length > 1,
             }}
           >
-            <CarouselContent className="h-full">
+            <CarouselContent className="h-full items-stretch">
               {vehicle.images.map((image, index) => (
-                <CarouselItem key={index} className="h-full p-0 relative">
+                <CarouselItem key={index} className="relative">
                   <Image
                     src={image.url}
                     alt={image.alt}
