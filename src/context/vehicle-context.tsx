@@ -3,7 +3,7 @@
 import { createContext, useContext, ReactNode, useMemo } from 'react';
 import { Vehicle } from '@/lib/types';
 import { useCollection } from '@/firebase/firestore/use-collection';
-import { collectionGroup, query, orderBy, where } from 'firebase/firestore';
+import { collectionGroup, query } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
 
 type VehicleContextType = {
@@ -18,13 +18,11 @@ export function VehicleProvider({ children }: { children: ReactNode }) {
 
   const vehiclesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    // Use a collectionGroup query to fetch all vehicle listings from all users.
-    // This now filters for active listings and uses the composite index created
-    // in the Firebase console to sort by creation date.
+    // TEMPORARY: Querying the whole collection group without filters/ordering
+    // while the composite index is building in Firebase.
+    // This avoids the "index is building" error.
     return query(
-      collectionGroup(firestore, 'vehicleListings'),
-      where('status', '==', 'active'),
-      orderBy('createdAt', 'desc')
+      collectionGroup(firestore, 'vehicleListings')
     );
   }, [firestore]);
 
@@ -35,7 +33,19 @@ export function VehicleProvider({ children }: { children: ReactNode }) {
       console.error("Error fetching vehicles via collectionGroup:", error);
   }
 
-  const vehicles = useMemo(() => (data || []).map(v => ({...v, id: v.id})), [data]);
+  // Client-side filtering and sorting as a temporary measure.
+  // This will be reverted once the Firebase index is confirmed to be ready.
+  const vehicles = useMemo(() => {
+    if (!data) return [];
+    return data
+      .filter(v => v.status === 'active') // Show only active listings
+      .sort((a, b) => { // Sort by creation date, descending
+        const dateA = a.createdAt?.toDate() || new Date(0);
+        const dateB = b.createdAt?.toDate() || new Date(0);
+        return dateB.getTime() - dateA.getTime();
+      })
+      .map(v => ({...v, id: v.id}));
+  }, [data]);
 
   const value = useMemo(() => ({ vehicles, isLoading }), [vehicles, isLoading]);
 
