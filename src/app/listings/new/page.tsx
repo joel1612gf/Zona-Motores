@@ -261,6 +261,12 @@ export default function NewListingPage() {
             throw new Error("No todas las imágenes se subieron correctamente.");
         }
 
+        // Reorder images to put the selected main photo first.
+        if (mainPhotoIndex !== null && mainPhotoIndex > 0 && uploadedImages.length > mainPhotoIndex) {
+          const mainImage = uploadedImages.splice(mainPhotoIndex, 1)[0];
+          uploadedImages.unshift(mainImage);
+        }
+
         const newVehicleData = {
             id: newVehicleRef.id,
             make: selectedBrand,
