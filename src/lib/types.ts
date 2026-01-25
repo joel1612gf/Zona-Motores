@@ -54,4 +54,5 @@ export type Vehicle = {
     lon: number;
   };
   createdAt: Timestamp;
+  status?: 'active' | 'paused' | 'sold';
 };

@@ -291,6 +291,7 @@ export default function NewListingPage() {
             },
             location: { city: 'Caracas', state: 'Distrito Capital', lat: 10.4806, lon: -66.9036 },
             createdAt: serverTimestamp(),
+            status: 'active' as 'active' | 'paused' | 'sold',
             ...(selectedType === 'Carro' && { doorCount: details.doorCount as '2' | '4' }),
             ...(selectedType === 'Camioneta' && { is4x4: details.is4x4 }),
             ...(!details.isOperational && { operationalDetails: details.operationalDetails }),
