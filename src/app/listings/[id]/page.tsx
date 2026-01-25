@@ -26,7 +26,8 @@ import {
   GitCompareArrows,
   ArrowDownToLine,
   ArrowUpFromLine,
-  LifeBuoy
+  LifeBuoy,
+  Shield
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { notFound } from 'next/navigation';
@@ -72,6 +73,9 @@ export default function ListingDetailPage() {
       </svg>
     );
     mainFeatures.push({ icon: FourByFourIcon, label: 'Es 4x4' });
+  }
+  if (vehicle.isArmored) {
+    mainFeatures.push({ icon: Shield, label: `Blindado Nivel ${vehicle.armorLevel || 'N/A'}` });
   }
   if (vehicle.doorCount) mainFeatures.push({ icon: DoorOpen, label: `${vehicle.doorCount} puertas` });
   if (vehicle.isOperational) mainFeatures.push({ icon: CircleCheck, label: 'Rueda actualmente' });

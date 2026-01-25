@@ -21,6 +21,7 @@ import { Progress } from '@/components/ui/progress';
 import imageCompression from 'browser-image-compression';
 import type { Vehicle } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type PhotoState = {
   file?: File;
@@ -89,6 +90,8 @@ export default function EditListingPage() {
     isSignatory: true,
     doorCount: '4',
     is4x4: false,
+    isArmored: false,
+    armorLevel: '1',
     hasSoundSystem: false,
     ownerCount: '1',
     tireLife: '75',
@@ -121,6 +124,8 @@ export default function EditListingPage() {
         isSignatory: vehicleData.isSignatory,
         doorCount: vehicleData.doorCount || '4',
         is4x4: vehicleData.is4x4 || false,
+        isArmored: vehicleData.isArmored || false,
+        armorLevel: vehicleData.armorLevel?.toString() || '1',
         hasSoundSystem: vehicleData.hasSoundSystem,
         ownerCount: vehicleData.ownerCount.toString(),
         tireLife: vehicleData.tireLife.toString(),
@@ -269,17 +274,34 @@ export default function EditListingPage() {
       }
 
       // 4. Construct update payload
-      const updatedVehicleData = {
-        ...details,
+      const updatedVehicleData: any = {
         year: parseInt(details.year, 10),
         priceUSD: parseInt(details.price, 10),
         mileage: parseInt(details.mileage, 10) || 0,
+        transmission: details.transmission,
+        exteriorColor: details.exteriorColor,
+        engine: details.engine,
+        hadMajorCrash: details.hadMajorCrash,
+        hasAC: details.hasAC,
+        isOperational: details.isOperational,
+        isSignatory: details.isSignatory,
+        doorCount: details.doorCount,
+        is4x4: details.is4x4,
+        isArmored: details.isArmored,
+        hasSoundSystem: details.hasSoundSystem,
         ownerCount: parseInt(details.ownerCount, 10),
         tireLife: parseInt(details.tireLife, 10),
         description: details.moreDetails,
+        acceptsTradeIn: details.acceptsTradeIn,
         images: allImageInfos,
         updatedAt: serverTimestamp(),
       };
+      
+      updatedVehicleData.operationalDetails = details.isOperational ? null : details.operationalDetails;
+      updatedVehicleData.armorLevel = details.isArmored ? parseInt(details.armorLevel, 10) : null;
+      updatedVehicleData.tradeInDetails = details.acceptsTradeIn ? details.tradeInDetails : null;
+      updatedVehicleData.tradeInForHigherValue = details.acceptsTradeIn ? details.tradeInForHigherValue : null;
+      updatedVehicleData.tradeInForLowerValue = details.acceptsTradeIn ? details.tradeInForLowerValue : null;
       
       await updateDoc(vehicleRef, updatedVehicleData);
 
@@ -342,7 +364,6 @@ export default function EditListingPage() {
                       <Label htmlFor="price">Precio (USD)</Label>
                       <Input id="price" type="number" min="0" value={details.price} onChange={(e) => handleDetailChange('price', e.target.value)} placeholder="Ej: 22000" />
                   </div>
-                  {/* The rest of the form fields, same as new/page.tsx */}
                    <div className="space-y-2">
                       <Label htmlFor="mileage">Kilometraje</Label>
                       <Input id="mileage" type="number" min="0" value={details.mileage} onChange={(e) => handleDetailChange('mileage', e.target.value)} placeholder="Ej: 55000" />
@@ -390,12 +411,38 @@ export default function EditListingPage() {
                           </RadioGroup>
                       </div>
                   )}
-                  {vehicleData.bodyType === 'Camioneta' && (
-                       <div className="flex items-center justify-between rounded-lg border p-4"><Label htmlFor="is4x4">¿Es 4x4?</Label><Switch id="is4x4" checked={details.is4x4} onCheckedChange={(c) => handleDetailChange('is4x4', c)} /></div>
-                  )}
+                  <div className="flex items-center justify-between rounded-lg border p-4">
+                    <Label htmlFor="is4x4">¿Es 4x4?</Label>
+                    <Switch id="is4x4" checked={details.is4x4} onCheckedChange={(c) => handleDetailChange('is4x4', c)} />
+                  </div>
                   <div className="flex items-center justify-between rounded-lg border p-4">
                       <Label htmlFor="hasSoundSystem">¿Tiene sistema de sonido?</Label>
                       <Switch id="hasSoundSystem" checked={details.hasSoundSystem} onCheckedChange={(c) => handleDetailChange('hasSoundSystem', c)} />
+                  </div>
+                  <div className="md:col-span-2 space-y-4 rounded-lg border p-4">
+                      <div className="flex items-center justify-between">
+                          <Label htmlFor="isArmored" className="pr-4">¿El vehículo es blindado?</Label>
+                          <Switch id="isArmored" checked={details.isArmored} onCheckedChange={(c) => handleDetailChange('isArmored', c)} />
+                      </div>
+                      {details.isArmored && (
+                          <div className="space-y-2 pt-4 border-t animate-in fade-in-50 duration-300">
+                              <Label htmlFor="armorLevel">Nivel de Blindaje</Label>
+                              <Select onValueChange={(v) => handleDetailChange('armorLevel', v)} value={details.armorLevel}>
+                                  <SelectTrigger id="armorLevel">
+                                      <SelectValue placeholder="Selecciona el nivel" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                      <SelectItem value="1">Nivel 1</SelectItem>
+                                      <SelectItem value="2">Nivel 2</SelectItem>
+                                      <SelectItem value="3">Nivel 3</SelectItem>
+                                      <SelectItem value="4">Nivel 4</SelectItem>
+                                      <SelectItem value="5">Nivel 5</SelectItem>
+                                      <SelectItem value="6">Nivel 6</SelectItem>
+                                      <SelectItem value="7">Nivel 7</SelectItem>
+                                  </SelectContent>
+                              </Select>
+                          </div>
+                      )}
                   </div>
                    <div className="md:col-span-2 space-y-4 rounded-lg border p-4">
                       <div className="flex items-center justify-between"><Label htmlFor="acceptsTradeIn">¿Aceptas cambios?</Label><Switch id="acceptsTradeIn" checked={details.acceptsTradeIn} onCheckedChange={(c) => handleDetailChange('acceptsTradeIn', c)} /></div>

@@ -41,6 +41,18 @@
             "type": "string"
           }
         },
+        "is4x4": {
+          "type": "boolean",
+          "description": "Indicates if the vehicle has 4x4 traction."
+        },
+        "isArmored": {
+          "type": "boolean",
+          "description": "Indicates if the vehicle is armored."
+        },
+        "armorLevel": {
+          "type": "number",
+          "description": "The armor level of the vehicle, from 1 to 7."
+        },
         "locationLatitude": {
           "type": "number",
           "description": "Latitude coordinate of the vehicle's location."

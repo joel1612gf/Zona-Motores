@@ -27,6 +27,8 @@ export type Vehicle = {
   exteriorColor: string;
   doorCount?: '2' | '4';
   is4x4?: boolean;
+  isArmored?: boolean;
+  armorLevel?: number;
   ownerCount: number;
   tireLife: number;
   

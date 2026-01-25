@@ -21,6 +21,7 @@ import { useMakes } from '@/context/makes-context';
 import { ref, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import { Progress } from '@/components/ui/progress';
 import imageCompression from 'browser-image-compression';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type VehicleType = 'Moto' | 'Carro' | 'Camioneta';
 type Step = 'selection' | 'details' | 'photos';
@@ -76,6 +77,8 @@ export default function NewListingPage() {
     isSignatory: true,
     doorCount: '4',
     is4x4: false,
+    isArmored: false,
+    armorLevel: '1',
     hasSoundSystem: false,
     ownerCount: '1',
     tireLife: '75',
@@ -286,6 +289,8 @@ export default function NewListingPage() {
             isOperational: details.isOperational,
             isSignatory: details.isSignatory,
             acceptsTradeIn: details.acceptsTradeIn,
+            is4x4: details.is4x4,
+            isArmored: details.isArmored,
             description: details.moreDetails,
             images: uploadedImages,
             sellerId: user.uid,
@@ -299,13 +304,13 @@ export default function NewListingPage() {
             createdAt: serverTimestamp(),
             status: 'active' as 'active' | 'paused' | 'sold',
             ...(selectedType === 'Carro' && { doorCount: details.doorCount as '2' | '4' }),
-            ...(selectedType === 'Camioneta' && { is4x4: details.is4x4 }),
             ...(!details.isOperational && { operationalDetails: details.operationalDetails }),
             ...(details.acceptsTradeIn && {
                 tradeInDetails: details.tradeInDetails,
                 tradeInForHigherValue: details.tradeInForHigherValue,
                 tradeInForLowerValue: details.tradeInForLowerValue,
             }),
+            ...(details.isArmored && { armorLevel: parseInt(details.armorLevel, 10) }),
         };
 
         await setDoc(newVehicleRef, newVehicleData);
@@ -524,15 +529,38 @@ export default function NewListingPage() {
                         </RadioGroup>
                     </div>
                 )}
-                {selectedType === 'Camioneta' && (
-                     <div className="flex items-center justify-between rounded-lg border p-4">
-                        <Label htmlFor="is4x4" className="pr-4">¿Es 4x4?</Label>
-                        <Switch id="is4x4" checked={details.is4x4} onCheckedChange={(c) => handleDetailChange('is4x4', c)} />
-                    </div>
-                )}
+                <div className="flex items-center justify-between rounded-lg border p-4">
+                    <Label htmlFor="is4x4" className="pr-4">¿Es 4x4?</Label>
+                    <Switch id="is4x4" checked={details.is4x4} onCheckedChange={(c) => handleDetailChange('is4x4', c)} />
+                </div>
                 <div className="flex items-center justify-between rounded-lg border p-4">
                     <Label htmlFor="hasSoundSystem" className="pr-4">¿Tiene sistema de sonido?</Label>
                     <Switch id="hasSoundSystem" checked={details.hasSoundSystem} onCheckedChange={(c) => handleDetailChange('hasSoundSystem', c)} />
+                </div>
+                <div className="md:col-span-2 space-y-4 rounded-lg border p-4">
+                    <div className="flex items-center justify-between">
+                        <Label htmlFor="isArmored" className="pr-4">¿El vehículo es blindado?</Label>
+                        <Switch id="isArmored" checked={details.isArmored} onCheckedChange={(c) => handleDetailChange('isArmored', c)} />
+                    </div>
+                    {details.isArmored && (
+                        <div className="space-y-2 pt-4 border-t animate-in fade-in-50 duration-300">
+                            <Label htmlFor="armorLevel">Nivel de Blindaje</Label>
+                            <Select onValueChange={(v) => handleDetailChange('armorLevel', v)} defaultValue={details.armorLevel}>
+                                <SelectTrigger id="armorLevel">
+                                    <SelectValue placeholder="Selecciona el nivel" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="1">Nivel 1</SelectItem>
+                                    <SelectItem value="2">Nivel 2</SelectItem>
+                                    <SelectItem value="3">Nivel 3</SelectItem>
+                                    <SelectItem value="4">Nivel 4</SelectItem>
+                                    <SelectItem value="5">Nivel 5</SelectItem>
+                                    <SelectItem value="6">Nivel 6</SelectItem>
+                                    <SelectItem value="7">Nivel 7</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
                 </div>
                  <div className="md:col-span-2 space-y-4 rounded-lg border p-4">
                     <div className="flex items-center justify-between">
