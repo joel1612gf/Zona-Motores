@@ -189,7 +189,11 @@ export default function NewListingPage() {
           const fileName = `${newVehicleRef.id}-${i}-${photo.file.name}`;
           const imageRef = ref(storage, `vehicle-images/${user.uid}/${fileName}`);
           
-          const uploadTask = uploadBytesResumable(imageRef, photo.file);
+          const metadata = {
+            contentType: photo.file.type,
+          };
+          
+          const uploadTask = uploadBytesResumable(imageRef, photo.file, metadata);
 
           await new Promise<void>((resolve, reject) => {
             uploadTask.on('state_changed',
