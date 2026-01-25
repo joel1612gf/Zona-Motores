@@ -58,6 +58,8 @@ export default function ListingDetailPage() {
       <svg
         {...props}
         xmlns="http://www.w3.org/2000/svg"
+        width="24"
+        height="24"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -65,11 +67,12 @@ export default function ListingDetailPage() {
         strokeLinecap="round"
         strokeLinejoin="round"
       >
-        <path d="M10 12h4" />
-        <path d="M12 10v4" />
-        <path d="M16 12h1.5a1.5 1.5 0 0 0 0-3H16v3Z" />
-        <path d="M7 9v6" />
-        <path d="m4 12 3-3v6l-3-3" />
+        <path d="M7 15V9l-3 3" />
+        <path d="M4 12h3" />
+        <path d="M11 9l4 6" />
+        <path d="M15 9l-4 6" />
+        <path d="M20 15V9l-3 3" />
+        <path d="M17 12h3" />
       </svg>
     );
     mainFeatures.push({ icon: FourByFourIcon, label: 'Es 4x4' });
