@@ -30,13 +30,15 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { doc, deleteDoc, updateDoc } from 'firebase/firestore';
-import { useFirestore, useUser } from '@/firebase';
+import { useFirestore, useUser, useStorage } from '@/firebase';
+import { ref, deleteObject } from 'firebase/storage';
 import { cn } from '@/lib/utils';
 
 
 export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
     const { toast } = useToast();
     const firestore = useFirestore();
+    const storage = useStorage();
     const { user } = useUser();
     const [isDeleting, setIsDeleting] = useState(false);
     const [isTogglingStatus, setIsTogglingStatus] = useState(false);
@@ -47,6 +49,20 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
         try {
             const vehicleRef = doc(firestore, 'users', user.uid, 'vehicleListings', vehicle.id);
             await deleteDoc(vehicleRef);
+
+            // After deleting the document, delete the images from Storage.
+            try {
+                const imageDeletePromises = vehicle.images.map(image => {
+                    const imageRef = ref(storage, image.url);
+                    return deleteObject(imageRef);
+                });
+                await Promise.all(imageDeletePromises);
+            } catch (storageError) {
+                console.error("Error deleting one or more images from storage:", storageError);
+                // We won't show a separate error toast for this to avoid confusing the user.
+                // The main action (listing deletion) was successful.
+            }
+
             toast({
                 title: "Publicación Eliminada",
                 description: `Tu ${vehicle.make} ${vehicle.model} ha sido eliminado.`,
