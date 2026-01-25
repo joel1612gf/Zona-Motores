@@ -1,10 +1,10 @@
 'use client';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import { useVehicles } from '@/context/vehicle-context';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogClose } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle as CardTitleComponent } from '@/components/ui/card';
@@ -29,9 +29,10 @@ import {
   LifeBuoy,
   Shield,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  X
 } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, cn } from '@/lib/utils';
 import { notFound } from 'next/navigation';
 
 export default function ListingDetailPage() {
@@ -42,6 +43,26 @@ export default function ListingDetailPage() {
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
+  // State and refs for zoom/pan
+  const [transform, setTransform] = useState({ scale: 1, x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const panStart = useRef({ x: 0, y: 0 });
+  const imageContainerRef = useRef<HTMLDivElement>(null);
+  const initialTouchState = useRef({ distance: 0, scale: 1 });
+
+  // Reset zoom when lightbox closes or image changes
+  useEffect(() => {
+    setTransform({ scale: 1, x: 0, y: 0 });
+  }, [isLightboxOpen, currentImageIndex]);
+
+  const handleLightboxOpenChange = (open: boolean) => {
+    if (!open) {
+      setTransform({ scale: 1, x: 0, y: 0 });
+      setIsPanning(false);
+    }
+    setIsLightboxOpen(open);
+  };
+
   if (!vehicle) {
     notFound();
   }
@@ -49,6 +70,91 @@ export default function ListingDetailPage() {
   const handleImageClick = (index: number) => {
     setCurrentImageIndex(index);
     setIsLightboxOpen(true);
+  };
+
+  const handlePrevImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentImageIndex(prev => (prev === 0 ? vehicle.images.length - 1 : prev - 1));
+  };
+
+  const handleNextImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentImageIndex(prev => (prev === vehicle.images.length - 1 ? 0 : prev + 1));
+  };
+
+  // Zoom/Pan Handlers
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const scaleAmount = -e.deltaY * 0.002;
+    setTransform(prev => {
+      const newScale = Math.max(1, Math.min(prev.scale + scaleAmount, 5));
+      if (newScale === 1) {
+        return { scale: 1, x: 0, y: 0 };
+      }
+      // TODO: Implement zoom towards cursor for better UX
+      return { ...prev, scale: newScale };
+    });
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0 || transform.scale <= 1) return;
+    e.preventDefault();
+    setIsPanning(true);
+    panStart.current = { x: e.clientX - transform.x, y: e.clientY - transform.y };
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isPanning) return;
+    e.preventDefault();
+    const newX = e.clientX - panStart.current.x;
+    const newY = e.clientY - panStart.current.y;
+    setTransform(prev => ({ ...prev, x: newX, y: newY }));
+  };
+
+  const handleMouseUpOrLeave = () => {
+    setIsPanning(false);
+  };
+  
+  // Touch Handlers
+  const getDistance = (touches: React.TouchList) => {
+    return Math.sqrt(
+      Math.pow(touches[0].clientX - touches[1].clientX, 2) +
+      Math.pow(touches[0].clientY - touches[1].clientY, 2)
+    );
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      setIsPanning(false);
+      initialTouchState.current = { distance: getDistance(e.touches), scale: transform.scale };
+    } else if (e.touches.length === 1 && transform.scale > 1) {
+      e.preventDefault();
+      setIsPanning(true);
+      panStart.current = { x: e.touches[0].clientX - transform.x, y: e.touches[0].clientY - transform.y };
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      const newDistance = getDistance(e.touches);
+      const newScale = Math.max(1, (newDistance / initialTouchState.current.distance) * initialTouchState.current.scale);
+      setTransform(prev => ({ ...prev, scale: newScale, x: 0, y: 0 }));
+    } else if (e.touches.length === 1 && isPanning) {
+      e.preventDefault();
+      const newX = e.touches[0].clientX - panStart.current.x;
+      const newY = e.touches[0].clientY - panStart.current.y;
+      setTransform(prev => ({ ...prev, x: newX, y: newY }));
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setIsPanning(false);
+    if (transform.scale <= 1) {
+      setTransform({ scale: 1, x: 0, y: 0 });
+    }
   };
 
   const mainFeatures: { icon: React.FC<React.SVGProps<SVGSVGElement>>; label: string }[] = [];
@@ -198,55 +304,74 @@ export default function ListingDetailPage() {
         </div>
       </div>
 
-      <Dialog open={isLightboxOpen} onOpenChange={setIsLightboxOpen}>
-        <DialogContent className="max-w-screen-xl w-full h-[90vh] p-0 border-none bg-background/95">
+      <Dialog open={isLightboxOpen} onOpenChange={handleLightboxOpenChange}>
+        <DialogContent className="max-w-screen-xl w-full h-[90vh] p-0 border-none bg-black/90 flex items-center justify-center overflow-hidden">
           <DialogTitle className="sr-only">Galería de Imágenes del Vehículo</DialogTitle>
           <DialogDescription className="sr-only">
-            Visor de imágenes para {`${vehicle.year} ${vehicle.make} ${vehicle.model}`}. Usa las flechas para navegar entre las fotos.
+            Visor de imágenes para {`${vehicle.year} ${vehicle.make} ${vehicle.model}`}. Usa la rueda del ratón o pellizca para hacer zoom. Arrastra para mover la imagen.
           </DialogDescription>
           
-          <div className="relative w-full h-full flex items-center justify-center">
-            <div className="relative w-full h-full">
-              <Image
-                src={vehicle.images[currentImageIndex].url}
-                alt={vehicle.images[currentImageIndex].alt}
-                fill
-                className="object-contain"
-                data-ai-hint={vehicle.images[currentImageIndex].hint}
-                sizes="(max-width: 1280px) 90vw, 80vw"
-              />
-            </div>
-
-            {vehicle.images.length > 1 && (
-              <>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-black/50 text-white hover:bg-black/80 hover:text-white z-10"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setCurrentImageIndex(prev => (prev === 0 ? vehicle.images.length - 1 : prev - 1));
-                  }}
-                >
-                  <ChevronLeft className="h-6 w-6" />
-                  <span className="sr-only">Anterior</span>
-                </Button>
-                
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-black/50 text-white hover:bg-black/80 hover:text-white z-10"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setCurrentImageIndex(prev => (prev === vehicle.images.length - 1 ? 0 : prev + 1));
-                  }}
-                >
-                  <ChevronRight className="h-6 w-6" />
-                  <span className="sr-only">Siguiente</span>
-                </Button>
-              </>
+          <div
+            ref={imageContainerRef}
+            className={cn(
+              "relative w-full h-full",
+              transform.scale > 1 ? (isPanning ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-auto'
             )}
+            onWheel={handleWheel}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUpOrLeave}
+            onMouseLeave={handleMouseUpOrLeave}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
+            <Image
+              key={currentImageIndex}
+              src={vehicle.images[currentImageIndex].url}
+              alt={vehicle.images[currentImageIndex].alt}
+              fill
+              className="object-contain"
+              style={{
+                transform: `scale(${transform.scale}) translate(${transform.x}px, ${transform.y}px)`,
+                cursor: 'inherit',
+                transition: isPanning ? 'none' : 'transform 0.1s ease-out',
+              }}
+              data-ai-hint={vehicle.images[currentImageIndex].hint}
+              sizes="(max-width: 1280px) 90vw, 80vw"
+              draggable="false"
+            />
           </div>
+
+          {/* Navigation buttons: only show when not zoomed in */}
+          {vehicle.images.length > 1 && transform.scale === 1 && (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-black/50 text-white hover:bg-black/80 hover:text-white z-20"
+                onClick={handlePrevImage}
+              >
+                <ChevronLeft className="h-6 w-6" />
+                <span className="sr-only">Anterior</span>
+              </Button>
+              
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-black/50 text-white hover:bg-black/80 hover:text-white z-20"
+                onClick={handleNextImage}
+              >
+                <ChevronRight className="h-6 w-6" />
+                <span className="sr-only">Siguiente</span>
+              </Button>
+            </>
+          )}
+
+          <DialogClose className="absolute right-4 top-4 rounded-full p-2 bg-black/50 text-white hover:bg-black/80 hover:text-white z-20 transition-colors">
+            <X className="h-5 w-5" />
+            <span className="sr-only">Cerrar</span>
+          </DialogClose>
         </DialogContent>
       </Dialog>
     </div>
