@@ -19,12 +19,9 @@ export function VehicleProvider({ children }: { children: ReactNode }) {
   const vehiclesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     // Use a collectionGroup query to fetch all vehicle listings from all users.
-    // This previously used orderBy('createdAt', 'desc'), which requires a composite index
-    // in Firestore that must be created manually via a link in the error console.
-    // To prevent the app from crashing while that index is not created, we are
-    // temporarily removing the sorting. The app will work, but listings may not
-    // appear in chronological order.
-    return query(collectionGroup(firestore, 'vehicleListings'));
+    // This now uses the composite index created in the Firebase console
+    // to sort the listings by creation date in descending order.
+    return query(collectionGroup(firestore, 'vehicleListings'), orderBy('createdAt', 'desc'));
   }, [firestore]);
 
   const { data, isLoading, error } = useCollection<Vehicle>(vehiclesQuery);
