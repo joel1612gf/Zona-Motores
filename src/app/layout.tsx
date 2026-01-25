@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { cn } from '@/lib/utils';
 import { Toaster } from '@/components/ui/toaster';
@@ -12,6 +12,9 @@ import { MakesProvider } from '@/context/makes-context';
 export const metadata: Metadata = {
   title: 'Zona Motores',
   description: 'Encuentra tu próximo vehículo en Venezuela',
+};
+
+export const viewport: Viewport = {
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: 'white' },
     { media: '(prefers-color-scheme: dark)', color: 'black' },
