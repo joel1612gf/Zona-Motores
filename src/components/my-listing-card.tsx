@@ -48,9 +48,9 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
         setIsDeleting(true);
         try {
             const vehicleRef = doc(firestore, 'users', user.uid, 'vehicleListings', vehicle.id);
-            await deleteDoc(vehicleRef);
-
-            // After deleting the document, delete the images from Storage.
+            
+            // First, delete the images from Storage.
+            // Use a separate try-catch for storage errors so that if it fails, we still delete the Firestore doc.
             try {
                 const imageDeletePromises = vehicle.images.map(image => {
                     const imageRef = ref(storage, image.url);
@@ -61,7 +61,15 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
                 console.error("Error deleting one or more images from storage:", storageError);
                 // We won't show a separate error toast for this to avoid confusing the user.
                 // The main action (listing deletion) was successful.
+                toast({
+                    variant: "destructive",
+                    title: "Error en Storage",
+                    description: "No se pudieron eliminar las imágenes, pero la publicación sí se borró.",
+                });
             }
+
+            // After attempting to delete images, delete the Firestore document.
+            await deleteDoc(vehicleRef);
 
             toast({
                 title: "Publicación Eliminada",
@@ -136,9 +144,11 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
                     Ver
                 </Link>
             </Button>
-            <Button variant="outline" size="sm" disabled>
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/listings/${vehicle.id}/edit`}>
                 <Pencil className="mr-1.5 h-4 w-4" />
                 Editar
+              </Link>
             </Button>
             <Button variant="outline" size="sm" onClick={handleToggleStatus} disabled={isTogglingStatus || vehicle.status === 'sold'}>
                 {isTogglingStatus ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : 
