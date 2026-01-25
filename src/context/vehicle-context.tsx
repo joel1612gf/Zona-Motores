@@ -3,7 +3,7 @@
 import { createContext, useContext, ReactNode, useMemo } from 'react';
 import { Vehicle } from '@/lib/types';
 import { useCollection } from '@/firebase/firestore/use-collection';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { collectionGroup, query, orderBy } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
 
 type VehicleContextType = {
@@ -18,13 +18,16 @@ export function VehicleProvider({ children }: { children: ReactNode }) {
 
   const vehiclesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return query(collection(firestore, 'vehicle_listings'), orderBy('createdAt', 'desc'));
+    // Use a collectionGroup query to fetch all vehicle listings from all users.
+    // This requires a composite index in Firestore.
+    return query(collectionGroup(firestore, 'vehicleListings'), orderBy('createdAt', 'desc'));
   }, [firestore]);
 
   const { data, isLoading, error } = useCollection<Vehicle>(vehiclesQuery);
   
   if (error) {
-      console.error("Error fetching vehicles:", error);
+      // The permission error will be thrown by the hook, this is for console logging.
+      console.error("Error fetching vehicles via collectionGroup:", error);
   }
 
   const vehicles = useMemo(() => (data || []).map(v => ({...v, id: v.id})), [data]);

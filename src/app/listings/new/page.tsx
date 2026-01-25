@@ -213,7 +213,7 @@ export default function NewListingPage() {
     setUploadProgress(0);
 
     try {
-        const vehicleCollection = collection(firestore, 'vehicle_listings');
+        const vehicleCollection = collection(firestore, 'users', user.uid, 'vehicleListings');
         const newVehicleRef = doc(vehicleCollection);
 
         const uploadedImages: { url: string; alt: string; hint: string }[] = [];

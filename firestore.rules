@@ -11,17 +11,39 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
+      // Only the owner can read or write their own user profile
       allow read, write: if isOwner(userId);
+
+      // Vehicle listings are a subcollection of users
+      match /vehicleListings/{listingId} {
+        // Anyone can get a single listing
+        allow get: if true;
+        
+        // Only the owner of the user document can manage their own listings
+        allow create, update, delete: if isOwner(userId);
+      }
     }
 
+    // This rule allows a collection group query on 'vehicleListings'.
+    // It's required to let anyone list all vehicles across all users.
+    // A composite index will need to be created in Firestore for this to work.
+    match /{path=**}/vehicleListings/{listingId} {
+      allow list: if true;
+    }
+
+    // This collection is no longer used, so we deny all access to prevent confusion.
     match /vehicle_listings/{listingId} {
-      allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update, delete: if isSignedIn() && isOwner(resource.data.sellerId);
+      allow read, write: if false;
     }
 
+    // vehicle_meta can be read by anyone
     match /vehicle_meta/{docId} {
       allow get, list: if true;
+    }
+
+    // exchangeRates can be read by anyone
+    match /exchangeRates/{rateId} {
+        allow get, list: if true;
     }
   }
 }

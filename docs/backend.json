@@ -12,7 +12,7 @@
         },
         "sellerId": {
           "type": "string",
-          "description": "Reference to Seller. (Relationship: Seller 1:N VehicleListing)"
+          "description": "Reference to the User who is the seller."
         },
         "make": {
           "type": "string",
@@ -71,15 +71,15 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Seller",
       "type": "object",
-      "description": "Represents a seller of vehicles in the Motores Zone application.",
+      "description": "Represents a seller of vehicles, which is essentially a user profile.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the Seller entity."
+          "description": "Unique identifier for the Seller entity, matches auth.uid."
         },
         "phoneNumber": {
           "type": "string",
-          "description": "The seller's phone number used for verification via WhatsApp API."
+          "description": "The seller's phone number used for verification."
         },
         "isVerified": {
           "type": "boolean",
@@ -88,7 +88,6 @@
       },
       "required": [
         "id",
-        "phoneNumber",
         "isVerified"
       ]
     },
@@ -126,60 +125,23 @@
     ]
   },
   "firestore": {
-    "structure": [
-      {
-        "path": "/sellers/{sellerId}",
-        "definition": {
-          "entityName": "Seller",
-          "schema": {
-            "$ref": "#/backend/entities/Seller"
-          },
-          "description": "Stores seller profiles. 'sellerId' corresponds to the user's auth.uid.",
-          "params": [
-            {
-              "name": "sellerId",
-              "description": "The unique identifier for the seller, which is the same as the user's auth.uid.  This enforces path-based ownership."
-            }
-          ]
-        }
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/Seller"
       },
-      {
-        "path": "/sellers/{sellerId}/vehicleListings/{vehicleListingId}",
-        "definition": {
-          "entityName": "VehicleListing",
-          "schema": {
-            "$ref": "#/backend/entities/VehicleListing"
-          },
-          "description": "Stores vehicle listings associated with a specific seller. Leverages path-based ownership.",
-          "params": [
-            {
-              "name": "sellerId",
-              "description": "The unique identifier for the seller, corresponding to the user's auth.uid."
-            },
-            {
-              "name": "vehicleListingId",
-              "description": "The unique identifier for the vehicle listing."
-            }
-          ]
-        }
+      "description": "Stores user profiles. 'userId' corresponds to the user's auth.uid."
+    },
+    "/users/{userId}/vehicleListings/{vehicleListingId}": {
+      "schema": {
+        "$ref": "#/entities/VehicleListing"
       },
-      {
-        "path": "/exchangeRates/{exchangeRateId}",
-        "definition": {
-          "entityName": "ExchangeRate",
-          "schema": {
-            "$ref": "#/backend/entities/ExchangeRate"
-          },
-          "description": "Stores exchange rate data. This is likely an admin-managed collection.",
-          "params": [
-            {
-              "name": "exchangeRateId",
-              "description": "The unique identifier for the exchange rate entry."
-            }
-          ]
-        }
-      }
-    ],
-    "reasoning": "The Firestore structure is designed to support the Motores Zone application's core features, including vehicle listings, currency conversion, seller verification, and advanced search capabilities. Authorization Independence is achieved by leveraging path-based ownership for seller data and their listings, eliminating the need for `get()` calls in security rules.  The structure facilitates secure `list` operations via Structural Segregation. All documents within a collection share the same security posture.  By separating user profiles and vehicle listings, we avoid mixing data with different access requirements within the same collection, this strategy simplifies rules and enhances security.\n\nSpecifically:\n\n*   **/sellers/{sellerId}**: Stores seller profiles, owned by the user (seller) identified by `sellerId`.  The `sellerId` matches the `auth.uid` of the authenticated user, ensuring that only the seller can read or write their own profile.  This leverages Path-Based Ownership.\n*   **/sellers/{sellerId}/vehicleListings/{vehicleListingId}**: Stores vehicle listings associated with a specific seller.  The listings are nested under the seller's document, continuing the path-based ownership model. This eliminates the need for complex authorization logic and allows for secure and efficient `list` operations of a seller's listings.\n*   **/exchangeRates/{exchangeRateId}**: Stores exchange rate data.  Given that the app will use the official BCV exchange rate, this collection is designed for admin-level management.\n"
+      "description": "Stores vehicle listings as a subcollection of a user. Leverages path-based ownership."
+    },
+    "/exchangeRates/{exchangeRateId}": {
+      "schema": {
+        "$ref": "#/entities/ExchangeRate"
+      },
+      "description": "Stores exchange rate data. This is likely an admin-managed collection."
+    }
   }
 }

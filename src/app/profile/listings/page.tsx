@@ -4,12 +4,13 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useFirestore, useUser, useMemoFirebase, useCollection } from '@/firebase';
-import { collection, query, where, orderBy } from 'firebase/firestore';
+import { collection, query, orderBy } from 'firebase/firestore';
 import type { Vehicle } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MyListingCard } from '@/components/my-listing-card';
 import { PlusCircle } from 'lucide-react';
+import { Card } from '@/components/ui/card';
 
 export default function MyListingsPage() {
   const { user, isUserLoading: isAuthLoading } = useUser();
@@ -18,9 +19,9 @@ export default function MyListingsPage() {
 
   const myListingsQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
+    // Query the nested subcollection directly for this user's listings
     return query(
-      collection(firestore, 'vehicle_listings'),
-      where('sellerId', '==', user.uid),
+      collection(firestore, 'users', user.uid, 'vehicleListings'),
       orderBy('createdAt', 'desc')
     );
   }, [user, firestore]);

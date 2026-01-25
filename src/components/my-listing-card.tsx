@@ -30,20 +30,23 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { doc, deleteDoc, updateDoc } from 'firebase/firestore';
-import { useFirestore } from '@/firebase';
+import { useFirestore, useUser } from '@/firebase';
 import { cn } from '@/lib/utils';
 
 
 export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
     const { toast } = useToast();
     const firestore = useFirestore();
+    const { user } = useUser();
     const [isDeleting, setIsDeleting] = useState(false);
     const [isTogglingStatus, setIsTogglingStatus] = useState(false);
 
     const handleDelete = async () => {
+        if (!user) return;
         setIsDeleting(true);
         try {
-            await deleteDoc(doc(firestore, 'vehicle_listings', vehicle.id));
+            const vehicleRef = doc(firestore, 'users', user.uid, 'vehicleListings', vehicle.id);
+            await deleteDoc(vehicleRef);
             toast({
                 title: "Publicación Eliminada",
                 description: `Tu ${vehicle.make} ${vehicle.model} ha sido eliminado.`,
@@ -60,14 +63,15 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
     };
 
     const handleToggleStatus = async () => {
+        if (!user) return;
         setIsTogglingStatus(true);
         const newStatus = vehicle.status === 'active' ? 'paused' : 'active';
         try {
-            const vehicleRef = doc(firestore, 'vehicle_listings', vehicle.id);
+            const vehicleRef = doc(firestore, 'users', user.uid, 'vehicleListings', vehicle.id);
             await updateDoc(vehicleRef, { status: newStatus });
             toast({
                 title: `Publicación ${newStatus === 'active' ? 'Activada' : 'Pausada'}`,
-                description: `Tu ${vehicle.make} ${vehicle.model} ahora está ${newStatus}.`,
+                description: `Tu ${vehicle.make} ${vehicle.model} ahora está ${newStatus === 'active' ? 'activa' : 'pausada'}.`,
             });
         } catch (error) {
             console.error("Error updating status:", error);
@@ -120,7 +124,7 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
                 <Pencil className="mr-1.5 h-4 w-4" />
                 Editar
             </Button>
-            <Button variant="outline" size="sm" onClick={handleToggleStatus} disabled={isTogglingStatus}>
+            <Button variant="outline" size="sm" onClick={handleToggleStatus} disabled={isTogglingStatus || vehicle.status === 'sold'}>
                 {isTogglingStatus ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : 
                 (vehicle.status === 'active' ? <Pause className="mr-1.5 h-4 w-4" /> : <Play className="mr-1.5 h-4 w-4" />)}
                 {vehicle.status === 'active' ? 'Pausar' : 'Activar'}
@@ -128,7 +132,7 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
             
             <AlertDialog>
                 <AlertDialogTrigger asChild>
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" disabled={isDeleting}>
                         <Trash2 className="mr-1.5 h-4 w-4" />
                         Borrar
                     </Button>
