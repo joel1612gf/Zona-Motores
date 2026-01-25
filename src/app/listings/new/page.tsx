@@ -187,7 +187,7 @@ export default function NewListingPage() {
         for (let i = 0; i < photos.length; i++) {
           const photo = photos[i];
           const fileName = `${Date.now()}-${i}-${photo.file.name}`;
-          const imageRef = ref(storage, `vehicle-images/${user.uid}/${fileName}`);
+          const imageRef = ref(storage, `Zona motores/vehicle-images/${user.uid}/${fileName}`);
           
           const metadata = {
             contentType: photo.file.type,
