@@ -1,4 +1,3 @@
-
 'use client';
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
@@ -28,7 +27,9 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   LifeBuoy,
-  Shield
+  Shield,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { notFound } from 'next/navigation';
@@ -39,14 +40,14 @@ export default function ListingDetailPage() {
   const vehicle = vehicles.find(v => v.id === params.id);
 
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
-  const [lightboxStartIndex, setLightboxStartIndex] = useState(0);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   if (!vehicle) {
     notFound();
   }
 
   const handleImageClick = (index: number) => {
-    setLightboxStartIndex(index);
+    setCurrentImageIndex(index);
     setIsLightboxOpen(true);
   };
 
@@ -198,39 +199,54 @@ export default function ListingDetailPage() {
       </div>
 
       <Dialog open={isLightboxOpen} onOpenChange={setIsLightboxOpen}>
-        <DialogContent className="max-w-screen-xl w-full h-[90vh] p-0 border-none bg-background/95 flex">
+        <DialogContent className="max-w-screen-xl w-full h-[90vh] p-0 border-none bg-background/95">
           <DialogTitle className="sr-only">Galería de Imágenes del Vehículo</DialogTitle>
           <DialogDescription className="sr-only">
             Visor de imágenes para {`${vehicle.year} ${vehicle.make} ${vehicle.model}`}. Usa las flechas para navegar entre las fotos.
           </DialogDescription>
-          <Carousel
-            className="w-full h-full"
-            opts={{
-              startIndex: lightboxStartIndex,
-              loop: vehicle.images.length > 1,
-            }}
-          >
-            <CarouselContent className="h-full items-stretch">
-              {vehicle.images.map((image, index) => (
-                <CarouselItem key={index} className="relative">
-                  <Image
-                    src={image.url}
-                    alt={image.alt}
-                    fill
-                    className="object-contain"
-                    data-ai-hint={image.hint}
-                    sizes="(max-width: 1280px) 90vw, 80vw"
-                  />
-                </CarouselItem>
-              ))}
-            </CarouselContent>
+          
+          <div className="relative w-full h-full flex items-center justify-center">
+            <div className="relative w-full h-full">
+              <Image
+                src={vehicle.images[currentImageIndex].url}
+                alt={vehicle.images[currentImageIndex].alt}
+                fill
+                className="object-contain"
+                data-ai-hint={vehicle.images[currentImageIndex].hint}
+                sizes="(max-width: 1280px) 90vw, 80vw"
+              />
+            </div>
+
             {vehicle.images.length > 1 && (
               <>
-                <CarouselPrevious className="absolute left-4 top-1/2 -translate-y-1/2 text-white bg-black/50 hover:bg-black/80 hover:text-white z-20" />
-                <CarouselNext className="absolute right-4 top-1/2 -translate-y-1/2 text-white bg-black/50 hover:bg-black/80 hover:text-white z-20" />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-black/50 text-white hover:bg-black/80 hover:text-white z-10"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCurrentImageIndex(prev => (prev === 0 ? vehicle.images.length - 1 : prev - 1));
+                  }}
+                >
+                  <ChevronLeft className="h-6 w-6" />
+                  <span className="sr-only">Anterior</span>
+                </Button>
+                
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-black/50 text-white hover:bg-black/80 hover:text-white z-10"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCurrentImageIndex(prev => (prev === vehicle.images.length - 1 ? 0 : prev + 1));
+                  }}
+                >
+                  <ChevronRight className="h-6 w-6" />
+                  <span className="sr-only">Siguiente</span>
+                </Button>
               </>
             )}
-          </Carousel>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
