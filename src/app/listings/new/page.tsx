@@ -186,7 +186,7 @@ export default function NewListingPage() {
         
         for (let i = 0; i < photos.length; i++) {
           const photo = photos[i];
-          const fileName = `${newVehicleRef.id}-${i}-${photo.file.name}`;
+          const fileName = `${Date.now()}-${i}-${photo.file.name}`;
           const imageRef = ref(storage, `vehicle-images/${user.uid}/${fileName}`);
           
           const metadata = {
@@ -228,6 +228,7 @@ export default function NewListingPage() {
         }
 
         const newVehicleData = {
+            id: newVehicleRef.id,
             make: selectedBrand,
             model: selectedModel,
             year: parseInt(selectedYear, 10),
