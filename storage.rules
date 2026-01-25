@@ -1,7 +1,7 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Allow public read for all files in the bucket.
+    // Allow public read for all files.
     match /{allPaths=**} {
       allow read: if true;
     }
