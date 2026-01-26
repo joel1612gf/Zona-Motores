@@ -6,6 +6,9 @@ export type UserProfile = {
   isVerified: boolean;
   phone?: string;
   accountType?: 'personal' | 'dealer';
+  logoUrl?: string;
+  heroUrl?: string;
+  address?: string;
 };
 
 export type ImageInfo = {

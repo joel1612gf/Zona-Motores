@@ -63,7 +63,7 @@ export default function Home() {
                 <Link href="/listings">Ver Todos los Anuncios</Link>
               </Button>
               <Button asChild size="lg">
-                <Link href="#">
+                <Link href="/dealerships">
                   <Store className="mr-2 h-4 w-4" />
                   Concesionarios
                 </Link>

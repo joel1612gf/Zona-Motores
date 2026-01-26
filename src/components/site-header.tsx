@@ -37,6 +37,9 @@ export function SiteHeader() {
           <Link href="/listings" className="text-foreground/60 transition-colors hover:text-foreground/80">
             Anuncios
           </Link>
+          <Link href="/dealerships" className="text-foreground/60 transition-colors hover:text-foreground/80">
+            Concesionarios
+          </Link>
         </nav>
         <div className="flex flex-1 items-center justify-end space-x-2">
           <Button variant="outline" onClick={handleNewListingClick}>
