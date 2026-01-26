@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Bike, Car, Truck, UploadCloud, X, Loader2, ShieldAlert } from 'lucide-react';
+import { Bike, Car, Truck, UploadCloud, X, Loader2, ShieldAlert, Phone } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -52,7 +52,7 @@ export default function NewListingPage() {
     return doc(firestore, 'users', user.uid);
   }, [firestore, user]);
 
-  const { data: profileData } = useDoc(profileRef);
+  const { data: profileData, isLoading: isProfileLoading } = useDoc(profileRef);
 
   // Logic to check for listing limit
   const userListingsQuery = useMemoFirebase(() => {
@@ -715,7 +715,7 @@ export default function NewListingPage() {
     </div>
   );
 
-  if (isUserLoading || areListingsLoading) {
+  if (isUserLoading || areListingsLoading || isProfileLoading) {
     return (
         <div className="container max-w-5xl mx-auto py-12">
             <div className="flex justify-center items-center min-h-[50vh]">
@@ -723,6 +723,27 @@ export default function NewListingPage() {
             </div>
         </div>
     );
+  }
+
+  const isVerified = (profileData as any)?.isVerified || false;
+  if (!isVerified) {
+    return (
+       <div className="container max-w-3xl mx-auto py-12">
+           <Card className="p-8 text-center">
+               <Phone className="mx-auto h-12 w-12 text-destructive mb-4" />
+               <h1 className="font-headline text-3xl font-bold">Verificación de Teléfono Requerida</h1>
+               <p className="mt-4 text-lg text-muted-foreground">
+                   Para poder publicar un anuncio, primero debes verificar tu número de teléfono.
+               </p>
+               <p className="mt-2 text-muted-foreground">
+                   Esto nos ayuda a mantener una comunidad segura y confiable para todos, evitando el spam y los perfiles falsos.
+               </p>
+               <Button asChild className="mt-8" size="lg">
+                   <Link href="/profile">Verificar mi Teléfono</Link>
+               </Button>
+           </Card>
+       </div>
+   );
   }
 
   if (limitReached && !areListingsLoading) {
