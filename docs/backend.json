@@ -96,6 +96,14 @@
         "isVerified": {
           "type": "boolean",
           "description": "Indicates whether the seller has verified their phone number."
+        },
+        "accountType": {
+          "type": "string",
+          "description": "The type of seller account, for future features.",
+          "enum": [
+            "personal",
+            "dealer"
+          ]
         }
       },
       "required": [

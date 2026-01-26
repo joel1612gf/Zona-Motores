@@ -5,6 +5,7 @@ export type UserProfile = {
   displayName: string;
   isVerified: boolean;
   phone?: string;
+  accountType?: 'personal' | 'dealer';
 };
 
 export type ImageInfo = {

@@ -116,7 +116,8 @@ export default function ProfilePage() {
         displayName: data.displayName,
         email: user.email,
         phoneNumber: data.phoneNumber || '',
-        isVerified: (profileData as any)?.isVerified || false
+        isVerified: (profileData as any)?.isVerified || false,
+        accountType: (profileData as any)?.accountType || 'personal'
       };
       promises.push(setDoc(profileRef, firestoreData, { merge: true }));
       
