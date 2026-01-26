@@ -3,11 +3,12 @@
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Bike, Car, Truck, UploadCloud, X, Loader2 } from 'lucide-react';
+import { Bike, Car, Truck, UploadCloud, X, Loader2, ShieldAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -16,7 +17,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useFirestore, useUser, useMemoFirebase, useStorage } from '@/firebase';
 import { useDoc } from '@/firebase/firestore/use-doc';
-import { collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { collection, doc, serverTimestamp, setDoc, query, where, getDocs } from 'firebase/firestore';
+import { useCollection } from '@/firebase/firestore/use-collection';
 import { useMakes } from '@/context/makes-context';
 import { ref, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import { Progress } from '@/components/ui/progress';
@@ -36,10 +38,12 @@ const vehicleTypeOptions: {
   { id: 'Camioneta', name: 'Camioneta', icon: Truck },
 ];
 
+const LISTING_LIMIT = 3;
+
 export default function NewListingPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { user } = useUser();
+  const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const storage = useStorage();
 
@@ -49,6 +53,23 @@ export default function NewListingPage() {
   }, [firestore, user]);
 
   const { data: profileData } = useDoc(profileRef);
+
+  // Logic to check for listing limit
+  const userListingsQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    return collection(firestore, 'users', user.uid, 'vehicleListings');
+  }, [user, firestore]);
+
+  const { data: allUserListings, isLoading: areListingsLoading } = useCollection(userListingsQuery);
+  
+  const activeListingCount = useMemo(() => {
+    if (!allUserListings) return 0;
+    // Listings without a status are considered active (for legacy data)
+    return allUserListings.filter(l => l.status === 'active' || l.status === undefined).length;
+  }, [allUserListings]);
+  
+  const limitReached = activeListingCount >= LISTING_LIMIT;
+
 
   const { makesByType, isLoading: areMakesLoading } = useMakes();
 
@@ -211,6 +232,30 @@ export default function NewListingPage() {
       });
       return;
     }
+
+    try {
+        const userListingsRef = collection(firestore, 'users', user.uid, 'vehicleListings');
+        const snapshot = await getDocs(userListingsRef);
+        const currentActiveCount = snapshot.docs.map(d => d.data()).filter(l => l.status === 'active' || l.status === undefined).length;
+
+        if (currentActiveCount >= LISTING_LIMIT) {
+            toast({
+                title: "Límite de publicaciones alcanzado",
+                description: "No puedes publicar más de 3 vehículos a la vez. Pausa o elimina uno para continuar.",
+                variant: "destructive",
+            });
+            router.push('/profile/listings');
+            return;
+        }
+    } catch (e) {
+        console.error("Could not verify listing count", e);
+        toast({
+            title: "Error al verificar límite",
+            description: "No pudimos verificar tu número de publicaciones. Inténtalo de nuevo.",
+            variant: "destructive",
+        });
+        return;
+    }
     
     setIsPublishing(true);
     setUploadProgress(0);
@@ -221,8 +266,14 @@ export default function NewListingPage() {
 
         const uploadedImages: { url: string; alt: string; hint: string }[] = [];
         
-        for (let i = 0; i < photos.length; i++) {
-          const photo = photos[i];
+        const photosToUpload = [...photos];
+        if (mainPhotoIndex !== null && mainPhotoIndex > 0) {
+            const mainPhoto = photosToUpload.splice(mainPhotoIndex, 1)[0];
+            photosToUpload.unshift(mainPhoto);
+        }
+        
+        for (let i = 0; i < photosToUpload.length; i++) {
+          const photo = photosToUpload[i];
           const fileName = `${Date.now()}-${i}-${photo.file.name}`;
           const imageRef = ref(storage, `vehicle-images/${user.uid}/${fileName}`);
           
@@ -262,12 +313,6 @@ export default function NewListingPage() {
         
         if (uploadedImages.length !== photos.length) {
             throw new Error("No todas las imágenes se subieron correctamente.");
-        }
-
-        // Reorder images to put the selected main photo first.
-        if (mainPhotoIndex !== null && mainPhotoIndex > 0 && uploadedImages.length > mainPhotoIndex) {
-          const mainImage = uploadedImages.splice(mainPhotoIndex, 1)[0];
-          uploadedImages.unshift(mainImage);
         }
 
         const newVehicleData = {
@@ -670,6 +715,41 @@ export default function NewListingPage() {
     </div>
   );
 
+  if (isUserLoading || areListingsLoading) {
+    return (
+        <div className="container max-w-5xl mx-auto py-12">
+            <div className="flex justify-center items-center min-h-[50vh]">
+                <Loader2 className="h-16 w-16 animate-spin text-primary" />
+            </div>
+        </div>
+    );
+  }
+
+  if (limitReached && !areListingsLoading) {
+    return (
+        <div className="container max-w-3xl mx-auto py-12">
+           <Card className="p-8 text-center">
+               <ShieldAlert className="mx-auto h-12 w-12 text-destructive mb-4" />
+               <h1 className="font-headline text-3xl font-bold">Límite de Publicaciones Alcanzado</h1>
+               <p className="mt-4 text-lg text-muted-foreground">
+                   Has alcanzado el límite de 3 publicaciones activas simultáneas para usuarios particulares.
+               </p>
+               <p className="mt-2 text-muted-foreground">
+                   Para publicar un nuevo vehículo, primero debes eliminar o pausar una de tus publicaciones existentes.
+               </p>
+               <div className="mt-6 bg-secondary/50 p-4 rounded-lg border">
+                   <h3 className="font-semibold text-lg">¿Eres un concesionario?</h3>
+                   <p className="text-sm text-muted-foreground mt-1">
+                       ¡Próximamente! Ofreceremos planes especiales para concesionarios y revendedores que te permitirán publicar anuncios ilimitados y obtener otras ventajas.
+                   </p>
+               </div>
+               <Button asChild className="mt-8" size="lg">
+                   <Link href="/profile/listings">Gestionar Mis Publicaciones</Link>
+               </Button>
+           </Card>
+       </div>
+   );
+  }
 
   return (
     <div className="container max-w-5xl mx-auto py-12">
