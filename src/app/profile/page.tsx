@@ -1,18 +1,19 @@
 
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { doc, setDoc } from 'firebase/firestore';
-import { updateProfile, sendEmailVerification } from 'firebase/auth';
+import { updateProfile, sendEmailVerification, RecaptchaVerifier, linkWithPhoneNumber, type ConfirmationResult } from 'firebase/auth';
 
 import { useUser, useFirestore, useAuth, useMemoFirebase } from '@/firebase';
 import { useDoc } from '@/firebase/firestore/use-doc';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
@@ -35,6 +36,13 @@ export default function ProfilePage() {
   const auth = useAuth();
   const { toast } = useToast();
 
+  const [isVerificationDialogOpen, setIsVerificationDialogOpen] = useState(false);
+  const [isCodeSent, setIsCodeSent] = useState(false);
+  const [isSubmittingCode, setIsSubmittingCode] = useState(false);
+  const [isSendingCode, setIsSendingCode] = useState(false);
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+  const [verificationCode, setVerificationCode] = useState('');
+
   // Memoize the document reference
   const profileRef = useMemoFirebase(() => {
     if (!user) return null;
@@ -55,6 +63,7 @@ export default function ProfilePage() {
     register,
     handleSubmit,
     reset,
+    getValues,
     formState: { isSubmitting, errors },
   } = form;
 
@@ -68,7 +77,7 @@ export default function ProfilePage() {
     } else if (user) {
         reset({
             displayName: user.displayName || '',
-            phoneNumber: '',
+            phoneNumber: user.phoneNumber || '',
         });
     }
   }, [user, profileData, reset]);
@@ -127,6 +136,80 @@ export default function ProfilePage() {
     }
   }
 
+  const setupRecaptcha = () => {
+    if (!auth) return;
+    if (!(window as any).recaptchaVerifier) {
+      (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        'size': 'invisible',
+        'callback': (response: any) => {
+          // reCAPTCHA solved, allow signInWithPhoneNumber.
+          setIsSendingCode(false);
+        },
+        'expired-callback': () => {
+          // Response expired. Ask user to solve reCAPTCHA again.
+          setIsSendingCode(false);
+          toast({ title: 'reCAPTCHA expirado', description: 'Por favor, intenta enviar el código de nuevo.', variant: 'destructive' });
+        }
+      });
+    }
+    return (window as any).recaptchaVerifier;
+  }
+
+  const handleSendVerificationCode = async () => {
+    if (!user) return;
+    const phoneNumber = getValues('phoneNumber');
+    if (!phoneNumber) {
+        toast({ title: 'Número de teléfono requerido', description: 'Por favor, guarda un número de teléfono en tu perfil primero.', variant: 'destructive' });
+        return;
+    }
+
+    setIsSendingCode(true);
+    const appVerifier = setupRecaptcha();
+    
+    try {
+        const result = await linkWithPhoneNumber(user, phoneNumber, appVerifier);
+        setConfirmationResult(result);
+        setIsCodeSent(true);
+        toast({ title: 'Código SMS Enviado', description: `Se ha enviado un código a ${phoneNumber}.` });
+    } catch(error) {
+        console.error("Error sending phone verification code:", error);
+        toast({ title: 'Error al Enviar Código', description: 'No se pudo enviar el SMS. Verifica el número y el formato (+584121234567).', variant: 'destructive' });
+    } finally {
+        setIsSendingCode(false);
+    }
+  };
+
+  const handleConfirmVerificationCode = async () => {
+      if (!confirmationResult || !verificationCode) return;
+      setIsSubmittingCode(true);
+      try {
+        await confirmationResult.confirm(verificationCode);
+        
+        // Update firestore profile
+        if (profileRef) {
+            await setDoc(profileRef, { isVerified: true }, { merge: true });
+        }
+
+        toast({ title: '¡Número Verificado!', description: 'Tu número de teléfono ha sido verificado con éxito.', className: 'bg-green-100 dark:bg-green-900' });
+        setIsVerificationDialogOpen(false);
+      } catch (error) {
+        console.error("Error confirming verification code:", error);
+        toast({ title: 'Código Incorrecto', description: 'El código que ingresaste no es válido. Inténtalo de nuevo.', variant: 'destructive' });
+      } finally {
+        setIsSubmittingCode(false);
+      }
+  }
+  
+  const handleDialogClose = () => {
+    // Reset state when dialog is closed
+    setIsCodeSent(false);
+    setConfirmationResult(null);
+    setVerificationCode('');
+    if ((window as any).recaptchaVerifier) {
+      (window as any).recaptchaVerifier.clear();
+    }
+  }
+
 
   if (isAuthLoading || isProfileLoading) {
     return (
@@ -163,6 +246,8 @@ export default function ProfilePage() {
     router.push('/');
     return null;
   }
+  
+  const isPhoneNumberVerified = (profileData as any)?.isVerified || false;
 
   return (
     <div className="container max-w-4xl mx-auto py-12">
@@ -197,8 +282,9 @@ export default function ProfilePage() {
                     id="phoneNumber" 
                     type="tel"
                     {...register('phoneNumber')}
-                    placeholder="+58 412 1234567"
+                    placeholder="+584121234567"
                   />
+                   <p className="text-xs text-muted-foreground">Usa el formato internacional (ej: +584121234567).</p>
                   {errors.phoneNumber && <p className="text-sm text-destructive">{errors.phoneNumber.message}</p>}
                 </div>
               </CardContent>
@@ -231,10 +317,14 @@ export default function ProfilePage() {
                 </div>
                 <div className='flex items-center justify-between'>
                     <div className='flex items-center gap-2'>
-                        <Phone className="text-muted-foreground" />
+                       {isPhoneNumberVerified ? <Phone className="text-green-500" /> : <Phone className="text-orange-500" />}
                         <span>Teléfono</span>
                     </div>
-                    <Button variant="outline" size="sm" disabled>Próximamente</Button>
+                    {isPhoneNumberVerified ? (
+                         <Badge variant="secondary" className="border-green-300 bg-green-100 text-green-800 dark:border-green-700 dark:bg-green-900/50 dark:text-green-300">Verificado</Badge>
+                    ) : (
+                       <Button variant="outline" size="sm" onClick={() => setIsVerificationDialogOpen(true)}>Verificar</Button>
+                    )}
                 </div>
                 <div className='flex items-center justify-between'>
                     <div className='flex items-center gap-2'>
@@ -247,6 +337,45 @@ export default function ProfilePage() {
           </Card>
         </div>
       </div>
+      <Dialog open={isVerificationDialogOpen} onOpenChange={(open) => { if(!open) handleDialogClose(); setIsVerificationDialogOpen(open);}}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Verificar Número de Teléfono</DialogTitle>
+                <DialogDescription>
+                    {!isCodeSent 
+                        ? 'Se enviará un código de verificación por SMS a tu número. Se aplicará un reCAPTCHA invisible.'
+                        : 'Ingresa el código de 6 dígitos que recibiste por SMS.'
+                    }
+                </DialogDescription>
+            </DialogHeader>
+            <div id="recaptcha-container" className="my-4"></div>
+            {isCodeSent ? (
+                <div className="space-y-4">
+                    <Input 
+                        type="text"
+                        value={verificationCode}
+                        onChange={(e) => setVerificationCode(e.target.value)}
+                        placeholder="Código de 6 dígitos"
+                        maxLength={6}
+                    />
+                    <Button onClick={handleConfirmVerificationCode} disabled={isSubmittingCode || verificationCode.length < 6} className="w-full">
+                        {isSubmittingCode && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Confirmar Código
+                    </Button>
+                </div>
+            ) : (
+                <Button onClick={handleSendVerificationCode} disabled={isSendingCode} className="w-full">
+                    {isSendingCode && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Enviar Código de Verificación
+                </Button>
+            )}
+            <DialogFooter>
+                 <DialogClose asChild>
+                    <Button variant="outline" onClick={handleDialogClose}>Cancelar</Button>
+                </DialogClose>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
