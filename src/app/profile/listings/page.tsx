@@ -45,24 +45,22 @@ export default function MyListingsPage() {
         let pausedCount = 0;
         let deletedCount = 0;
         
-        // FOR TESTING: Change days to minutes
-        const PAUSE_THRESHOLD_MINUTES = 1; // Original: 7 days
-        const DELETE_THRESHOLD_MINUTES = 2; // Original: 14 days
+        const PAUSE_THRESHOLD_DAYS = 7;
+        const DELETE_THRESHOLD_DAYS = 14;
 
         const maintenancePromises = listings.map(async (listing) => {
             if (!listing.createdAt) return; // Skip if no createdAt
             const createdAtDate = listing.createdAt.toDate();
-            // Changed to minutes for testing
-            const minutesSinceCreation = (now.getTime() - createdAtDate.getTime()) / (1000 * 60);
+            const daysSinceCreation = (now.getTime() - createdAtDate.getTime()) / (1000 * 60 * 60 * 24);
             const vehicleRef = doc(firestore, 'users', user.uid, 'vehicleListings', listing.id);
 
-            // Auto-pause active listings older than PAUSE_THRESHOLD_MINUTES
-            if (listing.status === 'active' && minutesSinceCreation > PAUSE_THRESHOLD_MINUTES) {
+            // Auto-pause active listings older than PAUSE_THRESHOLD_DAYS
+            if (listing.status === 'active' && daysSinceCreation > PAUSE_THRESHOLD_DAYS) {
                 pausedCount++;
                 return updateDoc(vehicleRef, { status: 'paused' });
             } 
-            // Auto-delete paused listings older than DELETE_THRESHOLD_MINUTES
-            else if (listing.status === 'paused' && minutesSinceCreation > DELETE_THRESHOLD_MINUTES) {
+            // Auto-delete paused listings older than DELETE_THRESHOLD_DAYS
+            else if (listing.status === 'paused' && daysSinceCreation > DELETE_THRESHOLD_DAYS) {
                 deletedCount++;
                 try {
                     const imageDeletePromises = listing.images.map(image => {
