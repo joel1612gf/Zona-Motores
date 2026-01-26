@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Bike, Car, Truck, UploadCloud, X, Loader2, ShieldAlert, Phone } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Card } from '@/components/ui/card';
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
@@ -25,6 +25,7 @@ import { ref, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import { Progress } from '@/components/ui/progress';
 import imageCompression from 'browser-image-compression';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
 
 type VehicleType = 'Moto' | 'Carro' | 'Camioneta';
 type Step = 'selection' | 'details' | 'photos';
@@ -40,6 +41,7 @@ const vehicleTypeOptions: {
 ];
 
 const LISTING_LIMIT = 3;
+const ADMIN_EMAIL = 'zonamotores.ve@gmail.com';
 
 export default function NewListingPage() {
   const router = useRouter();
@@ -47,6 +49,8 @@ export default function NewListingPage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const storage = useStorage();
+
+  const isAdmin = user?.email === ADMIN_EMAIL;
 
   const profileRef = useMemoFirebase(() => {
     if (!user) return null;
@@ -69,7 +73,7 @@ export default function NewListingPage() {
     return allUserListings.filter(l => l.status !== 'sold').length;
   }, [allUserListings]);
   
-  const limitReached = currentListingCount >= LISTING_LIMIT;
+  const limitReached = !isAdmin && currentListingCount >= LISTING_LIMIT;
 
 
   const { makesByType, isLoading: areMakesLoading } = useMakes();
@@ -109,6 +113,8 @@ export default function NewListingPage() {
     tradeInDetails: '',
     tradeInForHigherValue: false,
     tradeInForLowerValue: false,
+    sellerName: '',
+    sellerPhone: '',
   });
 
   const allMakesForSelectedType = useMemo(() => {
@@ -247,6 +253,7 @@ export default function NewListingPage() {
     }
 
     try {
+      if (!isAdmin) {
         const userListingsRef = collection(firestore, 'users', user.uid, 'vehicleListings');
         const snapshot = await getDocs(userListingsRef);
         const currentTotalCount = snapshot.docs.map(d => d.data()).filter(l => l.status !== 'sold').length;
@@ -260,6 +267,7 @@ export default function NewListingPage() {
             router.push('/profile/listings');
             return;
         }
+      }
     } catch (e) {
         console.error("Could not verify listing count", e);
         toast({
@@ -354,9 +362,10 @@ export default function NewListingPage() {
             sellerId: user.uid,
             seller: {
                 uid: user.uid,
-                displayName: user.displayName || 'Vendedor Anónimo',
+                displayName: isAdmin ? details.sellerName : (user.displayName || 'Vendedor Anónimo'),
                 isVerified: (profileData as any)?.isVerified || false,
-                phone: user.phoneNumber || ''
+                phone: isAdmin ? details.sellerPhone : (user.phoneNumber || ''),
+                accountType: (profileData as any)?.accountType || 'personal'
             },
             location: { city: 'Caracas', state: 'Distrito Capital', lat: 10.4806, lon: -66.9036 },
             createdAt: serverTimestamp(),
@@ -559,6 +568,25 @@ export default function NewListingPage() {
             Detalles del Vehículo: {selectedYear} {selectedBrand} {selectedModel}
         </h2>
         <Card className="p-6">
+            {isAdmin && (
+                <>
+                    <CardHeader className="p-0 pb-6 -mt-2">
+                        <CardTitle>Información del Vendedor (Admin)</CardTitle>
+                        <CardDescription>Estás publicando en nombre de otra persona. Introduce sus datos de contacto.</CardDescription>
+                    </CardHeader>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start mb-6">
+                            <div className="space-y-2">
+                            <Label htmlFor="sellerName">Nombre del Vendedor</Label>
+                            <Input id="sellerName" value={details.sellerName} onChange={(e) => handleDetailChange('sellerName', e.target.value)} placeholder="Ej: Carlos Rodriguez" />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="sellerPhone">Teléfono del Vendedor</Label>
+                            <Input id="sellerPhone" type="tel" value={details.sellerPhone} onChange={(e) => handleDetailChange('sellerPhone', e.target.value)} placeholder="+58412..." />
+                        </div>
+                    </div>
+                    <Separator className="mb-6" />
+                </>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                 <div className="space-y-2">
                     <Label htmlFor="price">Precio (USD)</Label>
