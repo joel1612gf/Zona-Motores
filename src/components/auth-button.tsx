@@ -300,24 +300,22 @@ export function AuthButton({ open, onOpenChange }: AuthButtonProps) {
             </>
           ) : (
             <>
-              <div className="relative">
-                <DialogHeader>
-                  <DialogTitle className="font-headline text-2xl text-center">
-                    {mode === 'signIn' ? 'Iniciar Sesión' : `Crear Cuenta de ${accountType === 'personal' ? 'Persona' : 'Concesionario'}`}
-                  </DialogTitle>
-                  <DialogDescription className="text-center">
-                    {mode === 'signIn' 
-                      ? 'Para continuar, inicia sesión en tu cuenta de Zona Motores.'
-                      : 'Completa tus datos para finalizar el registro.'
-                    }
-                  </DialogDescription>
-                </DialogHeader>
+              <DialogHeader>
                 {mode === 'signUp' && (
-                  <Button variant="ghost" size="sm" className="absolute top-4 left-0" onClick={() => setSignUpStep('type')}>
+                  <Button variant="ghost" size="sm" className="self-start p-0 h-auto -ml-1" onClick={() => setSignUpStep('type')}>
                     &larr; Volver
                   </Button>
                 )}
-              </div>
+                <DialogTitle className="font-headline text-2xl text-center">
+                  {mode === 'signIn' ? 'Iniciar Sesión' : `Crear Cuenta de ${accountType === 'personal' ? 'Persona' : 'Concesionario'}`}
+                </DialogTitle>
+                <DialogDescription className="text-center">
+                  {mode === 'signIn' 
+                    ? 'Para continuar, inicia sesión en tu cuenta de Zona Motores.'
+                    : 'Completa tus datos para finalizar el registro.'
+                  }
+                </DialogDescription>
+              </DialogHeader>
 
               <div className="grid grid-cols-2 gap-4">
                   <Button variant="outline" onClick={() => handleOAuthSignIn('google')} disabled={isSubmitting}>
