@@ -62,13 +62,13 @@ export default function NewListingPage() {
 
   const { data: allUserListings, isLoading: areListingsLoading } = useCollection(userListingsQuery);
   
-  const activeListingCount = useMemo(() => {
+  const currentListingCount = useMemo(() => {
     if (!allUserListings) return 0;
-    // Listings without a status are considered active (for legacy data)
-    return allUserListings.filter(l => l.status === 'active' || l.status === undefined).length;
+    // Count all listings that are not marked as 'sold'.
+    return allUserListings.filter(l => l.status !== 'sold').length;
   }, [allUserListings]);
   
-  const limitReached = activeListingCount >= LISTING_LIMIT;
+  const limitReached = currentListingCount >= LISTING_LIMIT;
 
 
   const { makesByType, isLoading: areMakesLoading } = useMakes();
@@ -236,12 +236,12 @@ export default function NewListingPage() {
     try {
         const userListingsRef = collection(firestore, 'users', user.uid, 'vehicleListings');
         const snapshot = await getDocs(userListingsRef);
-        const currentActiveCount = snapshot.docs.map(d => d.data()).filter(l => l.status === 'active' || l.status === undefined).length;
+        const currentTotalCount = snapshot.docs.map(d => d.data()).filter(l => l.status !== 'sold').length;
 
-        if (currentActiveCount >= LISTING_LIMIT) {
+        if (currentTotalCount >= LISTING_LIMIT) {
             toast({
                 title: "Límite de publicaciones alcanzado",
-                description: "No puedes publicar más de 3 vehículos a la vez. Pausa o elimina uno para continuar.",
+                description: `No puedes tener más de ${LISTING_LIMIT} publicaciones (activas o pausadas). Elimina una para continuar.`,
                 variant: "destructive",
             });
             router.push('/profile/listings');
@@ -264,13 +264,13 @@ export default function NewListingPage() {
         const vehicleCollection = collection(firestore, 'users', user.uid, 'vehicleListings');
         const newVehicleRef = doc(vehicleCollection);
 
-        const uploadedImages: { url: string; alt: string; hint: string }[] = [];
-        
         const photosToUpload = [...photos];
-        if (mainPhotoIndex !== null && mainPhotoIndex > 0) {
+        if (mainPhotoIndex !== null && mainPhotoIndex > 0 && photosToUpload.length > mainPhotoIndex) {
             const mainPhoto = photosToUpload.splice(mainPhotoIndex, 1)[0];
             photosToUpload.unshift(mainPhoto);
         }
+
+        const uploadedImages: { url: string; alt: string; hint: string }[] = [];
         
         for (let i = 0; i < photosToUpload.length; i++) {
           const photo = photosToUpload[i];
@@ -732,10 +732,10 @@ export default function NewListingPage() {
                <ShieldAlert className="mx-auto h-12 w-12 text-destructive mb-4" />
                <h1 className="font-headline text-3xl font-bold">Límite de Publicaciones Alcanzado</h1>
                <p className="mt-4 text-lg text-muted-foreground">
-                   Has alcanzado el límite de 3 publicaciones activas simultáneas para usuarios particulares.
+                   Has alcanzado el límite de {LISTING_LIMIT} publicaciones simultáneas (activas o pausadas).
                </p>
                <p className="mt-2 text-muted-foreground">
-                   Para publicar un nuevo vehículo, primero debes eliminar o pausar una de tus publicaciones existentes.
+                   Para publicar un nuevo vehículo, primero debes eliminar una de tus publicaciones existentes.
                </p>
                <div className="mt-6 bg-secondary/50 p-4 rounded-lg border">
                    <h3 className="font-semibold text-lg">¿Eres un concesionario?</h3>
