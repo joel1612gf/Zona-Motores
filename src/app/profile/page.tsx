@@ -3,12 +3,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, type SubmitHandler } from 'react-hook-form';
+import Image from 'next/image';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { doc, setDoc } from 'firebase/firestore';
 import { updateProfile, sendEmailVerification, RecaptchaVerifier, linkWithPhoneNumber, type ConfirmationResult } from 'firebase/auth';
+import { ref, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
+import imageCompression from 'browser-image-compression';
 
-import { useUser, useFirestore, useAuth, useMemoFirebase } from '@/firebase';
+import { useUser, useFirestore, useAuth, useMemoFirebase, useStorage } from '@/firebase';
 import { useDoc } from '@/firebase/firestore/use-doc';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,13 +20,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, MailCheck, MailWarning, ShieldCheck, Phone, FileText } from 'lucide-react';
+import { Loader2, MailCheck, MailWarning, ShieldCheck, Phone, FileText, UploadCloud } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Progress } from '@/components/ui/progress';
 
-// Define the schema for the profile form
 const profileSchema = z.object({
   displayName: z.string().min(3, { message: 'El nombre debe tener al menos 3 caracteres.' }).max(50),
   phoneNumber: z.string().optional(),
+  address: z.string().optional(),
 });
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
@@ -32,6 +36,7 @@ export default function ProfilePage() {
   const { user, isUserLoading: isAuthLoading } = useUser();
   const router = useRouter();
   const firestore = useFirestore();
+  const storage = useStorage();
   const auth = useAuth();
   const { toast } = useToast();
 
@@ -42,12 +47,15 @@ export default function ProfilePage() {
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
   const [verificationCode, setVerificationCode] = useState('');
   
-  // New state for resend logic
   const [countdown, setCountdown] = useState(0);
   const [isResending, setIsResending] = useState(false);
 
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [heroFile, setHeroFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [heroPreview, setHeroPreview] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
-  // Memoize the document reference
   const profileRef = useMemoFirebase(() => {
     if (!user) return null;
     return doc(firestore, 'users', user.uid);
@@ -60,6 +68,7 @@ export default function ProfilePage() {
     defaultValues: {
       displayName: '',
       phoneNumber: '',
+      address: '',
     },
   });
 
@@ -77,13 +86,16 @@ export default function ProfilePage() {
     }
   }, [isAuthLoading, user, router]);
 
-
   useEffect(() => {
-    if (user && profileData) {
+    const data = profileData as any;
+    if (user && data) {
       reset({
         displayName: user.displayName || '',
-        phoneNumber: (profileData as any)?.phoneNumber || '',
+        phoneNumber: data?.phoneNumber || '',
+        address: data?.address || '',
       });
+      if (data.logoUrl) setLogoPreview(data.logoUrl);
+      if (data.heroUrl) setHeroPreview(data.heroUrl);
     } else if (user) {
         reset({
             displayName: user.displayName || '',
@@ -92,7 +104,6 @@ export default function ProfilePage() {
     }
   }, [user, profileData, reset]);
   
-  // Timer effect
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (isCodeSent && countdown > 0) {
@@ -105,19 +116,80 @@ export default function ProfilePage() {
     return () => clearInterval(timer);
   }, [isCodeSent, countdown]);
 
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'hero') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const compressionToast = toast({ title: 'Comprimiendo imagen...', description: 'Por favor, espera.' });
+
+    try {
+      const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
+      const compressedFile = await imageCompression(file, options);
+      
+      const previewUrl = URL.createObjectURL(compressedFile);
+
+      if (type === 'logo') {
+        setLogoFile(compressedFile);
+        setLogoPreview(previewUrl);
+      } else {
+        setHeroFile(compressedFile);
+        setHeroPreview(previewUrl);
+      }
+      toast({ title: 'Imagen lista', description: 'La imagen ha sido comprimida y está lista para subirse.' });
+    } catch (error) {
+      console.error('Error compressing image:', error);
+      toast({ title: 'Error de compresión', variant: 'destructive' });
+    } finally {
+      compressionToast.dismiss();
+    }
+  };
+
 
   const onSaveChanges: SubmitHandler<ProfileFormValues> = async (data) => {
     if (!user || !profileRef) return;
     
+    setUploadProgress(0);
+
     try {
-      const promises = [];
-      // Update auth profile if display name changed
+      const promises: Promise<any>[] = [];
+      let newLogoUrl: string | null = (profileData as any)?.logoUrl || null;
+      let newHeroUrl: string | null = (profileData as any)?.heroUrl || null;
+      const totalUploads = (logoFile ? 1 : 0) + (heroFile ? 1 : 0);
+      let uploadsCompleted = 0;
+
+      const uploadFile = async (file: File, path: string): Promise<string> => {
+        const fileRef = ref(storage, path);
+        const uploadTask = uploadBytesResumable(fileRef, file, { contentType: file.type });
+        
+        return new Promise((resolve, reject) => {
+          uploadTask.on('state_changed', 
+            (snapshot) => {
+              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+              const overallProgress = ((uploadsCompleted * 100) + progress) / totalUploads;
+              setUploadProgress(overallProgress);
+            },
+            (error) => reject(error),
+            async () => {
+              uploadsCompleted++;
+              const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+              resolve(downloadURL);
+            }
+          );
+        });
+      };
+      
+      if (logoFile) {
+        newLogoUrl = await uploadFile(logoFile, `dealer-assets/${user.uid}/logo`);
+      }
+      if (heroFile) {
+        newHeroUrl = await uploadFile(heroFile, `dealer-assets/${user.uid}/hero`);
+      }
+
       if (data.displayName !== user.displayName) {
         promises.push(updateProfile(user, { displayName: data.displayName }));
       }
 
-      // Update Firestore document
-      const firestoreData = {
+      const firestoreData: any = {
         uid: user.uid,
         displayName: data.displayName,
         email: user.email,
@@ -125,6 +197,13 @@ export default function ProfilePage() {
         isVerified: (profileData as any)?.isVerified || false,
         accountType: (profileData as any)?.accountType || 'personal'
       };
+      
+      if((profileData as any)?.accountType === 'dealer') {
+          firestoreData.address = data.address || '';
+          firestoreData.logoUrl = newLogoUrl;
+          firestoreData.heroUrl = newHeroUrl;
+      }
+
       promises.push(setDoc(profileRef, firestoreData, { merge: true }));
       
       await Promise.all(promises);
@@ -140,6 +219,8 @@ export default function ProfilePage() {
         description: 'No se pudieron guardar los cambios. Inténtalo de nuevo.',
         variant: 'destructive',
       });
+    } finally {
+        setUploadProgress(null);
     }
   };
 
@@ -166,19 +247,14 @@ export default function ProfilePage() {
     const recaptchaContainer = document.getElementById('recaptcha-container');
     if (!recaptchaContainer) return;
     
-    // Clear previous verifier if it exists
     if ((window as any).recaptchaVerifier) {
       (window as any).recaptchaVerifier.clear();
     }
     
     (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, recaptchaContainer, {
       'size': 'invisible',
-      'callback': (response: any) => {
-        // reCAPTCHA solved, allow signInWithPhoneNumber.
-        // This callback is often handled implicitly by the await call.
-      },
+      'callback': (response: any) => {},
       'expired-callback': () => {
-        // Response expired. Ask user to solve reCAPTCHA again.
         setIsSendingCode(false);
         setIsResending(false);
         toast({ title: 'reCAPTCHA expirado', description: 'Por favor, intenta enviar el código de nuevo.', variant: 'destructive' });
@@ -196,11 +272,8 @@ export default function ProfilePage() {
         return;
     }
     
-    if (isResend) {
-      setIsResending(true);
-    } else {
-      setIsSendingCode(true);
-    }
+    if (isResend) setIsResending(true);
+    else setIsSendingCode(true);
 
     const appVerifier = setupRecaptcha();
     
@@ -208,27 +281,20 @@ export default function ProfilePage() {
         const result = await linkWithPhoneNumber(user, phoneNumber, appVerifier);
         setConfirmationResult(result);
         setIsCodeSent(true);
-        setCountdown(60); // Start/reset countdown
+        setCountdown(60);
         toast({ title: 'Código SMS Enviado', description: `Se ha enviado un código a ${phoneNumber}.` });
     } catch(error: any) {
         console.error("Error sending phone verification code:", error);
-        
         let description = 'No se pudo enviar el SMS. Verifica el número y el formato (+584121234567).';
-        if (error.code === 'auth/operation-not-allowed') {
-            description = 'La verificación por teléfono parece estar desactivada. Por favor, contacta a soporte.';
-        } else if (error.code === 'auth/invalid-phone-number') {
+        if (error.code === 'auth/invalid-phone-number') {
             description = 'El número de teléfono no es válido. Asegúrate de usar el formato internacional (ej: +584121234567).';
         } else if (error.code === 'auth/too-many-requests') {
-            description = 'Has intentado enviar el código demasiadas veces. Por favor, espera un momento antes de volver a intentarlo.';
+            description = 'Demasiados intentos. Espera un momento antes de volver a intentarlo.';
         }
-
         toast({ title: 'Error al Enviar Código', description, variant: 'destructive' });
     } finally {
-      if (isResend) {
-        setIsResending(false);
-      } else {
-        setIsSendingCode(false);
-      }
+      if (isResend) setIsResending(false);
+      else setIsSendingCode(false);
     }
   };
 
@@ -237,24 +303,20 @@ export default function ProfilePage() {
       setIsSubmittingCode(true);
       try {
         await confirmationResult.confirm(verificationCode);
-        
-        // Update firestore profile
         if (profileRef) {
             await setDoc(profileRef, { isVerified: true }, { merge: true });
         }
-
-        toast({ title: '¡Número Verificado!', description: 'Tu número de teléfono ha sido verificado con éxito.', className: 'bg-green-100 dark:bg-green-900' });
+        toast({ title: '¡Número Verificado!', description: 'Tu número ha sido verificado con éxito.', className: 'bg-green-100 dark:bg-green-900' });
         setIsVerificationDialogOpen(false);
       } catch (error) {
         console.error("Error confirming verification code:", error);
-        toast({ title: 'Código Incorrecto', description: 'El código que ingresaste no es válido. Inténtalo de nuevo.', variant: 'destructive' });
+        toast({ title: 'Código Incorrecto', description: 'El código no es válido. Inténtalo de nuevo.', variant: 'destructive' });
       } finally {
         setIsSubmittingCode(false);
       }
   }
   
   const handleDialogClose = () => {
-    // Reset state when dialog is closed
     setIsCodeSent(false);
     setConfirmationResult(null);
     setVerificationCode('');
@@ -264,31 +326,26 @@ export default function ProfilePage() {
     }
   }
 
-
   if (isAuthLoading || isProfileLoading) {
     return (
         <div className="container max-w-4xl mx-auto py-12">
             <h1 className="font-headline text-3xl font-bold mb-8">Mi Perfil</h1>
             <div className="grid gap-8 md:grid-cols-3">
-                <div className="md:col-span-2">
+                <div className="md:col-span-2 space-y-8">
                     <Card>
                         <CardHeader><Skeleton className="h-6 w-48" /></CardHeader>
-                        <CardContent className="space-y-6">
-                            <Skeleton className="h-10 w-full" />
-                            <Skeleton className="h-10 w-full" />
-                            <Skeleton className="h-10 w-full" />
-                        </CardContent>
+                        <CardContent className="space-y-6"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></CardContent>
                         <CardFooter><Skeleton className="h-10 w-32" /></CardFooter>
+                    </Card>
+                    <Card>
+                        <CardHeader><Skeleton className="h-6 w-48" /></CardHeader>
+                        <CardContent className="space-y-6"><Skeleton className="h-24 w-full" /><Skeleton className="h-24 w-full" /></CardContent>
                     </Card>
                 </div>
                 <div>
                      <Card>
                         <CardHeader><Skeleton className="h-6 w-40" /></CardHeader>
-                        <CardContent className="space-y-4">
-                            <Skeleton className="h-8 w-full" />
-                            <Skeleton className="h-8 w-full" />
-                            <Skeleton className="h-8 w-full" />
-                        </CardContent>
+                        <CardContent className="space-y-4"><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-full" /></CardContent>
                     </Card>
                 </div>
             </div>
@@ -297,31 +354,34 @@ export default function ProfilePage() {
   }
   
   if (!user) {
-    return null;
+    // This part of the code should not be reached if the useEffect for redirection works correctly.
+    // It's a fallback.
+    return (
+      <div className="container max-w-4xl mx-auto py-12 text-center">
+        <Loader2 className="mx-auto h-12 w-12 animate-spin" />
+        <p className="mt-4">Redirigiendo...</p>
+      </div>
+    );
   }
   
+  const isDealer = (profileData as any)?.accountType === 'dealer';
   const isPhoneNumberVerified = (profileData as any)?.isVerified || false;
 
   return (
     <div className="container max-w-4xl mx-auto py-12">
       <h1 className="font-headline text-3xl font-bold mb-8">Mi Perfil</h1>
-      <div className="grid gap-8 md:grid-cols-3">
+      <div className="grid gap-8 md:grid-cols-3 items-start">
         <div className="md:col-span-2">
-          <form onSubmit={handleSubmit(onSaveChanges)}>
+          <form onSubmit={handleSubmit(onSaveChanges)} className="space-y-8">
             <Card>
               <CardHeader>
-                <CardTitle>Información de Perfil</CardTitle>
-                <CardDescription>
-                  Esta información se mostrará públicamente en tus anuncios.
-                </CardDescription>
+                <CardTitle>Información General</CardTitle>
+                <CardDescription>Esta información se mostrará públicamente en tus anuncios.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="displayName">Nombre Completo</Label>
-                  <Input 
-                    id="displayName" 
-                    {...register('displayName')}
-                  />
+                  <Label htmlFor="displayName">Nombre Completo o del Concesionario</Label>
+                  <Input id="displayName" {...register('displayName')} />
                   {errors.displayName && <p className="text-sm text-destructive">{errors.displayName.message}</p>}
                 </div>
                 <div className="space-y-2">
@@ -331,26 +391,78 @@ export default function ProfilePage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phoneNumber">Número de Teléfono</Label>
-                  <Input 
-                    id="phoneNumber" 
-                    type="tel"
-                    {...register('phoneNumber')}
-                    placeholder="+584121234567"
-                  />
+                  <Input id="phoneNumber" type="tel" {...register('phoneNumber')} placeholder="+584121234567"/>
                    <p className="text-xs text-muted-foreground">Usa el formato internacional (ej: +584121234567).</p>
                   {errors.phoneNumber && <p className="text-sm text-destructive">{errors.phoneNumber.message}</p>}
                 </div>
               </CardContent>
-              <CardFooter>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Guardar Cambios
-                </Button>
-              </CardFooter>
             </Card>
+
+            {isDealer && (
+                 <Card>
+                    <CardHeader>
+                        <CardTitle>Perfil de Concesionario</CardTitle>
+                        <CardDescription>Esta información se mostrará en tu página de concesionario.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                         <div className="space-y-2">
+                           <Label htmlFor="address">Dirección</Label>
+                           <Input id="address" {...register('address')} placeholder="Ej: Av. Principal, Edif. XYZ, Local 1" />
+                           {errors.address && <p className="text-sm text-destructive">{errors.address.message}</p>}
+                         </div>
+                        <div className="space-y-4">
+                           <Label>Logo (recomendado: 1:1, ej: 400x400px)</Label>
+                           <div className="flex items-center gap-4">
+                               <div className="relative h-24 w-24 rounded-full border-2 border-dashed flex items-center justify-center bg-muted overflow-hidden">
+                                 {logoPreview ? (
+                                   <Image src={logoPreview} alt="Vista previa del logo" layout="fill" objectFit="cover" />
+                                 ) : (
+                                   <UploadCloud className="h-8 w-8 text-muted-foreground" />
+                                 )}
+                               </div>
+                               <Input id="logo-upload" type="file" accept="image/*" onChange={(e) => handleImageSelect(e, 'logo')} className="hidden" />
+                               <Button type="button" variant="outline" onClick={() => document.getElementById('logo-upload')?.click()}>
+                                   Subir Logo
+                                </Button>
+                           </div>
+                        </div>
+                         <div className="space-y-4">
+                           <Label>Imagen de Portada (recomendado: 16:9, ej: 1600x900px)</Label>
+                           <div className="flex items-center gap-4">
+                               <div className="relative aspect-video w-full max-w-sm rounded-md border-2 border-dashed flex items-center justify-center bg-muted overflow-hidden">
+                                 {heroPreview ? (
+                                   <Image src={heroPreview} alt="Vista previa de la portada" layout="fill" objectFit="cover" />
+                                 ) : (
+                                   <UploadCloud className="h-8 w-8 text-muted-foreground" />
+                                 )}
+                               </div>
+                               <Input id="hero-upload" type="file" accept="image/*" onChange={(e) => handleImageSelect(e, 'hero')} className="hidden" />
+                               <Button type="button" variant="outline" onClick={() => document.getElementById('hero-upload')?.click()}>
+                                Subir Portada
+                               </Button>
+                           </div>
+                        </div>
+                    </CardContent>
+                 </Card>
+            )}
+
+            <CardFooter className="px-0">
+                <div className="flex items-center gap-4">
+                    <Button type="submit" disabled={isSubmitting || uploadProgress !== null}>
+                      {(isSubmitting || uploadProgress !== null) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Guardar Cambios
+                    </Button>
+                    {uploadProgress !== null && (
+                      <div className="w-48">
+                        <Progress value={uploadProgress} className="h-2"/>
+                        <p className="text-xs text-muted-foreground mt-1">Subiendo... {uploadProgress.toFixed(0)}%</p>
+                      </div>
+                    )}
+                </div>
+            </CardFooter>
           </form>
         </div>
-        <div className="space-y-6">
+        <div className="space-y-6 md:sticky md:top-24">
           <Card>
             <CardHeader>
                 <CardTitle>Verificación</CardTitle>

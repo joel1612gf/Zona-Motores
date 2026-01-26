@@ -104,6 +104,18 @@
             "personal",
             "dealer"
           ]
+        },
+        "logoUrl": {
+            "type": "string",
+            "description": "URL for the dealership's logo image."
+        },
+        "heroUrl": {
+            "type": "string",
+            "description": "URL for the dealership's hero or cover image."
+        },
+        "address": {
+            "type": "string",
+            "description": "Physical address of the dealership."
         }
       },
       "required": [
