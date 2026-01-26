@@ -130,6 +130,18 @@ export default function NewListingPage() {
   };
 
   const handleNextToDetails = () => {
+    const yearNum = parseInt(selectedYear, 10);
+    const minYear = 1950;
+    const maxYear = new Date().getFullYear() + 1;
+
+    if (isNaN(yearNum) || yearNum < minYear || yearNum > maxYear) {
+        toast({
+            title: "Año Inválido",
+            description: `Por favor, ingresa un año entre ${minYear} y ${maxYear}.`,
+            variant: "destructive",
+        });
+        return;
+    }
     setStep('details');
   }
   
@@ -411,6 +423,7 @@ export default function NewListingPage() {
     let year = parseInt(selectedYear, 10);
     if (isNaN(year)) {
         setSelectedYear('');
+        toast({ title: "Año inválido", description: "Por favor, introduce un número válido.", variant: "destructive" });
         return;
     }
 
@@ -422,18 +435,15 @@ export default function NewListingPage() {
             year += 2000;
         }
     }
-
+    
+    const finalYearString = year.toString();
+    setSelectedYear(finalYearString);
+    
     const minYear = 1950;
     const maxYear = new Date().getFullYear() + 1;
 
-    if (year < minYear) {
-        toast({ title: "Año inválido", description: `El año mínimo es ${minYear}.`, variant: "destructive" });
-        setSelectedYear(minYear.toString());
-    } else if (year > maxYear) {
-        toast({ title: "Año inválido", description: `El año máximo es ${maxYear}.`, variant: "destructive" });
-        setSelectedYear(maxYear.toString());
-    } else {
-        setSelectedYear(year.toString());
+    if (year < minYear || year > maxYear) {
+        toast({ title: "Año inválido", description: `El año debe estar entre ${minYear} y ${maxYear}.`, variant: "destructive" });
     }
   };
 
@@ -530,7 +540,7 @@ export default function NewListingPage() {
                     </div>
                 </div>
 
-                {(selectedBrand && selectedModel && selectedYear.length >= 4) && (
+                {(selectedBrand && selectedModel && selectedYear) && (
                     <Button onClick={handleNextToDetails} size="lg">
                         Siguiente
                     </Button>

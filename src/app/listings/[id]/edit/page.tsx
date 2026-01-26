@@ -162,6 +162,7 @@ export default function EditListingPage() {
     let year = parseInt(value, 10);
     if (isNaN(year)) {
         handleDetailChange('year', '');
+        toast({ title: "Año inválido", description: "Por favor, introduce un número válido.", variant: "destructive" });
         return;
     }
 
@@ -172,20 +173,16 @@ export default function EditListingPage() {
             year += 2000;
         }
     }
+    
+    const finalYearString = year.toString();
+    handleDetailChange('year', finalYearString);
 
     const minYear = 1950;
     const maxYear = new Date().getFullYear() + 1;
-
-    let finalYear = year;
-    if (year < minYear) {
-        toast({ title: "Año inválido", description: `El año mínimo es ${minYear}.`, variant: "destructive" });
-        finalYear = minYear;
-    } else if (year > maxYear) {
-        toast({ title: "Año inválido", description: `El año máximo es ${maxYear}.`, variant: "destructive" });
-        finalYear = maxYear;
-    }
     
-    handleDetailChange('year', finalYear.toString());
+    if (year < minYear || year > maxYear) {
+        toast({ title: "Año inválido", description: `El año debe estar entre ${minYear} y ${maxYear}.`, variant: "destructive" });
+    }
   };
 
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -242,6 +239,18 @@ export default function EditListingPage() {
     if (!user || !vehicleRef || !vehicleData) return;
     if (photos.length < 1) {
       toast({ title: "Fotos insuficientes", description: "Debes tener al menos 1 foto.", variant: "destructive" });
+      return;
+    }
+
+    const year = parseInt(details.year, 10);
+    const minYear = 1950;
+    const maxYear = new Date().getFullYear() + 1;
+    if (isNaN(year) || year < minYear || year > maxYear) {
+      toast({
+        title: 'Año Inválido',
+        description: `Por favor, ingresa un año entre ${minYear} y ${maxYear}.`,
+        variant: 'destructive',
+      });
       return;
     }
 
