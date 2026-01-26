@@ -145,7 +145,7 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
              <Alert className="mt-4 border-amber-500 bg-amber-50 text-amber-900 dark:bg-amber-900/20 dark:text-amber-200 dark:border-amber-500/50">
                 <Hand className="h-4 w-4 !text-amber-600 dark:!text-amber-400" />
                 <AlertTitle className="font-bold">¡Tu publicación fue pausada!</AlertTitle>
-                <AlertDescription asChild>
+                <AlertDescription>
                     <div className="flex flex-col gap-3 mt-2">
                         <p>Para mantener la plataforma actualizada, pausamos los anuncios con más de 7 días. ¿Ya vendiste este vehículo?</p>
                         <div className="flex flex-wrap gap-2">
