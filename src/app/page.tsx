@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { useVehicles } from '@/context/vehicle-context';
 import { vehicles as initialVehicles } from '@/lib/data';
 import { VehicleCard } from '@/components/vehicle-card';
-import { PlusCircle, Search } from 'lucide-react';
+import { Search, Store } from 'lucide-react';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -63,10 +63,10 @@ export default function Home() {
                 <Link href="/listings">Ver Todos los Anuncios</Link>
               </Button>
               <Button asChild size="lg">
-                  <Link href="/listings/new">
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Publicar un Vehículo
-                  </Link>
+                <Link href="#">
+                  <Store className="mr-2 h-4 w-4" />
+                  Concesionarios
+                </Link>
               </Button>
             </div>
           </div>
