@@ -300,12 +300,10 @@ export function AuthButton({ open, onOpenChange }: AuthButtonProps) {
             </>
           ) : (
             <>
-              <DialogHeader className="relative">
-                {mode === 'signUp' && (
-                  <Button variant="ghost" size="sm" className="self-start p-0 h-auto" onClick={() => setSignUpStep('type')}>
+              <DialogHeader>
+                 <Button variant="ghost" size="sm" className="self-start p-0 h-auto" onClick={() => setSignUpStep('type')}>
                     &larr; Volver
-                  </Button>
-                )}
+                </Button>
                 <DialogTitle className="font-headline text-2xl text-center">
                   {mode === 'signIn' ? 'Iniciar Sesión' : `Crear Cuenta de ${accountType === 'personal' ? 'Persona' : 'Concesionario'}`}
                 </DialogTitle>
@@ -323,7 +321,7 @@ export function AuthButton({ open, onOpenChange }: AuthButtonProps) {
                     Google
                   </Button>
                   <Button variant="outline" onClick={() => handleOAuthSignIn('apple')} disabled={isSubmitting}>
-                    {isSubmitting ? <Loader2 className="mr-2 animate-spin" /> : <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><path fill="currentColor" d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C39.2 141.6 0 184.2 0 241.2c0 61.6 31.5 118.8 80.8 152.1C111.9 414.4 142.9 425.9 178.6 425.9c35.5 0 67.2-11.5 99.5-32.7 31.1-20.2 47.9-52.9 49.3-86.8-5.8-.8-11.6-1.7-17.2-3.1-34.9-8.4-69.4-29.6-93.5-54.2-26.3-27-42.3-56.9-42.3-88.4 0-1.3.1-2.6.2-3.9 14.8-1.5 42.4-10.4 69.3-10.4 26.3 0 49.3 8.3 65.5 8.3 16.5 0 32.8-8.3 49.3-8.3 14.3 0 28.5 2.8 41.2 5.6-20.9 23.3-33.8 51.5-33.8 82.9zM207.2 120.1c12.3-13.9 20.9-30.9 20.9-48.4 0-18.3-8-34-21.9-42.8-14.2-9.3-31-10-44.5-2.8-13.3 7.2-25.9 22.8-30.9 38.8-1.3 4.1 6.5 11.4 12.3 11.4 6 0 10.3-6.5 11.5-9.3 5.3-13.3 15.3-24.8 28.5-24.8 10.5 0 20.8 7.2 20.8 23.3 0 10.5-5.3 20.8-13.3 28.5-5.8 6.3-10.3 15.3-10.3 24.5 0 9.3 4.2 17.5 10.3 22.8 5.3 5.3 11.5 10.3 18.8 10.3 7.2 0 12.3-4.5 17.8-10.3z"/></svg>}
+                    {isSubmitting ? <Loader2 className="mr-2 animate-spin" /> : <svg className="mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30"><path fill="currentColor" d="M25.565,9.785c-0.123,0.077-3.051,1.702-3.051,5.305c0.138,4.109,3.695,5.55,3.756,5.55 c-0.061,0.077-0.537,1.963-1.947,3.94C23.204,26.283,21.962,28,20.076,28c-1.794,0-2.438-1.135-4.508-1.135 c-2.223,0-2.852,1.135-4.554,1.135c-1.886,0-3.22-1.809-4.4-3.496c-1.533-2.208-2.836-5.673-2.882-9 c-0.031-1.763,0.307-3.496,1.165-4.968c1.211-2.055,3.373-3.45,5.734-3.496c1.809-0.061,3.419,1.242,4.523,1.242 c1.058,0,3.036-1.242,5.274-1.242C21.394,7.041,23.97,7.332,25.565,9.785z M15.001,6.688c-0.322-1.61,0.567-3.22,1.395-4.247 c1.058-1.242,2.729-2.085,4.17-2.085c0.092,1.61-0.491,3.189-1.533,4.339C18.098,5.937,16.488,6.872,15.001,6.688z"></path></svg>}
                     Apple
                   </Button>
               </div>
