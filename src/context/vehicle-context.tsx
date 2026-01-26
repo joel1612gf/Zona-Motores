@@ -5,6 +5,7 @@ import { Vehicle } from '@/lib/types';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { collectionGroup, query } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
+import { vehicles as initialVehicles } from '@/lib/data';
 
 type VehicleContextType = {
   vehicles: Vehicle[];
@@ -26,26 +27,40 @@ export function VehicleProvider({ children }: { children: ReactNode }) {
     );
   }, [firestore]);
 
-  const { data, isLoading, error } = useCollection<Vehicle>(vehiclesQuery);
+  const { data: firestoreVehicles, isLoading, error } = useCollection<Vehicle>(vehiclesQuery);
   
   if (error) {
       // The permission error will be thrown by the hook, this is for console logging.
       console.error("Error fetching vehicles via collectionGroup:", error);
   }
 
-  // Client-side filtering and sorting as a temporary measure.
-  // This will be reverted once the Firebase index is confirmed to be ready.
+  // Combine initial data with Firestore data for demonstration purposes
   const vehicles = useMemo(() => {
-    if (!data) return [];
-    return data
-      .filter(v => v.status === 'active') // Show only active listings
+    const vehicleMap = new Map<string, Vehicle>();
+
+    // Add initial mock data for demonstration
+    initialVehicles.forEach(mockVehicle => {
+      vehicleMap.set(mockVehicle.id, mockVehicle);
+    });
+
+    // Overwrite with live data from Firestore if it exists
+    if (firestoreVehicles) {
+      firestoreVehicles.forEach(firestoreVehicle => {
+        vehicleMap.set(firestoreVehicle.id, firestoreVehicle);
+      });
+    }
+    
+    const combinedVehicles = Array.from(vehicleMap.values());
+
+    return combinedVehicles
+      .filter(v => (v.status || 'active') === 'active') // Handle initial data not having status
       .sort((a, b) => { // Sort by creation date, descending
         const dateA = a.createdAt?.toDate() || new Date(0);
         const dateB = b.createdAt?.toDate() || new Date(0);
         return dateB.getTime() - dateA.getTime();
-      })
-      .map(v => ({...v, id: v.id}));
-  }, [data]);
+      });
+  }, [firestoreVehicles]);
+
 
   const value = useMemo(() => ({ vehicles, isLoading }), [vehicles, isLoading]);
 
