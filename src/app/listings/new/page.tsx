@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -398,6 +399,44 @@ export default function NewListingPage() {
     setSelectedYear('');
   };
 
+  const handleYearChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (value.length > 4) return;
+    setSelectedYear(value);
+  };
+
+  const handleYearBlur = () => {
+    if (!selectedYear) return;
+    
+    let year = parseInt(selectedYear, 10);
+    if (isNaN(year)) {
+        setSelectedYear('');
+        return;
+    }
+
+    // Handle 2-digit year
+    if (year >= 0 && year < 100) {
+        if (year > (new Date().getFullYear() % 100) + 1) { 
+            year += 1900;
+        } else {
+            year += 2000;
+        }
+    }
+
+    const minYear = 1950;
+    const maxYear = new Date().getFullYear() + 1;
+
+    if (year < minYear) {
+        toast({ title: "Año inválido", description: `El año mínimo es ${minYear}.`, variant: "destructive" });
+        setSelectedYear(minYear.toString());
+    } else if (year > maxYear) {
+        toast({ title: "Año inválido", description: `El año máximo es ${maxYear}.`, variant: "destructive" });
+        setSelectedYear(maxYear.toString());
+    } else {
+        setSelectedYear(year.toString());
+    }
+  };
+
   const getPrompt = () => {
     if (!selectedBrand) {
       return `¿Qué marca es tu ${selectedType?.toLowerCase()}?`;
@@ -480,7 +519,10 @@ export default function NewListingPage() {
                                 type="number"
                                 placeholder="Ej: 2021"
                                 value={selectedYear}
-                                onChange={(e) => setSelectedYear(e.target.value)}
+                                onChange={handleYearChange}
+                                onBlur={handleYearBlur}
+                                min="1950"
+                                max={new Date().getFullYear() + 1}
                                 className="w-[200px]"
                                 autoFocus
                             />

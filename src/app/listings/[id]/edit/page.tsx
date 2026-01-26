@@ -149,6 +149,45 @@ export default function EditListingPage() {
     setDetails(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleYearChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (value.length > 4) return;
+    handleDetailChange('year', value);
+  };
+
+  const handleYearBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (!value) return;
+
+    let year = parseInt(value, 10);
+    if (isNaN(year)) {
+        handleDetailChange('year', '');
+        return;
+    }
+
+    if (year >= 0 && year < 100) {
+        if (year > (new Date().getFullYear() % 100) + 1) {
+            year += 1900;
+        } else {
+            year += 2000;
+        }
+    }
+
+    const minYear = 1950;
+    const maxYear = new Date().getFullYear() + 1;
+
+    let finalYear = year;
+    if (year < minYear) {
+        toast({ title: "Año inválido", description: `El año mínimo es ${minYear}.`, variant: "destructive" });
+        finalYear = minYear;
+    } else if (year > maxYear) {
+        toast({ title: "Año inválido", description: `El año máximo es ${maxYear}.`, variant: "destructive" });
+        finalYear = maxYear;
+    }
+    
+    handleDetailChange('year', finalYear.toString());
+  };
+
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
@@ -358,7 +397,16 @@ export default function EditListingPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                   <div className="space-y-2">
                       <Label htmlFor="year">Año</Label>
-                      <Input id="year" type="number" min="1900" max={new Date().getFullYear() + 1} value={details.year} onChange={(e) => handleDetailChange('year', e.target.value)} placeholder="Ej: 2021" />
+                      <Input
+                        id="year"
+                        type="number"
+                        min="1950"
+                        max={new Date().getFullYear() + 1}
+                        value={details.year}
+                        onChange={handleYearChange}
+                        onBlur={handleYearBlur}
+                        placeholder="Ej: 2021"
+                      />
                   </div>
                   <div className="space-y-2">
                       <Label htmlFor="price">Precio (USD)</Label>
