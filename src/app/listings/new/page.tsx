@@ -241,7 +241,7 @@ export default function NewListingPage() {
         if (currentTotalCount >= LISTING_LIMIT) {
             toast({
                 title: "Límite de publicaciones alcanzado",
-                description: `No puedes tener más de ${LISTING_LIMIT} publicaciones (activas o pausadas). Elimina una para continuar.`,
+                description: `No puedes tener más de ${LISTING_LIMIT} publicaciones. Elimina una para continuar.`,
                 variant: "destructive",
             });
             router.push('/profile/listings');
@@ -732,7 +732,7 @@ export default function NewListingPage() {
                <ShieldAlert className="mx-auto h-12 w-12 text-destructive mb-4" />
                <h1 className="font-headline text-3xl font-bold">Límite de Publicaciones Alcanzado</h1>
                <p className="mt-4 text-lg text-muted-foreground">
-                   Has alcanzado el límite de {LISTING_LIMIT} publicaciones simultáneas (activas o pausadas).
+                   Has alcanzado el límite de {LISTING_LIMIT} publicaciones simultáneas.
                </p>
                <p className="mt-2 text-muted-foreground">
                    Para publicar un nuevo vehículo, primero debes eliminar una de tus publicaciones existentes.
