@@ -171,9 +171,19 @@ export default function ProfilePage() {
         setConfirmationResult(result);
         setIsCodeSent(true);
         toast({ title: 'Código SMS Enviado', description: `Se ha enviado un código a ${phoneNumber}.` });
-    } catch(error) {
+    } catch(error: any) {
         console.error("Error sending phone verification code:", error);
-        toast({ title: 'Error al Enviar Código', description: 'No se pudo enviar el SMS. Verifica el número y el formato (+584121234567).', variant: 'destructive' });
+        
+        let description = 'No se pudo enviar el SMS. Verifica el número y el formato (+584121234567).';
+        if (error.code === 'auth/operation-not-allowed') {
+            description = 'La verificación por teléfono parece estar desactivada. Estoy refrescando la configuración, por favor intenta de nuevo en un momento.';
+        } else if (error.code === 'auth/invalid-phone-number') {
+            description = 'El número de teléfono no es válido. Asegúrate de usar el formato internacional (ej: +584121234567).';
+        } else if (error.code === 'auth/too-many-requests') {
+            description = 'Has intentado enviar el código demasiadas veces. Por favor, espera un momento antes de volver a intentarlo.';
+        }
+
+        toast({ title: 'Error al Enviar Código', description, variant: 'destructive' });
     } finally {
         setIsSendingCode(false);
     }
