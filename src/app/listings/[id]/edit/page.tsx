@@ -237,8 +237,8 @@ export default function EditListingPage() {
 
   const handleUpdate = async () => {
     if (!user || !vehicleRef || !vehicleData) return;
-    if (photos.length < 1) {
-      toast({ title: "Fotos insuficientes", description: "Debes tener al menos 1 foto.", variant: "destructive" });
+    if (photos.length < 4) {
+      toast({ title: "Fotos insuficientes", description: "Debes tener al menos 4 fotos.", variant: "destructive" });
       return;
     }
 
@@ -529,7 +529,7 @@ export default function EditListingPage() {
           {/* Photos Management */}
           <Card className="p-6">
               <h3 className="text-xl font-bold font-headline mb-4">Fotos</h3>
-              <p className="text-center text-muted-foreground mb-6">Sube hasta 12 fotos. Selecciona una como la foto principal.</p>
+              <p className="text-center text-muted-foreground mb-6">Sube entre 4 y 12 fotos. Selecciona una como la foto principal.</p>
 
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
                   {photos.map((photo, index) => (
@@ -559,7 +559,7 @@ export default function EditListingPage() {
                   </div>
               )}
               <Button onClick={() => router.push('/profile/listings')} variant="outline" size="lg">Cancelar</Button>
-              <Button onClick={handleUpdate} size="lg" disabled={photos.length < 1 || isUpdating}>
+              <Button onClick={handleUpdate} size="lg" disabled={photos.length < 4 || isUpdating}>
                   {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                   {isUpdating ? 'Guardando...' : 'Guardar Cambios'}
               </Button>

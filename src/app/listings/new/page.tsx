@@ -229,10 +229,10 @@ export default function NewListingPage() {
         return;
      }
 
-     if (photos.length < 1) {
+     if (photos.length < 4) {
         toast({
             title: "Fotos insuficientes",
-            description: "Debes subir al menos 1 foto.",
+            description: "Debes subir al menos 4 fotos.",
             variant: "destructive",
         });
         return;
@@ -710,7 +710,7 @@ export default function NewListingPage() {
             Vamos a seleccionar las mejores fotos de tu {selectedBrand} {selectedModel}
         </h2>
         <p className="text-center text-muted-foreground mb-6">
-            Sube entre 1 y 12 fotos. Selecciona una como la foto principal.
+            Sube entre 4 y 12 fotos. Selecciona una como la foto principal.
         </p>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
@@ -759,9 +759,9 @@ export default function NewListingPage() {
                     <p className="text-sm text-muted-foreground mt-1">Subiendo fotos... {uploadProgress.toFixed(0)}%</p>
                 </div>
             )}
-            <Button onClick={handlePublish} size="lg" disabled={photos.length < 1 || isPublishing}>
+            <Button onClick={handlePublish} size="lg" disabled={photos.length < 4 || isPublishing}>
                 {isPublishing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isPublishing ? 'Publicando...' : `Publicar Anuncio (${photos.length < 1 ? '1 foto mín.' : `${photos.length}/12`})`}
+                {isPublishing ? 'Publicando...' : `Publicar Anuncio (${photos.length < 4 ? '4 fotos mín.' : `${photos.length}/12`})`}
             </Button>
         </div>
     </div>
