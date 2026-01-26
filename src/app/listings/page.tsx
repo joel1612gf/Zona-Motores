@@ -30,6 +30,13 @@ function ListingsPageContent() {
   });
   const [layout, setLayout] = useState<'grid' | 'list'>('grid');
   
+  const handleSearchSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const searchTerm = formData.get('search') as string;
+    setFilters(prev => ({ ...prev, searchTerm: searchTerm.trim() }));
+  };
+
   const filteredVehicles = useMemo(() => {
     return allVehicles.filter(vehicle => {
       const { searchTerm, make, model, minPrice, maxPrice, minYear, maxYear, bodyType, transmission } = filters;
@@ -114,16 +121,21 @@ function ListingsPageContent() {
               </Button>
             </div>
           </div>
-          <div className="relative mb-8 max-w-xl mx-auto">
+          <form className="flex space-x-2 mb-8 max-w-xl mx-auto" onSubmit={handleSearchSubmit}>
             <Input
+                name="search"
                 id="search-input"
+                type="search"
                 placeholder="Busca por marca, modelo..."
-                value={filters.searchTerm}
-                onChange={(e) => setFilters(prev => ({...prev, searchTerm: e.target.value}))}
-                className="text-base"
+                defaultValue={filters.searchTerm}
+                key={filters.searchTerm}
+                className="text-base flex-1"
             />
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none" />
-          </div>
+            <Button type="submit">
+                <Search className="mr-2 h-5 w-5" />
+                Buscar
+            </Button>
+          </form>
           {averagePrice && (
             <div className="mb-6 p-4 border-l-4 border-primary bg-primary/10 rounded-r-lg" role="alert">
               <div className="flex">
