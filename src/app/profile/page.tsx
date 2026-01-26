@@ -71,6 +71,12 @@ export default function ProfilePage() {
     formState: { isSubmitting, errors },
   } = form;
 
+  useEffect(() => {
+    if (!isAuthLoading && !user) {
+      router.push('/');
+    }
+  }, [isAuthLoading, user, router]);
+
 
   useEffect(() => {
     if (user && profileData) {
@@ -291,7 +297,6 @@ export default function ProfilePage() {
   }
   
   if (!user) {
-    router.push('/');
     return null;
   }
   
