@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -42,6 +41,11 @@ export default function ProfilePage() {
   const [isSendingCode, setIsSendingCode] = useState(false);
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
   const [verificationCode, setVerificationCode] = useState('');
+  
+  // New state for resend logic
+  const [countdown, setCountdown] = useState(0);
+  const [isResending, setIsResending] = useState(false);
+
 
   // Memoize the document reference
   const profileRef = useMemoFirebase(() => {
@@ -81,6 +85,20 @@ export default function ProfilePage() {
         });
     }
   }, [user, profileData, reset]);
+  
+  // Timer effect
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isCodeSent && countdown > 0) {
+      timer = setInterval(() => {
+        setCountdown((prev) => prev - 1);
+      }, 1000);
+    } else if (countdown === 0) {
+      clearInterval(timer);
+    }
+    return () => clearInterval(timer);
+  }, [isCodeSent, countdown]);
+
 
   const onSaveChanges: SubmitHandler<ProfileFormValues> = async (data) => {
     if (!user || !profileRef) return;
@@ -138,45 +156,59 @@ export default function ProfilePage() {
 
   const setupRecaptcha = () => {
     if (!auth) return;
-    if (!(window as any).recaptchaVerifier) {
-      (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-        'size': 'invisible',
-        'callback': (response: any) => {
-          // reCAPTCHA solved, allow signInWithPhoneNumber.
-          setIsSendingCode(false);
-        },
-        'expired-callback': () => {
-          // Response expired. Ask user to solve reCAPTCHA again.
-          setIsSendingCode(false);
-          toast({ title: 'reCAPTCHA expirado', description: 'Por favor, intenta enviar el código de nuevo.', variant: 'destructive' });
-        }
-      });
+    const recaptchaContainer = document.getElementById('recaptcha-container');
+    if (!recaptchaContainer) return;
+    
+    // Clear previous verifier if it exists
+    if ((window as any).recaptchaVerifier) {
+      (window as any).recaptchaVerifier.clear();
     }
+    
+    (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, recaptchaContainer, {
+      'size': 'invisible',
+      'callback': (response: any) => {
+        // reCAPTCHA solved, allow signInWithPhoneNumber.
+        // This callback is often handled implicitly by the await call.
+      },
+      'expired-callback': () => {
+        // Response expired. Ask user to solve reCAPTCHA again.
+        setIsSendingCode(false);
+        setIsResending(false);
+        toast({ title: 'reCAPTCHA expirado', description: 'Por favor, intenta enviar el código de nuevo.', variant: 'destructive' });
+      }
+    });
+    
     return (window as any).recaptchaVerifier;
   }
 
-  const handleSendVerificationCode = async () => {
+  const handleSendVerificationCode = async (isResend = false) => {
     if (!user) return;
     const phoneNumber = getValues('phoneNumber');
     if (!phoneNumber) {
         toast({ title: 'Número de teléfono requerido', description: 'Por favor, guarda un número de teléfono en tu perfil primero.', variant: 'destructive' });
         return;
     }
+    
+    if (isResend) {
+      setIsResending(true);
+    } else {
+      setIsSendingCode(true);
+    }
 
-    setIsSendingCode(true);
     const appVerifier = setupRecaptcha();
     
     try {
         const result = await linkWithPhoneNumber(user, phoneNumber, appVerifier);
         setConfirmationResult(result);
         setIsCodeSent(true);
+        setCountdown(60); // Start/reset countdown
         toast({ title: 'Código SMS Enviado', description: `Se ha enviado un código a ${phoneNumber}.` });
     } catch(error: any) {
         console.error("Error sending phone verification code:", error);
         
         let description = 'No se pudo enviar el SMS. Verifica el número y el formato (+584121234567).';
         if (error.code === 'auth/operation-not-allowed') {
-            description = 'La verificación por teléfono parece estar desactivada. Estoy refrescando la configuración, por favor intenta de nuevo en un momento.';
+            description = 'La verificación por teléfono parece estar desactivada. Por favor, contacta a soporte.';
         } else if (error.code === 'auth/invalid-phone-number') {
             description = 'El número de teléfono no es válido. Asegúrate de usar el formato internacional (ej: +584121234567).';
         } else if (error.code === 'auth/too-many-requests') {
@@ -185,7 +217,11 @@ export default function ProfilePage() {
 
         toast({ title: 'Error al Enviar Código', description, variant: 'destructive' });
     } finally {
+      if (isResend) {
+        setIsResending(false);
+      } else {
         setIsSendingCode(false);
+      }
     }
   };
 
@@ -215,6 +251,7 @@ export default function ProfilePage() {
     setIsCodeSent(false);
     setConfirmationResult(null);
     setVerificationCode('');
+    setCountdown(0);
     if ((window as any).recaptchaVerifier) {
       (window as any).recaptchaVerifier.clear();
     }
@@ -372,9 +409,19 @@ export default function ProfilePage() {
                         {isSubmittingCode && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Confirmar Código
                     </Button>
+                     <div className="text-center text-sm text-muted-foreground">
+                        {countdown > 0 ? (
+                            `Puedes reenviar el código en ${countdown} segundos.`
+                        ) : (
+                            <Button variant="link" onClick={() => handleSendVerificationCode(true)} disabled={isResending} className="p-0 h-auto">
+                                {isResending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Reenviar código
+                            </Button>
+                        )}
+                    </div>
                 </div>
             ) : (
-                <Button onClick={handleSendVerificationCode} disabled={isSendingCode} className="w-full">
+                <Button onClick={() => handleSendVerificationCode(false)} disabled={isSendingCode} className="w-full">
                     {isSendingCode && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Enviar Código de Verificación
                 </Button>
