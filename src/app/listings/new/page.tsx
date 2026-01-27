@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -806,7 +805,7 @@ export default function NewListingPage() {
   }
 
   const isVerified = (profileData as any)?.isVerified || false;
-  if (!isVerified) {
+  if (!isVerified && !isAdmin) {
     return (
        <div className="container max-w-3xl mx-auto py-12">
            <Card className="p-8 text-center">
