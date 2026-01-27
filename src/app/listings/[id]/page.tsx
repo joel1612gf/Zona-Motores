@@ -84,7 +84,18 @@ export default function ListingDetailPage() {
     const price = formatCurrency(vehicle.priceUSD);
     const phoneNumber = vehicle.seller.phone.replace(/[^0-9+]/g, '');
 
-    const message = `Hola ${sellerName}, te escribo para mas informacion sobre un ${vehicleInfo} que tienes publicado en Zona Motores en ${price}.`;
+    const summaryItems: string[] = [];
+    if (vehicle.hasAC) summaryItems.push("tiene aire acondicionado");
+    if (vehicle.hasSoundSystem) summaryItems.push("tiene sistema de sonido");
+    if (!vehicle.hadMajorCrash) summaryItems.push("no ha tenido choques fuertes");
+    if (vehicle.isOperational) summaryItems.push("está rodando sin problemas");
+
+    let summaryText = '';
+    if (summaryItems.length > 0) {
+      summaryText = `\n\nSolo para confirmar, en el anuncio indicas que el vehículo ${summaryItems.join(', ')}. ¿Es correcto?`;
+    }
+
+    const message = `Hola ${sellerName}, te escribo para más información sobre el ${vehicleInfo} que tienes publicado en Zona Motores en ${price}.${summaryText}`;
 
     return `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
   };
@@ -459,5 +470,3 @@ export default function ListingDetailPage() {
     </div>
   );
 }
-
-    
