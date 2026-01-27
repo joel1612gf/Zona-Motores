@@ -9,18 +9,22 @@ service cloud.firestore {
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
+    
+    function isAdmin() {
+      return request.auth.token.email == 'zonamotores.ve@gmail.com';
+    }
 
     match /users/{userId} {
-      // Only the owner can read or write their own user profile
-      allow read, write: if isOwner(userId);
+      // The owner or an admin can read or write their own user profile
+      allow read, write: if isOwner(userId) || isAdmin();
 
       // Vehicle listings are a subcollection of users
       match /vehicleListings/{listingId} {
         // Anyone can get a single listing
         allow get: if true;
         
-        // Only the owner of the user document can manage their own listings
-        allow create, update, delete: if isOwner(userId);
+        // Only the owner of the user document or an admin can manage their own listings
+        allow create, update, delete: if isOwner(userId) || isAdmin();
       }
     }
 
