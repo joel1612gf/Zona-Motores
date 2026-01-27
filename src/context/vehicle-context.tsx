@@ -53,7 +53,7 @@ export function VehicleProvider({ children }: { children: ReactNode }) {
     const combinedVehicles = Array.from(vehicleMap.values());
 
     return combinedVehicles
-      .filter(v => (v.status || 'active') === 'active') // Handle initial data not having status
+      .filter(v => (v.status || 'active') === 'active' && !v.seller.isBlocked)
       .sort((a, b) => { // Sort by creation date, descending
         const dateA = a.createdAt?.toDate() || new Date(0);
         const dateB = b.createdAt?.toDate() || new Date(0);

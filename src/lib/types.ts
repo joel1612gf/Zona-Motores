@@ -9,6 +9,7 @@ export type UserProfile = {
   logoUrl?: string;
   heroUrl?: string;
   address?: string;
+  isBlocked?: boolean;
 };
 
 export type ImageInfo = {

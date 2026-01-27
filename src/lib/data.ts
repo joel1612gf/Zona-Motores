@@ -3,9 +3,9 @@ import { PlaceHolderImages } from './placeholder-images';
 import { Timestamp } from 'firebase/firestore';
 
 const userProfiles: Record<string, UserProfile> = {
-  user1: { uid: 'user1', displayName: 'Juan Perez', isVerified: true, phone: '+584141234567', accountType: 'personal' },
-  user2: { uid: 'user2', displayName: 'Maria Rodriguez', isVerified: false, phone: '+584129876543', accountType: 'personal' },
-  user3: { uid: 'user3', displayName: 'Carlos Gomez', isVerified: true, phone: '+584241122334', accountType: 'personal' },
+  user1: { uid: 'user1', displayName: 'Juan Perez', isVerified: true, phone: '+584141234567', accountType: 'personal', isBlocked: false },
+  user2: { uid: 'user2', displayName: 'Maria Rodriguez', isVerified: false, phone: '+584129876543', accountType: 'personal', isBlocked: false },
+  user3: { uid: 'user3', displayName: 'Carlos Gomez', isVerified: true, phone: '+584241122334', accountType: 'personal', isBlocked: false },
   user4: {
     uid: 'user4',
     displayName: 'ArmandoMotors',
@@ -15,6 +15,7 @@ const userProfiles: Record<string, UserProfile> = {
     logoUrl: 'https://picsum.photos/seed/armando-motors-logo/200/200',
     heroUrl: 'https://picsum.photos/seed/armando-motors-hero/1800/800',
     address: 'Los Teques, KM 18',
+    isBlocked: false,
   },
   user5: {
     uid: 'user5',
@@ -25,6 +26,7 @@ const userProfiles: Record<string, UserProfile> = {
     logoUrl: 'https://picsum.photos/seed/concesionario-vzla-logo/200/200',
     heroUrl: 'https://picsum.photos/seed/concesionario-vzla-hero/1800/800',
     address: 'Caracas, El Hatillo',
+    isBlocked: false,
   },
 };
 

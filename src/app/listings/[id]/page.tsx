@@ -1,14 +1,30 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter, notFound } from 'next/navigation';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useVehicles } from '@/context/vehicle-context';
+import { useUser, useFirestore, useStorage } from '@/firebase';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger, DialogHeader, DialogClose } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle as CardTitleComponent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { ref, deleteObject } from 'firebase/storage';
+import { useToast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { 
   Gauge, 
   MapPin, 
@@ -30,10 +46,16 @@ import {
   Shield,
   ChevronLeft,
   ChevronRight,
-  X
+  X,
+  Pencil as PencilIcon,
+  Trash2,
+  Loader2,
+  ShieldBan,
+  Play,
+  Pause
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
-import { notFound } from 'next/navigation';
+
 
 function WhatsAppIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -54,11 +76,23 @@ export default function ListingDetailPage() {
   const params = useParams<{ id: string }>();
   const { vehicles } = useVehicles();
   const vehicle = vehicles.find(v => v.id === params.id);
+  const { user: adminUser } = useUser();
+  const firestore = useFirestore();
+  const storage = useStorage();
+  const router = useRouter();
+  const { toast } = useToast();
 
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isContactDialogOpen, setIsContactDialogOpen] = useState(false);
   const [countdown, setCountdown] = useState(5);
+
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isTogglingStatus, setIsTogglingStatus] = useState(false);
+  const [isBlocking, setIsBlocking] = useState(false);
+  
+  const isAdmin = adminUser?.email === 'zonamotores.ve@gmail.com';
+
 
   useEffect(() => {
     if (isContactDialogOpen) {
@@ -211,6 +245,89 @@ export default function ListingDetailPage() {
     setIsPanning(false);
     if (transform.scale <= 1) {
       setTransform({ scale: 1, x: 0, y: 0 });
+    }
+  };
+
+  const handleToggleStatus = async (newStatus: 'active' | 'paused' | 'sold') => {
+      if (!adminUser) return;
+      setIsTogglingStatus(true);
+
+      try {
+          const vehicleRef = doc(firestore, 'users', vehicle.sellerId, 'vehicleListings', vehicle.id);
+          const updatePayload: { status: string; createdAt?: any } = { status: newStatus };
+          
+          if (newStatus === 'active') {
+              updatePayload.createdAt = serverTimestamp();
+          }
+          
+          await updateDoc(vehicleRef, updatePayload);
+          toast({
+              title: `Estado Actualizado`,
+              description: `La publicación ahora está ${newStatus}.`,
+          });
+      } catch (error) {
+          console.error("Error updating status:", error);
+           toast({
+              variant: "destructive",
+              title: "Error al actualizar",
+              description: "No se pudo cambiar el estado de la publicación.",
+          });
+      } finally {
+          setIsTogglingStatus(false);
+      }
+  };
+
+  const handleDelete = async () => {
+      if (!adminUser) return;
+      setIsDeleting(true);
+      try {
+          const vehicleRef = doc(firestore, 'users', vehicle.sellerId, 'vehicleListings', vehicle.id);
+          
+          if (vehicle.images && vehicle.images.length > 0) {
+              const imageDeletePromises = vehicle.images.map(image => {
+                  if (image.url.includes('firebasestorage.googleapis.com')) {
+                      const imageRef = ref(storage, image.url);
+                      return deleteObject(imageRef);
+                  }
+                  return Promise.resolve();
+              });
+              await Promise.all(imageDeletePromises);
+          }
+
+          await deleteDoc(vehicleRef);
+
+          toast({
+              title: "Publicación Eliminada",
+              description: `El vehículo ha sido eliminado permanentemente.`,
+          });
+          router.push('/listings');
+      } catch (error) {
+          console.error("Error deleting vehicle:", error);
+          toast({
+              variant: "destructive",
+              title: "Error al eliminar",
+              description: "No se pudo eliminar la publicación. Inténtalo de nuevo.",
+          });
+          setIsDeleting(false);
+      }
+  };
+
+  const handleToggleBlockSeller = async () => {
+    if(!adminUser) return;
+    setIsBlocking(true);
+    const newBlockedState = !vehicle.seller.isBlocked;
+    try {
+        const sellerRef = doc(firestore, 'users', vehicle.sellerId);
+        await updateDoc(sellerRef, { isBlocked: newBlockedState });
+        toast({
+            title: `Vendedor ${newBlockedState ? 'Bloqueado' : 'Desbloqueado'}`,
+            description: `${vehicle.seller.displayName} ha sido ${newBlockedState ? 'bloqueado' : 'desbloqueado'}.`,
+        });
+    } catch(error) {
+        console.error("Error blocking/unblocking seller:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar el estado del vendedor.' });
+    } finally {
+        setIsBlocking(false);
     }
   };
 
@@ -392,6 +509,82 @@ export default function ListingDetailPage() {
                </p>
             </CardContent>
           </Card>
+          {isAdmin && (
+            <Card className="border-red-500/50">
+                <CardHeader>
+                    <CardTitleComponent className="text-red-600 dark:text-red-500">Herramientas de Administrador</CardTitleComponent>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-2">
+                    <Button asChild variant="outline">
+                        <Link href={`/listings/${vehicle.id}/edit`}>
+                            <PencilIcon className="mr-2" /> Editar Anuncio
+                        </Link>
+                    </Button>
+                    
+                    {vehicle.status === 'active' ? (
+                         <Button variant="outline" onClick={() => handleToggleStatus('paused')} disabled={isTogglingStatus}>
+                            {isTogglingStatus ? <Loader2 className="animate-spin mr-2"/> : <Pause className="mr-2"/>}
+                            Pausar Anuncio
+                         </Button>
+                    ) : (
+                         <Button variant="outline" onClick={() => handleToggleStatus('active')} disabled={isTogglingStatus}>
+                            {isTogglingStatus ? <Loader2 className="animate-spin mr-2"/> : <Play className="mr-2"/>}
+                            Reactivar Anuncio
+                         </Button>
+                    )}
+                    
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="destructive">
+                                <Trash2 className="mr-2"/> Eliminar Anuncio
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>¿Eliminar este anuncio?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Esta acción es permanente y no se puede deshacer. Se borrará el anuncio y todas sus imágenes.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                                    {isDeleting && <Loader2 className="animate-spin mr-2"/>}
+                                    Sí, eliminar
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+
+                    <Separator className="my-2"/>
+
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button variant={vehicle.seller.isBlocked ? 'secondary' : 'destructive'}>
+                                <ShieldBan className="mr-2"/> {vehicle.seller.isBlocked ? 'Desbloquear Vendedor' : 'Bloquear Vendedor'}
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>¿{vehicle.seller.isBlocked ? 'Desbloquear' : 'Bloquear'} a {vehicle.seller.displayName}?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    {vehicle.seller.isBlocked 
+                                        ? 'Esto permitirá que el vendedor vuelva a publicar y sus anuncios sean visibles.'
+                                        : 'Al bloquear a este vendedor, se ocultarán todos sus anuncios y no podrá publicar nuevos. ¿Deseas continuar?'}
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={handleToggleBlockSeller} disabled={isBlocking} className={cn(!vehicle.seller.isBlocked && 'bg-destructive hover:bg-destructive/90')}>
+                                    {isBlocking && <Loader2 className="animate-spin mr-2"/>}
+                                    {vehicle.seller.isBlocked ? 'Sí, desbloquear' : 'Sí, bloquear'}
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 
@@ -434,7 +627,6 @@ export default function ListingDetailPage() {
             />
           </div>
 
-          {/* Navigation buttons: only show when not zoomed in */}
           {vehicle.images.length > 1 && transform.scale === 1 && (
             <>
               <Button

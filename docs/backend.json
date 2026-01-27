@@ -101,6 +101,10 @@
           "type": "boolean",
           "description": "Indicates whether the seller has verified their phone number."
         },
+        "isBlocked": {
+          "type": "boolean",
+          "description": "Indicates if the seller's account is blocked by an admin."
+        },
         "accountType": {
           "type": "string",
           "description": "The type of seller account, for future features.",
