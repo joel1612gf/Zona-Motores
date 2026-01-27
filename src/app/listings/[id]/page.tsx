@@ -4,7 +4,7 @@ import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import { useVehicles } from '@/context/vehicle-context';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
-import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger, DialogHeader } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle as CardTitleComponent } from '@/components/ui/card';
@@ -35,6 +35,21 @@ import {
 import { formatCurrency, cn } from '@/lib/utils';
 import { notFound } from 'next/navigation';
 
+function WhatsAppIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      viewBox="0 0 32 32"
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+    >
+      <path
+        d="M19.11 17.205c-.372 0-1.088 1.39-1.518 1.39a.63.63 0 0 1-.315-.1c-.802-.402-1.504-.817-2.163-1.447-.545-.516-1.146-1.29-1.46-1.963a.426.426 0 0 1-.073-.215c0-.33.99-.945.99-1.49 0-.143-.73-2.09-.832-2.335-.143-.372-.214-.487-.6-.487-.187 0-.36-.044-.53-.044-.315 0-.765.11-1.057.332-.29.22-.722.71-1.256 1.448a.93.93 0 0 0 .115.746c.143.372.43.83.698 1.15l.61.859a5.889 5.889 0 0 0 2.686 2.37c.792.43 1.77.72 2.654.72a.91.91 0 0 0 .546-.12c.328-.2.48-.68.6-.943.12-.264.12-.504 0-.66zM27.84 4.28C25.045 1.47 21.308 0 17.21 0 7.8 0 0 7.79 0 17.21c0 3.215.89 6.29 2.55 8.98l-2.54 9.38 9.61-2.49c2.6.16 5.38.25 8.08.25 9.4 0 17.2-7.8 17.2-17.2 0-4.1-1.48-7.8-4.28-10.6z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
 export default function ListingDetailPage() {
   const params = useParams<{ id: string }>();
   const { vehicles } = useVehicles();
@@ -42,6 +57,37 @@ export default function ListingDetailPage() {
 
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isContactDialogOpen, setIsContactDialogOpen] = useState(false);
+  const [countdown, setCountdown] = useState(5);
+
+  useEffect(() => {
+    if (isContactDialogOpen) {
+      setCountdown(5);
+      const timer = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [isContactDialogOpen]);
+
+  const createWhatsAppLink = () => {
+    if (!vehicle || !vehicle.seller.phone) return '';
+    
+    const sellerName = vehicle.seller.displayName;
+    const vehicleInfo = `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
+    const price = formatCurrency(vehicle.priceUSD);
+    const phoneNumber = vehicle.seller.phone.replace(/[^0-9+]/g, '');
+
+    const message = `Hola ${sellerName}, te escribo para mas informacion sobre un ${vehicleInfo} que tienes publicado en Zona Motores en ${price}.`;
+
+    return `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
+  };
 
   // State and refs for zoom/pan
   const [transform, setTransform] = useState({ scale: 1, x: 0, y: 0 });
@@ -293,9 +339,43 @@ export default function ListingDetailPage() {
                   {!vehicle.seller.isVerified && <Badge variant="destructive">No Verificado</Badge>}
                 </div>
               </div>
-              <Button className="w-full">
-                <Phone className="mr-2 h-4 w-4" /> Mostrar Número de Teléfono
-              </Button>
+              <Dialog open={isContactDialogOpen} onOpenChange={setIsContactDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button className="w-full">
+                    <Phone className="mr-2 h-4 w-4" /> Mostrar Número de Teléfono
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Contactar al Vendedor</DialogTitle>
+                    <DialogDescription>
+                      Estás a punto de contactar a {vehicle.seller.displayName} por WhatsApp.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="py-4 space-y-4">
+                    <div className="bg-muted h-24 flex items-center justify-center rounded-md text-muted-foreground text-sm">
+                      (Espacio para anuncio de Google)
+                    </div>
+
+                    <Button asChild size="lg" className="w-full bg-green-500 hover:bg-green-600 text-white" disabled={countdown > 0}>
+                        <a href={countdown === 0 ? createWhatsAppLink() : undefined} target="_blank" rel="noopener noreferrer">
+                            {countdown > 0 ? (
+                                `Espera ${countdown} segundos...`
+                            ) : (
+                                <>
+                                    <WhatsAppIcon className="mr-2 h-5 w-5" />
+                                    Contactar por WhatsApp
+                                </>
+                            )}
+                        </a>
+                    </Button>
+
+                    <div className="bg-muted h-24 flex items-center justify-center rounded-md text-muted-foreground text-sm">
+                        (Espacio para anuncio de Google)
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
                <p className="text-xs text-muted-foreground text-center">
                  Los vendedores verificados han confirmado su identidad vía WhatsApp.
                </p>
@@ -368,9 +448,11 @@ export default function ListingDetailPage() {
             </>
           )}
 
-          <DialogClose className="absolute right-4 top-4 rounded-full p-2 bg-black/50 text-white hover:bg-black/80 hover:text-white z-20 transition-colors">
-            <X className="h-5 w-5" />
-            <span className="sr-only">Cerrar</span>
+          <DialogClose asChild>
+            <button className="absolute right-4 top-4 rounded-full p-2 bg-black/50 text-white hover:bg-black/80 hover:text-white z-20 transition-colors">
+              <X className="h-5 w-5" />
+              <span className="sr-only">Cerrar</span>
+            </button>
           </DialogClose>
         </DialogContent>
       </Dialog>
