@@ -7,7 +7,7 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { UploadCloud, X, Loader2 } from 'lucide-react';
+import { UploadCloud, X, Loader2, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -15,7 +15,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useFirestore, useUser, useMemoFirebase, useStorage } from '@/firebase';
-import { doc, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp, getDoc, collectionGroup, query, where, getDocs } from 'firebase/firestore';
 import { ref, getDownloadURL, uploadBytesResumable, deleteObject } from 'firebase/storage';
 import { Progress } from '@/components/ui/progress';
 import imageCompression from 'browser-image-compression';
@@ -23,6 +23,7 @@ import type { Vehicle } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { summarizeVehicleListing } from '@/ai/flows/summarize-vehicle-listing';
 
 type PhotoState = {
   file?: File;
@@ -45,45 +46,30 @@ export default function EditListingPage() {
   const [vehicleData, setVehicleData] = useState<Vehicle | null>(null);
   const [isVehicleLoading, setIsVehicleLoading] = useState(true);
 
-  const vehicleRef = useMemoFirebase(() => {
-    if (!user || !params.id) return null;
-    // An admin needs to know the original sellerId to construct the path.
-    // For now, let's assume the admin flow will pass this, but this is a weakness.
-    // A better approach would be a collectionGroup query, but that's a bigger change.
-    // We'll rely on the fact that an admin can't get here without a full vehicle object from a list.
-    // The vehicle object sellerId is needed.
-    // For simplicity, we assume we get the sellerId from the vehicle data which is fetched.
-    // So, we need to fetch the vehicle data first regardless of user.
-    // Let's modify the fetch logic.
-    return doc(firestore, 'users', vehicleData?.sellerId || user.uid, 'vehicleListings', params.id as string);
-  }, [firestore, user, params.id, vehicleData?.sellerId]);
-
   useEffect(() => {
-    // We need to fetch vehicle data without knowing the user ID if the editor is an admin
-    // This is a bit tricky. The current structure is /users/{userId}/vehicleListings/{listingId}
-    // The URL only gives us listingId.
-    // For now, we assume this page is reached from a context where `vehicleData` is already available
-    // or can be fetched with a known `sellerId`.
-    // The logic is a bit circular. We need `vehicleData` to get `sellerId` to build `vehicleRef`.
-    // Let's change how `vehicleRef` is created. We will fetch first, then create the ref.
-    // For this to work, we need a way to find a vehicle by just its ID.
-    // The `useVehicles` context is the simplest way. Let's use that for now.
-    // THIS IS A SIMPLIFICATION. A real-world app would have a dedicated API route `getListing(id)`.
     const getVehicle = async () => {
         setIsVehicleLoading(true);
-        if (!params.id || !firestore) return;
-        
-        // This is a placeholder for a real API call.
-        // We're searching ALL vehicle listings. VERY INEFFICIENT for a large dataset.
-        // But for this project scale, it's a workaround.
-        const vehiclesColGroup = collection(firestore, 'vehicleListings');
+        if (!params.id || !firestore) {
+            setIsVehicleLoading(false);
+            return;
+        };
+
+        const vehiclesColGroup = collectionGroup(firestore, 'vehicleListings');
         const q = query(vehiclesColGroup, where('id', '==', params.id));
         
         try {
             const querySnapshot = await getDocs(q);
             if (!querySnapshot.empty) {
                 const docSnap = querySnapshot.docs[0];
-                setVehicleData({ id: docSnap.id, ...docSnap.data() } as Vehicle);
+                const vehicle = { id: docSnap.id, ...docSnap.data() } as Vehicle;
+                
+                // Permission Check
+                if (!isAdmin && user && vehicle.sellerId !== user.uid) {
+                    toast({ title: "No autorizado", description: "No tienes permiso para editar esta publicación.", variant: "destructive" });
+                    router.push('/');
+                    return;
+                }
+                setVehicleData(vehicle);
             } else {
                 setVehicleData(null);
             }
@@ -95,75 +81,19 @@ export default function EditListingPage() {
         }
     };
     
-    // getVehicle(); This is one way, but it requires a composite index on `id`.
-    // The current use-collection doesn't support this well.
-    // Let's assume the user navigates from a list and the vehicle data is findable.
-    // A better way is to make this component rely on a parent that fetches the data.
-    // Given the project structure, let's keep the existing `getDoc` but adjust it.
-    // `vehicleRef` will be tricky.
-    
-    if (params.id) {
-        const getVehicle = async () => {
-            setIsVehicleLoading(true);
-            try {
-                // This is a temporary solution. We can't know the sellerId from the URL.
-                // A better solution would be a collection group query.
-                // For now, this will only work if the logged in user is the seller.
-                // Admin will not be able to edit unless they are the sellerId, which is wrong.
-                // I will revert to a simpler logic that might fail for admin but works for users.
-                // The prompt implies I should make it work for admin.
-                // The ONLY way is a collectionGroup query or changing the data model.
-                // I will add a collectionGroup query. It requires an index.
-                const vehicleListingRef = doc(firestore, `vehicleListings/${params.id}`);
-                const docSnap = await getDoc(vehicleListingRef); // This won't work, path is wrong.
-
-                if(user) { // This will run for admin too
-                    const fullRef = doc(firestore, 'users', user.uid, 'vehicleListings', params.id as string);
-                    const docSnap = await getDoc(fullRef);
-                    if (docSnap.exists()) {
-                        setVehicleData({ id: docSnap.id, ...docSnap.data() } as Vehicle);
-                    } else {
-                        // Admin might be editing someone else's. This is the hard part.
-                        setVehicleData(null); // For now, assume not found
-                    }
-                }
-            } catch (e) {
-                console.error("Error fetching vehicle for edit:", e);
-                setVehicleData(null);
-            } finally {
-                setIsVehicleLoading(false);
-            }
-        };
-
-        if (user) {
-          // A full app would use a collection group query here to find the vehicle by ID
-          // across all users, then construct the ref.
-          // For now, this will only work if the admin somehow navigates from a place
-          // that provides the sellerID.
-          // The current `MyListings` page only shows listings for the current user.
-          // So admin can only edit their own posts. This is a limitation I'll accept for now.
-          const fullRef = doc(firestore, 'users', user.uid, 'vehicleListings', params.id as string);
-          getDoc(fullRef).then(docSnap => {
-             if (docSnap.exists()) {
-                setVehicleData({ id: docSnap.id, ...docSnap.data() } as Vehicle);
-            } else {
-                setVehicleData(null);
-            }
-          }).finally(() => setIsVehicleLoading(false));
-
-        } else if (!isUserLoading) {
-            setIsVehicleLoading(false);
-        }
+    // Trigger fetch when user/admin status is confirmed
+    if (!isUserLoading) {
+        getVehicle();
     }
 
-  }, [params.id, user, isUserLoading, firestore]);
-
+  }, [params.id, firestore, isUserLoading, user, isAdmin, router, toast]);
 
   const [photos, setPhotos] = useState<PhotoState[]>([]);
   const [photosToDelete, setPhotosToDelete] = useState<string[]>([]);
   const [mainPhotoIndex, setMainPhotoIndex] = useState<number | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
 
   const [details, setDetails] = useState({
     year: '',
@@ -191,20 +121,15 @@ export default function EditListingPage() {
     tradeInForLowerValue: false,
     sellerName: '',
     sellerPhone: '',
+    marketplaceUrl: '',
   });
 
   useEffect(() => {
     if (vehicleData) {
-      if (!isAdmin && user && vehicleData.sellerId !== user.uid) {
-        toast({ title: "No autorizado", description: "No tienes permiso para editar esta publicación.", variant: "destructive" });
-        router.push('/');
-        return;
-      }
-
       setDetails({
         year: vehicleData.year.toString(),
         price: vehicleData.priceUSD.toString(),
-        mileage: vehicleData.mileage.toString(),
+        mileage: vehicleData.mileage?.toString() || '0',
         transmission: vehicleData.transmission,
         exteriorColor: vehicleData.exteriorColor,
         engine: vehicleData.engine,
@@ -227,6 +152,7 @@ export default function EditListingPage() {
         tradeInForLowerValue: vehicleData.tradeInForLowerValue || false,
         sellerName: vehicleData.seller.displayName,
         sellerPhone: vehicleData.seller.phone || '',
+        marketplaceUrl: vehicleData.marketplaceUrl || '',
       });
 
       const existingPhotos = vehicleData.images.map(img => ({
@@ -236,7 +162,7 @@ export default function EditListingPage() {
       setPhotos(existingPhotos);
       setMainPhotoIndex(0);
     }
-  }, [vehicleData, user, router, toast, isAdmin]);
+  }, [vehicleData]);
 
   const handleDetailChange = (field: keyof typeof details, value: any) => {
     setDetails(prev => ({ ...prev, [field]: value }));
@@ -325,6 +251,43 @@ export default function EditListingPage() {
       setMainPhotoIndex(photos.length > 1 ? 0 : null);
     } else if (mainPhotoIndex && mainPhotoIndex > index) {
       setMainPhotoIndex(mainPhotoIndex - 1);
+    }
+  };
+  
+  const handleGenerateDescription = async () => {
+    if (!vehicleData) return;
+    setIsGeneratingDescription(true);
+    try {
+        const { summary } = await summarizeVehicleListing({
+            make: vehicleData.make,
+            model: vehicleData.model,
+            year: parseInt(details.year, 10),
+            mileage: parseInt(details.mileage, 10) || 0,
+            bodyType: vehicleData.bodyType,
+            exteriorColor: details.exteriorColor,
+            description: details.moreDetails,
+            features: [
+                details.is4x4 ? '4x4' : '',
+                details.isArmored ? `Blindado nivel ${details.armorLevel}` : '',
+                details.hasAC ? 'Aire Acondicionado' : '',
+                details.hasSoundSystem ? 'Sistema de sonido' : '',
+                details.acceptsTradeIn ? 'Acepta cambios' : '',
+            ].filter(Boolean),
+        });
+        handleDetailChange('moreDetails', summary);
+        toast({
+            title: "Descripción Generada",
+            description: "La descripción ha sido generada por IA y añadida al formulario."
+        });
+    } catch (e) {
+        console.error("Error generating description", e);
+        toast({
+            title: "Error",
+            description: "No se pudo generar la descripción.",
+            variant: "destructive"
+        });
+    } finally {
+        setIsGeneratingDescription(false);
     }
   };
 
@@ -446,6 +409,9 @@ export default function EditListingPage() {
             displayName: details.sellerName,
             phone: details.sellerPhone,
         };
+        if (details.marketplaceUrl) {
+            updatedVehicleData.marketplaceUrl = details.marketplaceUrl;
+        }
       }
       
       updatedVehicleData.operationalDetails = details.isOperational ? null : details.operationalDetails;
@@ -521,6 +487,10 @@ export default function EditListingPage() {
                               <Label htmlFor="sellerPhone">Teléfono del Vendedor</Label>
                               <Input id="sellerPhone" type="tel" value={details.sellerPhone} onChange={(e) => handleDetailChange('sellerPhone', e.target.value)} placeholder="+58412..." />
                           </div>
+                          <div className="md:col-span-2 space-y-2">
+                            <Label htmlFor="marketplaceUrl">URL de Marketplace (Opcional)</Label>
+                            <Input id="marketplaceUrl" value={details.marketplaceUrl} onChange={(e) => handleDetailChange('marketplaceUrl', e.target.value)} placeholder="https://www.facebook.com/marketplace/item/..." />
+                        </div>
                       </div>
                       <Separator className="mb-6" />
                   </>
@@ -642,8 +612,14 @@ export default function EditListingPage() {
                       <Input id="tireLife" type="number" min="0" max="100" step="5" value={details.tireLife} onChange={(e) => handleDetailChange('tireLife', e.target.value)} />
                   </div>
                    <div className="md:col-span-2 space-y-2">
+                    <div className="flex items-center justify-between mb-2">
                       <Label htmlFor="moreDetails">Descripción / Más detalles</Label>
-                      <Textarea id="moreDetails" value={details.moreDetails} onChange={(e) => handleDetailChange('moreDetails', e.target.value)} />
+                      <Button variant="outline" size="sm" onClick={handleGenerateDescription} disabled={isGeneratingDescription}>
+                          {isGeneratingDescription ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ExternalLink className="mr-2 h-4 w-4" />}
+                          Generar descripción con IA
+                      </Button>
+                    </div>
+                    <Textarea id="moreDetails" value={details.moreDetails} onChange={(e) => handleDetailChange('moreDetails', e.target.value)} />
                   </div>
               </div>
           </Card>

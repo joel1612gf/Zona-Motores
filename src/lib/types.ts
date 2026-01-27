@@ -61,4 +61,5 @@ export type Vehicle = {
   };
   createdAt: Timestamp;
   status?: 'active' | 'paused' | 'sold';
+  marketplaceUrl?: string;
 };

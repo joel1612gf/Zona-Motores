@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Bike, Car, Truck, UploadCloud, X, Loader2, ShieldAlert, Phone } from 'lucide-react';
+import { Bike, Car, Truck, UploadCloud, X, Loader2, ShieldAlert, Phone, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -25,6 +25,7 @@ import { Progress } from '@/components/ui/progress';
 import imageCompression from 'browser-image-compression';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { summarizeVehicleListing } from '@/ai/flows/summarize-vehicle-listing';
 
 type VehicleType = 'Moto' | 'Carro' | 'Camioneta';
 type Step = 'selection' | 'details' | 'photos';
@@ -88,6 +89,7 @@ export default function NewListingPage() {
   const [mainPhotoIndex, setMainPhotoIndex] = useState<number | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
 
   const [details, setDetails] = useState({
     price: '',
@@ -114,6 +116,7 @@ export default function NewListingPage() {
     tradeInForLowerValue: false,
     sellerName: '',
     sellerPhone: '',
+    marketplaceUrl: '',
   });
 
   const allMakesForSelectedType = useMemo(() => {
@@ -222,6 +225,43 @@ export default function NewListingPage() {
       } else if (mainPhotoIndex && mainPhotoIndex > index) {
           setMainPhotoIndex(mainPhotoIndex - 1);
       }
+  };
+
+  const handleGenerateDescription = async () => {
+    if (!selectedType) return;
+    setIsGeneratingDescription(true);
+    try {
+        const { summary } = await summarizeVehicleListing({
+            make: selectedBrand,
+            model: selectedModel,
+            year: parseInt(selectedYear, 10),
+            mileage: parseInt(details.mileage, 10) || 0,
+            bodyType: selectedType,
+            exteriorColor: details.exteriorColor,
+            description: details.moreDetails,
+            features: [
+                details.is4x4 ? '4x4' : '',
+                details.isArmored ? `Blindado nivel ${details.armorLevel}` : '',
+                details.hasAC ? 'Aire Acondicionado' : '',
+                details.hasSoundSystem ? 'Sistema de sonido' : '',
+                details.acceptsTradeIn ? 'Acepta cambios' : '',
+            ].filter(Boolean),
+        });
+        handleDetailChange('moreDetails', summary);
+        toast({
+            title: "Descripción Generada",
+            description: "La descripción ha sido generada por IA y añadida al formulario."
+        });
+    } catch (e) {
+        console.error("Error generating description", e);
+        toast({
+            title: "Error",
+            description: "No se pudo generar la descripción.",
+            variant: "destructive"
+        });
+    } finally {
+        setIsGeneratingDescription(false);
+    }
   };
 
   const handlePublish = async () => {
@@ -335,7 +375,7 @@ export default function NewListingPage() {
             throw new Error("No todas las imágenes se subieron correctamente.");
         }
 
-        const newVehicleData = {
+        const newVehicleData: any = {
             id: newVehicleRef.id,
             make: selectedBrand,
             model: selectedModel,
@@ -369,15 +409,25 @@ export default function NewListingPage() {
             location: { city: 'Caracas', state: 'Distrito Capital', lat: 10.4806, lon: -66.9036 },
             createdAt: serverTimestamp(),
             status: 'active' as 'active' | 'paused' | 'sold',
-            ...(selectedType === 'Carro' && { doorCount: details.doorCount as '2' | '4' }),
-            ...(!details.isOperational && { operationalDetails: details.operationalDetails }),
-            ...(details.acceptsTradeIn && {
-                tradeInDetails: details.tradeInDetails,
-                tradeInForHigherValue: details.tradeInForHigherValue,
-                tradeInForLowerValue: details.tradeInForLowerValue,
-            }),
-            ...(details.isArmored && { armorLevel: parseInt(details.armorLevel, 10) }),
         };
+        
+        if (isAdmin && details.marketplaceUrl) {
+            newVehicleData.marketplaceUrl = details.marketplaceUrl;
+        }
+        if (selectedType === 'Carro') {
+            newVehicleData.doorCount = details.doorCount as '2' | '4';
+        }
+        if (!details.isOperational) {
+            newVehicleData.operationalDetails = details.operationalDetails;
+        }
+        if (details.acceptsTradeIn) {
+            newVehicleData.tradeInDetails = details.tradeInDetails;
+            newVehicleData.tradeInForHigherValue = details.tradeInForHigherValue;
+            newVehicleData.tradeInForLowerValue = details.tradeInForLowerValue;
+        }
+        if (details.isArmored) {
+            newVehicleData.armorLevel = parseInt(details.armorLevel, 10);
+        }
 
         await setDoc(newVehicleRef, newVehicleData);
 
@@ -425,10 +475,11 @@ export default function NewListingPage() {
     setSelectedYear(value);
   };
 
-  const handleYearBlur = () => {
-    if (!selectedYear) return;
+  const handleYearBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (!value) return;
     
-    let year = parseInt(selectedYear, 10);
+    let year = parseInt(value, 10);
     if (isNaN(year)) {
         setSelectedYear('');
         toast({ title: "Año inválido", description: "Por favor, introduce un número válido.", variant: "destructive" });
@@ -574,13 +625,17 @@ export default function NewListingPage() {
                         <CardDescription>Estás publicando en nombre de otra persona. Introduce sus datos de contacto.</CardDescription>
                     </CardHeader>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start mb-6">
-                            <div className="space-y-2">
+                        <div className="space-y-2">
                             <Label htmlFor="sellerName">Nombre del Vendedor</Label>
                             <Input id="sellerName" value={details.sellerName} onChange={(e) => handleDetailChange('sellerName', e.target.value)} placeholder="Ej: Carlos Rodriguez" />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="sellerPhone">Teléfono del Vendedor</Label>
                             <Input id="sellerPhone" type="tel" value={details.sellerPhone} onChange={(e) => handleDetailChange('sellerPhone', e.target.value)} placeholder="+58412..." />
+                        </div>
+                        <div className="md:col-span-2 space-y-2">
+                            <Label htmlFor="marketplaceUrl">URL de Marketplace (Opcional)</Label>
+                            <Input id="marketplaceUrl" value={details.marketplaceUrl} onChange={(e) => handleDetailChange('marketplaceUrl', e.target.value)} placeholder="https://www.facebook.com/marketplace/item/..." />
                         </div>
                     </div>
                     <Separator className="mb-6" />
@@ -717,7 +772,13 @@ export default function NewListingPage() {
                     <Input id="tireLife" type="number" min="0" max="100" step="5" value={details.tireLife} onChange={(e) => handleDetailChange('tireLife', e.target.value)} placeholder="Ej: 75"/>
                 </div>
                  <div className="md:col-span-2 space-y-2">
-                    <Label htmlFor="moreDetails">Más detalles (opcional)</Label>
+                    <div className="flex items-center justify-between mb-2">
+                      <Label htmlFor="moreDetails">Descripción / Más detalles</Label>
+                      <Button variant="outline" size="sm" onClick={handleGenerateDescription} disabled={isGeneratingDescription}>
+                          {isGeneratingDescription ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ExternalLink className="mr-2 h-4 w-4" />}
+                          Generar descripción con IA
+                      </Button>
+                    </div>
                     <Textarea id="moreDetails" placeholder="Añade cualquier otra información relevante como extras, detalles de pintura, etc." value={details.moreDetails} onChange={(e) => handleDetailChange('moreDetails', e.target.value)} />
                 </div>
             </div>

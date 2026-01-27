@@ -28,7 +28,8 @@ import {
   Pause,
   Play,
   Loader2,
-  Hand
+  Hand,
+  ExternalLink,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { doc, deleteDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
@@ -235,6 +236,14 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
                     <Rocket className="mr-1.5 h-4 w-4" />
                     Promocionar
                 </Button>
+                {vehicle.marketplaceUrl && (
+                  <Button asChild variant="outline" size="sm">
+                    <Link href={vehicle.marketplaceUrl} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="mr-1.5 h-4 w-4" />
+                      Ir a Marketplace
+                    </Link>
+                  </Button>
+                )}
             </div>
         )}
       </div>

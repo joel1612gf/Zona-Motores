@@ -64,6 +64,10 @@
         "summary": {
           "type": "string",
           "description": "AI generated summary of the listing."
+        },
+        "marketplaceUrl": {
+          "type": "string",
+          "description": "Optional URL to an external marketplace listing for status checking."
         }
       },
       "required": [
