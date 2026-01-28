@@ -8,7 +8,7 @@ import { Filters, type FilterState } from '@/components/filters';
 import { Button } from '@/components/ui/button';
 import { Grid, List, Info, Search } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, getDistance } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 
 function ListingsPageContent() {
@@ -39,7 +39,7 @@ function ListingsPageContent() {
 
   const filteredVehicles = useMemo(() => {
     return allVehicles.filter(vehicle => {
-      const { searchTerm, make, model, minPrice, maxPrice, minYear, maxYear, bodyType, transmission } = filters;
+      const { searchTerm, make, model, minPrice, maxPrice, minYear, maxYear, bodyType, transmission, location } = filters;
       
       const searchMatch = (() => {
         const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -82,10 +82,19 @@ function ListingsPageContent() {
 
       const transmissionMatch = transmission === 'all' || vehicle.transmission === transmission;
 
-      // A real implementation would use the location filter to sort or filter by distance.
-      // This is a placeholder for that functionality.
+      const locationMatch = (() => {
+        if (!location) return true;
+        const distance = getDistance(
+          location.lat,
+          location.lon,
+          vehicle.location.lat,
+          vehicle.location.lon
+        );
+        return distance <= location.radius;
+      })();
 
-      return searchMatch && makeMatch && modelMatch && priceMatch && yearMatch && bodyTypeMatch && transmissionMatch;
+
+      return searchMatch && makeMatch && modelMatch && priceMatch && yearMatch && bodyTypeMatch && transmissionMatch && locationMatch;
     });
   }, [filters, allVehicles]);
 

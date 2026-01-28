@@ -6,9 +6,10 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { MapPin, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useVehicles } from '@/context/vehicle-context';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
+import { LocationFilterDialog } from './location-filter';
 
 export type FilterState = {
   searchTerm: string;
@@ -20,7 +21,7 @@ export type FilterState = {
   maxYear: string;
   bodyType: string;
   transmission: string;
-  location: GeolocationCoordinates | null;
+  location: { city: string; state: string; lat: number; lon: number, radius: number } | null;
 };
 
 type FiltersProps = {
@@ -49,9 +50,13 @@ export function Filters({ filters, onFilterChange }: FiltersProps) {
   }, [filters.make, vehicles]);
 
 
-  const handleInputChange = (field: keyof FilterState, value: string) => {
+  const handleInputChange = (field: keyof Omit<FilterState, 'location'>, value: string) => {
     onFilterChange({ ...filters, [field]: value });
   };
+  
+  const handleLocationChange = (location: FilterState['location']) => {
+    onFilterChange({ ...filters, location });
+  }
 
   const resetFilters = () => {
     onFilterChange(prev => ({
@@ -68,22 +73,6 @@ export function Filters({ filters, onFilterChange }: FiltersProps) {
     }));
   };
 
-  const handleLocationSearch = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          onFilterChange({ ...filters, location: position.coords });
-        },
-        (error) => {
-          console.error("Error getting location: ", error);
-          alert("No se pudo obtener tu ubicación. Por favor, activa los servicios de ubicación en tu navegador.");
-        }
-      );
-    } else {
-      alert("La geolocalización no es compatible con este navegador.");
-    }
-  };
-
   return (
     <div className="space-y-6">
       <Card>
@@ -95,7 +84,14 @@ export function Filters({ filters, onFilterChange }: FiltersProps) {
           </Button>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Accordion type="multiple" defaultValue={['make', 'price', 'year']} className="w-full">
+          <Accordion type="multiple" defaultValue={['make', 'price', 'year', 'location']} className="w-full">
+            <AccordionItem value="location">
+              <AccordionTrigger className="py-2 text-base">Ubicación</AccordionTrigger>
+              <AccordionContent className="space-y-4 pt-4">
+                <LocationFilterDialog currentLocation={filters.location} onApply={handleLocationChange} />
+              </AccordionContent>
+            </AccordionItem>
+            
             <AccordionItem value="make">
               <AccordionTrigger className="py-2 text-base">Marca y Modelo</AccordionTrigger>
               <AccordionContent className="space-y-4 pt-4">
@@ -233,16 +229,6 @@ export function Filters({ filters, onFilterChange }: FiltersProps) {
               </AccordionContent>
             </AccordionItem>
           </Accordion>
-
-          <Button variant="secondary" className="w-full" onClick={handleLocationSearch}>
-            <MapPin className="mr-2 h-4 w-4" />
-            Buscar Vehículos Cerca de Mí
-          </Button>
-           {filters.location && (
-              <p className="text-xs text-muted-foreground text-center">
-                Usando ubicación: Lat: {filters.location.latitude.toFixed(2)}, Lon: {filters.location.longitude.toFixed(2)}
-              </p>
-            )}
         </CardContent>
       </Card>
     </div>
