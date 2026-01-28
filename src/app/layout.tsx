@@ -10,9 +10,13 @@ import { ThemeProvider } from '@/components/theme-provider';
 import { MakesProvider } from '@/context/makes-context';
 
 export const metadata: Metadata = {
-  title: 'Zona Motores',
-  description: 'Encuentra tu próximo vehículo en Venezuela',
+  title: {
+    default: 'Zona Motores | Compra y Venta de Carros en Venezuela',
+    template: '%s | Zona Motores',
+  },
+  description: 'El mercado #1 para comprar y vender carros, camionetas y motos en Venezuela. Encuentra tu próximo vehículo de forma segura, rápida y fácil. Anuncios verificados y precios reales.',
 };
+
 
 export const viewport: Viewport = {
   themeColor: [
