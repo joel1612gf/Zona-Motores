@@ -41,14 +41,14 @@ export function VehicleCard({ vehicle, isFeatured = false }: { vehicle: Vehicle;
               )}
             </div>
         </div>
-        <CardContent className="p-4 space-y-1 flex flex-col flex-grow">
+        <CardContent className="p-2 sm:p-4 space-y-1 flex flex-col flex-grow">
           <h3 className="font-headline text-lg font-bold truncate">{`${vehicle.year} ${vehicle.make} ${vehicle.model}`}</h3>
           <p className="text-sm text-muted-foreground">{vehicle.mileage.toLocaleString()} km</p>
           <div className="flex-grow" />
           <p className="font-headline text-2xl font-bold text-primary">
             {formatCurrency(vehicle.priceUSD)}
           </p>
-          <div className="flex items-center text-sm text-muted-foreground pt-1">
+          <div className="hidden sm:flex items-center text-sm text-muted-foreground pt-1">
             <MapPin className="h-4 w-4 mr-1.5" />
             <span>{`${vehicle.location.city}, ${vehicle.location.state}`}</span>
           </div>

@@ -111,7 +111,7 @@ function ListingsPageContent() {
   }
 
   return (
-    <div className="container mx-auto py-8">
+    <div className="container mx-auto py-8 px-2 sm:px-6 lg:px-8">
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
         <div className="lg:col-span-1 hidden lg:block">
           <div className="sticky top-20">
@@ -179,7 +179,7 @@ function ListingsPageContent() {
             </div>
           )}
           {filteredVehicles.length > 0 ? (
-            <div className={`gap-4 sm:gap-6 ${layout === 'grid' ? 'grid grid-cols-2 xl:grid-cols-3' : 'flex flex-col'}`}>
+            <div className={`gap-2 sm:gap-6 ${layout === 'grid' ? 'grid grid-cols-2 xl:grid-cols-3' : 'flex flex-col'}`}>
               {filteredVehicles.map(vehicle => (
                 <VehicleCard key={vehicle.id} vehicle={vehicle} />
               ))}
