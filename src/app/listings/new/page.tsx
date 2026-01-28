@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Bike, Car, Truck, UploadCloud, X, Loader2, ShieldAlert, Phone, ExternalLink } from 'lucide-react';
+import { Bike, Car, Truck, UploadCloud, X, Loader2, ShieldAlert, Phone, ExternalLink, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -26,6 +26,18 @@ import imageCompression from 'browser-image-compression';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { summarizeVehicleListing } from '@/ai/flows/summarize-vehicle-listing';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { formatCurrency } from '@/lib/utils';
 
 type VehicleType = 'Moto' | 'Carro' | 'Camioneta';
 type Step = 'selection' | 'details' | 'photos';
@@ -265,6 +277,56 @@ export default function NewListingPage() {
   };
 
   const handlePublish = async () => {
+    const price = parseInt(details.price, 10);
+    const minPriceCar = 800;
+    const minPriceMoto = 300;
+    const maxPrice = 999999;
+
+    if (!details.price || isNaN(price) || price <= 0) {
+      toast({
+        title: "Precio requerido",
+        description: "Por favor, ingresa un precio válido para el vehículo.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (selectedType === 'Moto' && price < minPriceMoto) {
+      toast({
+        title: "Precio muy bajo",
+        description: `El precio mínimo para una moto es de ${formatCurrency(minPriceMoto)}.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if ((selectedType === 'Carro' || selectedType === 'Camioneta') && price < minPriceCar) {
+      toast({
+        title: "Precio muy bajo",
+        description: `El precio mínimo para un vehículo es de ${formatCurrency(minPriceCar)}.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (price > maxPrice) {
+      toast({
+        title: "Precio muy alto",
+        description: `El precio no puede exceder los ${formatCurrency(maxPrice)}.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (price % 50 !== 0) {
+        toast({
+            title: "Precio no redondeado",
+            description: "Para mantener la consistencia, por favor usa un precio en múltiplos de $50 (ej: $8500, $8550).",
+            variant: "destructive",
+        });
+        return;
+    }
+
      if (!user) {
         toast({
             title: "Necesitas iniciar sesión",
@@ -281,14 +343,6 @@ export default function NewListingPage() {
             variant: "destructive",
         });
         return;
-    }
-    if (!details.price || parseInt(details.price) <= 0) {
-      toast({
-          title: "Precio requerido",
-          description: "Por favor, ingresa un precio válido para el vehículo.",
-          variant: "destructive",
-      });
-      return;
     }
 
     try {
@@ -847,10 +901,33 @@ export default function NewListingPage() {
                     <p className="text-sm text-muted-foreground mt-1">Subiendo fotos... {uploadProgress.toFixed(0)}%</p>
                 </div>
             )}
-            <Button onClick={handlePublish} size="lg" disabled={photos.length < 4 || isPublishing}>
-                {isPublishing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isPublishing ? 'Publicando...' : `Publicar Anuncio (${photos.length < 4 ? '4 fotos mín.' : `${photos.length}/12`})`}
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                  <Button size="lg" disabled={photos.length < 4 || isPublishing}>
+                      {`Publicar Anuncio (${photos.length < 4 ? '4 fotos mín.' : `${photos.length}/12`})`}
+                  </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                  <AlertDialogHeader>
+                      <AlertDialogTitle className="flex items-center gap-2">
+                          <AlertTriangle className="text-amber-500" />
+                          Confirmación Final
+                      </AlertDialogTitle>
+                      <AlertDialogDescription className="pt-2">
+                          Al publicar, confirmas que el precio y las características del vehículo son reales.
+                          Cualquier información falsa o engañosa, especialmente en el precio, resultará en la <strong>suspensión permanente de tu cuenta</strong>.
+                          Esta es una comunidad basada en la confianza.
+                      </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                      <AlertDialogCancel>Volver a Editar</AlertDialogCancel>
+                      <AlertDialogAction onClick={handlePublish} disabled={isPublishing}>
+                          {isPublishing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                          {isPublishing ? 'Publicando...' : 'Confirmar y Publicar'}
+                      </AlertDialogAction>
+                  </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
         </div>
     </div>
   );
@@ -893,7 +970,7 @@ export default function NewListingPage() {
                <ShieldAlert className="mx-auto h-12 w-12 text-destructive mb-4" />
                <h1 className="font-headline text-3xl font-bold">Límite de Publicaciones Alcanzado</h1>
                <p className="mt-4 text-lg text-muted-foreground">
-                   Has alcanzado el límite de {LISTING_LIMIT} publicaciones simultáneas.
+                   Has alcanzado el límite de ${LISTING_LIMIT} publicaciones simultáneas.
                </p>
                <p className="mt-2 text-muted-foreground">
                    Para publicar un nuevo vehículo, primero debes eliminar una de tus publicaciones existentes.
