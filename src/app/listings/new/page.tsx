@@ -20,6 +20,7 @@ import { useDoc } from '@/firebase/firestore/use-doc';
 import { collection, doc, serverTimestamp, setDoc, query, where, getDocs } from 'firebase/firestore';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { useMakes } from '@/context/makes-context';
+import { useVehicles } from '@/context/vehicle-context';
 import { ref, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import { Progress } from '@/components/ui/progress';
 import imageCompression from 'browser-image-compression';
@@ -61,6 +62,7 @@ export default function NewListingPage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const storage = useStorage();
+  const { vehicles: allVehicles } = useVehicles();
 
   const isAdmin = user?.email === ADMIN_EMAIL;
 
@@ -276,6 +278,68 @@ export default function NewListingPage() {
     }
   };
 
+  // This function is for future implementation as requested.
+  // It validates the listing price against similar vehicles in the market.
+  // It is currently NOT ACTIVE.
+  const validatePriceAgainstMarket = (price: number): boolean => {
+    if (!selectedBrand || !selectedModel || !selectedYear || !allVehicles) return true;
+
+    const similarVehicles = allVehicles.filter(v => 
+      v.make === selectedBrand &&
+      v.model === selectedModel &&
+      v.year === parseInt(selectedYear, 10) &&
+      v.status === 'active'
+    );
+
+    // We need a reasonable number of vehicles to create a valid price range.
+    if (similarVehicles.length < 3) {
+      console.log("Not enough market data to validate price.");
+      return true; // Not enough data, so we allow any price.
+    }
+
+    const prices = similarVehicles.map(v => v.priceUSD);
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+    
+    // Define a tolerance margin (e.g., 30% from the edges of the range)
+    const lowerBound = minPrice * 0.7;
+    const upperBound = maxPrice * 1.3;
+
+    // Case 1: Price is significantly lower than the market
+    if (price < lowerBound) {
+      if (details.isOperational) {
+        // The vehicle runs, so a very low price is suspicious. 
+        // A confirmation dialog would be shown to the user here.
+        // For now, we just show a toast and allow it.
+        toast({
+            title: "Precio Sospechosamente Bajo",
+            description: `El precio que ingresaste es muy bajo comparado con el rango del mercado (${formatCurrency(minPrice)} - ${formatCurrency(maxPrice)}). Asegúrate de que es correcto.`,
+            duration: 8000,
+        });
+        return true; 
+      } else {
+        // The vehicle does not run, so a low price is expected.
+        return true;
+      }
+    }
+
+    // Case 2: Price is significantly higher than the market
+    if (price > upperBound) {
+      // A price that is too high is likely an error or misleading. We block this.
+      toast({
+        variant: "destructive",
+        title: "Precio Fuera de Rango",
+        description: `El precio ingresado es muy superior al rango del mercado para este vehículo (${formatCurrency(minPrice)} - ${formatcurrency(maxprice)}). Por favor, introduce un precio realista.`,
+        duration: 8000,
+      });
+      return false;
+    }
+
+    // Price is within the acceptable range
+    return true;
+  };
+
+
   const handlePublish = async () => {
     const price = parseInt(details.price, 10);
     const minPriceCar = 800;
@@ -361,6 +425,17 @@ export default function NewListingPage() {
         });
         return;
     }
+
+    /*
+    // --- FUTURE IMPLEMENTATION BLOCK ---
+    // To activate market price validation, uncomment the following lines.
+    // This checks the entered price against other similar vehicles.
+    const isPriceValid = validatePriceAgainstMarket(price);
+    if (!isPriceValid) {
+      // The function `validatePriceAgainstMarket` already shows a toast for errors.
+      return;
+    }
+    */
     
     setIsPublishing(true);
     setUploadProgress(0);
