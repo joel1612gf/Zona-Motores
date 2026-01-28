@@ -34,6 +34,7 @@ export function MapLocationFilter({ currentFilter, onApply }: MapLocationFilterP
   });
 
   const [isOpen, setIsOpen] = useState(false);
+  const [mapInstanceKey, setMapInstanceKey] = useState(Date.now()); // Key to force remount
   
   // Internal state for the dialog
   const [marker, setMarker] = useState<{ lat: number; lng: number } | null>(null);
@@ -42,7 +43,10 @@ export function MapLocationFilter({ currentFilter, onApply }: MapLocationFilterP
 
   const handleOpenChange = (open: boolean) => {
     if (open) {
-      // When dialog opens, initialize its state
+      // Force remount the map component to ensure a clean state
+      setMapInstanceKey(Date.now()); 
+      
+      // When dialog opens, initialize its state from the applied filter or defaults
       if (currentFilter) {
         const currentMarker = { lat: currentFilter.lat, lng: currentFilter.lon };
         setMarker(currentMarker);
@@ -118,6 +122,7 @@ export function MapLocationFilter({ currentFilter, onApply }: MapLocationFilterP
 
     return (
       <GoogleMap
+        key={mapInstanceKey} // Using a key to force remount
         mapContainerStyle={containerStyle}
         center={mapCenter}
         zoom={marker ? 10 : 5}
