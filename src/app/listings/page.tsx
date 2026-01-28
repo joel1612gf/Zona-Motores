@@ -55,6 +55,7 @@ function ListingsPageContent() {
             vehicle.transmission,
             vehicle.exteriorColor,
             vehicle.engine,
+            vehicle.seller.displayName,
             vehicle.is4x4 ? '4x4' : '',
             vehicle.hasAC ? 'aire acondicionado ac' : '',
             vehicle.hasSoundSystem ? 'sonido' : '',
