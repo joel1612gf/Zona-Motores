@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 import { useVehicles } from '@/context/vehicle-context';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
-import { LocationFilterDialog } from './location-filter';
+import { MapLocationFilter } from './map-location-filter';
 
 export type FilterState = {
   searchTerm: string;
@@ -21,7 +21,7 @@ export type FilterState = {
   maxYear: string;
   bodyType: string;
   transmission: string;
-  location: { city: string; state: string; lat: number; lon: number, radius: number } | null;
+  location: { lat: number; lon: number, radius: number } | null;
 };
 
 type FiltersProps = {
@@ -88,7 +88,7 @@ export function Filters({ filters, onFilterChange }: FiltersProps) {
             <AccordionItem value="location">
               <AccordionTrigger className="py-2 text-base">Ubicación</AccordionTrigger>
               <AccordionContent className="space-y-4 pt-4">
-                <LocationFilterDialog currentLocation={filters.location} onApply={handleLocationChange} />
+                <MapLocationFilter currentFilter={filters.location} onApply={handleLocationChange} />
               </AccordionContent>
             </AccordionItem>
             
