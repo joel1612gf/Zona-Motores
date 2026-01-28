@@ -16,8 +16,22 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export default function Home() {
   const { vehicles, isLoading } = useVehicles();
+  const [isClient, setIsClient] = React.useState(false);
+
+  React.useEffect(() => {
+    // This effect runs only on the client, after the initial render
+    setIsClient(true);
+  }, []);
+
+  // Use static data for featured vehicles
   const featuredVehicles = initialVehicles.slice(0, 5);
-  const latestVehicles = vehicles.slice(0, 8);
+
+  // Determine which vehicles to show in the "latest" section
+  // - On the server and initial client render, use static data to match the server-rendered HTML.
+  // - After the component mounts on the client, use the live data from the context.
+  const latestVehicles = isClient ? vehicles.slice(0, 8) : initialVehicles.slice(0, 8);
+  const showSkeletons = isLoading && isClient;
+
   const heroImage = PlaceHolderImages.find((p) => p.id === 'hero-car');
 
   const autoplayPlugin = React.useRef(
@@ -125,8 +139,8 @@ export default function Home() {
               className="w-full"
             >
               <CarouselContent className="-ml-2 md:-ml-4">
-                {isLoading 
-                  ? [...Array(4)].map((_, i) => (
+                {showSkeletons 
+                  ? [...Array(8)].map((_, i) => (
                       <CarouselItem key={i} className="pl-2 md:pl-4 basis-full sm:basis-1/2 lg:basis-1/3 xl:basis-1/4">
                         <div className="p-1 h-full">
                           <Skeleton className="h-[380px] w-full" />
