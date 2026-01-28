@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useRouter, notFound } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -55,6 +55,8 @@ import {
   Pause
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
+import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
+import { Skeleton } from '@/components/ui/skeleton';
 
 
 function WhatsAppIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -72,6 +74,8 @@ function WhatsAppIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
+const libraries: ('places' | 'drawing' | 'geometry' | 'visualization')[] = ['places'];
+
 export default function ListingDetailPage() {
   const params = useParams<{ id: string }>();
   const { vehicles } = useVehicles();
@@ -82,9 +86,15 @@ export default function ListingDetailPage() {
   const router = useRouter();
   const { toast } = useToast();
 
+  const { isLoaded, loadError } = useJsApiLoader({
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
+    libraries,
+  });
+
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isContactDialogOpen, setIsContactDialogOpen] = useState(false);
+  const [isMapDialogOpen, setIsMapDialogOpen] = useState(false);
   const [countdown, setCountdown] = useState(5);
 
   const [isDeleting, setIsDeleting] = useState(false);
@@ -378,8 +388,8 @@ export default function ListingDetailPage() {
     <div className="container mx-auto max-w-6xl py-8">
       <div className="grid md:grid-cols-3 gap-8 items-start">
         {/* Main Content */}
-        <div className="md:col-span-2 space-y-8">
-          <Carousel className="w-full">
+        <div className="md:col-span-2 space-y-8 flex flex-col">
+          <Carousel className="w-full order-1">
             <CarouselContent>
               {vehicle.images.map((image, index) => (
                 <CarouselItem key={index} onClick={() => handleImageClick(index)} className="cursor-pointer">
@@ -407,7 +417,7 @@ export default function ListingDetailPage() {
             )}
           </Carousel>
           
-          <Card>
+          <Card className="order-2">
             <CardHeader>
               <h1 className="font-headline text-2xl sm:text-3xl font-bold">{`${vehicle.year} ${vehicle.make} ${vehicle.model}`}</h1>
               <div className="flex items-center gap-2 pt-2 text-muted-foreground">
@@ -428,7 +438,7 @@ export default function ListingDetailPage() {
             </CardContent>
           </Card>
           
-          <Card>
+          <Card className="order-3">
             <CardHeader>
               <CardTitleComponent>Características</CardTitleComponent>
             </CardHeader>
@@ -446,7 +456,7 @@ export default function ListingDetailPage() {
             </CardContent>
           </Card>
           
-          <Card>
+          <Card className="order-4">
             <CardHeader>
               <CardTitleComponent>Descripción del Vendedor</CardTitleComponent>
             </CardHeader>
@@ -458,7 +468,7 @@ export default function ListingDetailPage() {
 
         {/* Sidebar */}
         <div className="md:col-span-1 space-y-6 md:sticky md:top-24">
-          <Card>
+          <Card className="overflow-hidden">
             <CardHeader>
               <CardTitleComponent>Información del Vendedor</CardTitleComponent>
             </CardHeader>
@@ -514,6 +524,67 @@ export default function ListingDetailPage() {
                  Los vendedores verificados han confirmado su identidad vía WhatsApp.
                </p>
             </CardContent>
+
+            <div className="border-t">
+              <Dialog open={isMapDialogOpen} onOpenChange={setIsMapDialogOpen}>
+                  <DialogTrigger asChild>
+                      <div className="h-40 w-full cursor-pointer relative group">
+                          {isLoaded && !loadError ? (
+                              <GoogleMap
+                                  mapContainerStyle={{ width: '100%', height: '100%' }}
+                                  center={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
+                                  zoom={12}
+                                  options={{
+                                    gestureHandling: 'none',
+                                    zoomControl: false,
+                                    streetViewControl: false,
+                                    mapTypeControl: false,
+                                    fullscreenControl: false,
+                                    clickableIcons: false
+                                  }}
+                              >
+                                  <Marker position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }} />
+                              </GoogleMap>
+                          ) : (
+                              <div className="w-full h-full flex items-center justify-center bg-muted">
+                                {loadError ? <p className="text-destructive text-xs p-2 text-center">Error al cargar mapa</p> : <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />}
+                              </div>
+                          )}
+                          <div className="absolute inset-0 bg-black/10 group-hover:bg-black/30 transition-colors flex items-center justify-center" aria-hidden="true">
+                              <div className="p-2 bg-background/80 rounded-md shadow-lg">
+                                  <p className="text-sm font-semibold">Ver en mapa</p>
+                              </div>
+                          </div>
+                      </div>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-4xl w-full h-[80vh] p-0">
+                      <DialogHeader className="p-4 absolute top-0 left-0 z-10 bg-gradient-to-b from-background via-background/80 to-transparent w-full">
+                          <DialogTitle>Ubicación del Vehículo</DialogTitle>
+                      </DialogHeader>
+                       {isLoaded && !loadError ? (
+                          <GoogleMap
+                              mapContainerStyle={{ width: '100%', height: '100%' }}
+                              center={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
+                              zoom={15}
+                              options={{
+                                streetViewControl: false,
+                                mapTypeControl: false,
+                                fullscreenControl: false
+                              }}
+                          >
+                              <Marker position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }} />
+                          </GoogleMap>
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-muted">
+                            {loadError ? <p className="text-destructive">Error al cargar mapa</p> : <Loader2 className="h-8 w-8 animate-spin" />}
+                        </div>
+                      )}
+                  </DialogContent>
+              </Dialog>
+            </div>
+            <div className="px-4 py-2 bg-muted/30 border-t">
+                <p className="text-xs text-muted-foreground text-center">La ubicación proporcionada por el vendedor es aproximada.</p>
+            </div>
           </Card>
           {isAdmin && (
             <Card className="border-red-500/50">
