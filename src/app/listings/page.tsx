@@ -6,10 +6,11 @@ import { useVehicles } from '@/context/vehicle-context';
 import { VehicleCard } from '@/components/vehicle-card';
 import { Filters, type FilterState } from '@/components/filters';
 import { Button } from '@/components/ui/button';
-import { Grid, List, Info, Search } from 'lucide-react';
+import { Grid, List, Info, Search, Filter } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, getDistance } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
 function ListingsPageContent() {
   const { vehicles: allVehicles, isLoading } = useVehicles();
@@ -57,8 +58,7 @@ function ListingsPageContent() {
             vehicle.is4x4 ? '4x4' : '',
             vehicle.hasAC ? 'aire acondicionado ac' : '',
             vehicle.hasSoundSystem ? 'sonido' : '',
-            vehicle.acceptsTradeIn ? 'acepta cambio trueque' : '',
-            vehicle.isSignatory ? 'firmante dueño directo' : ''
+            vehicle.acceptsTradeIn ? 'acepta cambio trueque' : ''
         ].join(' ').toLowerCase();
         
         const searchWords = normalizedSearch.split(' ').filter(w => w.length > 0);
@@ -113,24 +113,41 @@ function ListingsPageContent() {
   return (
     <div className="container mx-auto py-8">
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 hidden lg:block">
           <div className="sticky top-20">
             <Filters filters={filters} onFilterChange={setFilters} />
           </div>
         </div>
         <div className="lg:col-span-3">
           <div className="flex justify-between items-center mb-6">
-            <h1 className="font-headline text-3xl font-bold">Todos los Anuncios ({filteredVehicles.length})</h1>
-            <div className="hidden sm:flex items-center gap-2">
-              <Button variant={layout === 'grid' ? 'secondary' : 'ghost'} size="icon" onClick={() => setLayout('grid')} aria-label="Vista de cuadrícula">
-                <Grid className="h-4 w-4" />
-              </Button>
-              <Button variant={layout === 'list' ? 'secondary' : 'ghost'} size="icon" onClick={() => setLayout('list')} aria-label="Vista de lista">
-                <List className="h-4 w-4" />
-              </Button>
+            <h1 className="font-headline text-2xl md:text-3xl font-bold">Todos los Anuncios ({filteredVehicles.length})</h1>
+            <div className="flex items-center gap-2">
+                <div className="hidden sm:flex items-center gap-2">
+                    <Button variant={layout === 'grid' ? 'secondary' : 'ghost'} size="icon" onClick={() => setLayout('grid')} aria-label="Vista de cuadrícula">
+                        <Grid className="h-4 w-4" />
+                    </Button>
+                    <Button variant={layout === 'list' ? 'secondary' : 'ghost'} size="icon" onClick={() => setLayout('list')} aria-label="Vista de lista">
+                        <List className="h-4 w-4" />
+                    </Button>
+                </div>
+                 <div className="lg:hidden">
+                    <Sheet>
+                        <SheetTrigger asChild>
+                        <Button variant="outline">
+                            <Filter className="mr-2 h-4 w-4" />
+                            Filtros
+                        </Button>
+                        </SheetTrigger>
+                        <SheetContent side="left" className="w-[300px] sm:w-[340px]">
+                            <div className="py-6 h-full overflow-y-auto">
+                                <Filters filters={filters} onFilterChange={setFilters} />
+                            </div>
+                        </SheetContent>
+                    </Sheet>
+                </div>
             </div>
           </div>
-          <form className="flex space-x-2 mb-8 max-w-xl mx-auto" onSubmit={handleSearchSubmit}>
+          <form className="flex space-x-2 mb-8 w-full" onSubmit={handleSearchSubmit}>
             <Input
                 name="search"
                 id="search-input"
@@ -141,8 +158,8 @@ function ListingsPageContent() {
                 className="text-base flex-1"
             />
             <Button type="submit">
-                <Search className="mr-2 h-5 w-5" />
-                Buscar
+                <Search className="mr-0 sm:mr-2 h-5 w-5" />
+                <span className="hidden sm:inline">Buscar</span>
             </Button>
           </form>
           {averagePrice && (
@@ -150,9 +167,9 @@ function ListingsPageContent() {
               <div className="flex">
                 <Info className="h-5 w-5 text-primary mr-3 mt-1 flex-shrink-0" />
                 <div>
-                    <p className="font-semibold">
-                        Precio Promedio de Referencia: 
-                        <span className="font-headline text-2xl font-bold text-primary ml-2">{formatCurrency(averagePrice)}</span>
+                    <p className="font-semibold text-sm sm:text-base">
+                        Precio Promedio: 
+                        <span className="font-headline text-xl sm:text-2xl font-bold text-primary ml-2">{formatCurrency(averagePrice)}</span>
                     </p>
                     <p className="text-sm text-muted-foreground mt-1">
                         Basado en {filteredVehicles.length} vehículos que coinciden con tu búsqueda.
@@ -162,7 +179,7 @@ function ListingsPageContent() {
             </div>
           )}
           {filteredVehicles.length > 0 ? (
-            <div className={`gap-6 ${layout === 'grid' ? 'grid sm:grid-cols-2 xl:grid-cols-3' : 'flex flex-col'}`}>
+            <div className={`gap-4 sm:gap-6 ${layout === 'grid' ? 'grid grid-cols-2 xl:grid-cols-3' : 'flex flex-col'}`}>
               {filteredVehicles.map(vehicle => (
                 <VehicleCard key={vehicle.id} vehicle={vehicle} />
               ))}
@@ -183,7 +200,7 @@ function LoadingSkeleton() {
   return (
     <div className="container mx-auto py-8">
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 hidden lg:block">
           <div className="sticky top-20">
              <Skeleton className="h-[700px] w-full" />
           </div>
@@ -191,13 +208,12 @@ function LoadingSkeleton() {
         <div className="lg:col-span-3">
           <div className="flex justify-between items-center mb-6">
             <Skeleton className="h-8 w-48" />
-            <div className="hidden sm:flex items-center gap-2">
-              <Skeleton className="h-10 w-10" />
-              <Skeleton className="h-10 w-10" />
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-10 w-24" />
             </div>
           </div>
-           <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-6">
-             {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-[380px] w-full" />)}
+           <div className="grid grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+             {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-[300px] sm:h-[380px] w-full" />)}
            </div>
         </div>
       </div>

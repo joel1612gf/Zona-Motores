@@ -113,8 +113,8 @@ export default function MyListingsPage() {
 
   return (
     <div className="container max-w-6xl mx-auto py-12">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="font-headline text-3xl font-bold">Mis Publicaciones</h1>
+      <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
+        <h1 className="font-headline text-2xl sm:text-3xl font-bold">Mis Publicaciones</h1>
         <Button asChild>
           <Link href="/listings/new">
             <PlusCircle className="mr-2 h-4 w-4" />
