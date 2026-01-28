@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, ReactNode, useMemo } from 'react';
+import { createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { Vehicle } from '@/lib/types';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { collectionGroup, query } from 'firebase/firestore';
@@ -16,6 +16,12 @@ const VehicleContext = createContext<VehicleContextType | undefined>(undefined);
 
 export function VehicleProvider({ children }: { children: ReactNode }) {
   const firestore = useFirestore();
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    // This effect runs only on the client, after the initial render
+    setIsClient(true);
+  }, []);
 
   const vehiclesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -27,7 +33,7 @@ export function VehicleProvider({ children }: { children: ReactNode }) {
     );
   }, [firestore]);
 
-  const { data: firestoreVehicles, isLoading, error } = useCollection<Vehicle>(vehiclesQuery);
+  const { data: firestoreVehicles, isLoading: isFirestoreLoading, error } = useCollection<Vehicle>(vehiclesQuery);
   
   if (error) {
       // The permission error will be thrown by the hook, this is for console logging.
@@ -43,8 +49,8 @@ export function VehicleProvider({ children }: { children: ReactNode }) {
       vehicleMap.set(mockVehicle.id, mockVehicle);
     });
 
-    // Overwrite with live data from Firestore if it exists
-    if (firestoreVehicles) {
+    // Overwrite with live data from Firestore if it exists, only on the client
+    if (isClient && firestoreVehicles) {
       firestoreVehicles.forEach(firestoreVehicle => {
         vehicleMap.set(firestoreVehicle.id, firestoreVehicle);
       });
@@ -59,8 +65,9 @@ export function VehicleProvider({ children }: { children: ReactNode }) {
         const dateB = b.createdAt?.toDate() || new Date(0);
         return dateB.getTime() - dateA.getTime();
       });
-  }, [firestoreVehicles]);
+  }, [firestoreVehicles, isClient]);
 
+  const isLoading = isFirestoreLoading && isClient;
 
   const value = useMemo(() => ({ vehicles, isLoading }), [vehicles, isLoading]);
 
