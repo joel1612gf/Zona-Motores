@@ -1,10 +1,68 @@
 'use client';
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useRouter, notFound } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useVehicles } from '@/context/vehicle-context';
 import { useUser, useFirestore, useStorage } from '@/firebase';
+import { useTheme } from 'next-themes';
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger, DialogHeader, DialogClose } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle as CardTitleComponent } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { ref, deleteObject } from 'firebase/storage';
+import { useToast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { 
+  Gauge, 
+  MapPin, 
+  Phone, 
+  ShieldCheck, 
+  User, 
+  Settings2, 
+  Palette,
+  Snowflake,
+  Speaker,
+  DoorOpen,
+  CircleCheck,
+  FileText,
+  PenSquare,
+  GitCompareArrows,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  LifeBuoy,
+  Shield,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Pencil as PencilIcon,
+  Trash2,
+  Loader2,
+  ShieldBan,
+  Play,
+  Pause
+} from 'lucide-react';
+import {![CDATA['use client';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useParams, useRouter, notFound } from 'next/navigation';
+import Image from 'next/image';
+import Link from 'next/link';
+import { useVehicles } from '@/context/vehicle-context';
+import { useUser, useFirestore, useStorage } from '@/firebase';
+import { useTheme } from 'next-themes';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger, DialogHeader, DialogClose } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
@@ -85,11 +143,29 @@ export default function ListingDetailPage() {
   const storage = useStorage();
   const router = useRouter();
   const { toast } = useToast();
+  const { resolvedTheme } = useTheme();
 
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
     libraries,
   });
+
+  const carMarkerIcon = useMemo(() => {
+    if (typeof window === 'undefined' || !window.google?.maps?.Point) return undefined;
+    
+    const color = resolvedTheme === 'dark' ? '#FAFAFA' : '#2563EB';
+    
+    return {
+      path: 'M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9L1.4 12.9A3.3 3.3 0 0 0 1 14.8V17c0 .6.4 1 1h2M7 17v-1.3M17 17v-1.3M5 11h14M5 17a2 2 0 1 0 4 0 2 2 0 1 0-4 0m10 0a2 2 0 1 0 4 0 2 2 0 1 0-4 0',
+      fillColor: color,
+      fillOpacity: 1,
+      strokeWeight: 0,
+      rotation: 0,
+      scale: 1.2,
+      anchor: new window.google.maps.Point(12, 12),
+    };
+  }, [resolvedTheme]);
+
 
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -543,17 +619,17 @@ export default function ListingDetailPage() {
                                     clickableIcons: false
                                   }}
                               >
-                                  <Marker position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }} />
+                                  <Marker position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }} icon={carMarkerIcon} />
                               </GoogleMap>
                           ) : (
                               <div className="w-full h-full flex items-center justify-center bg-muted">
                                 {loadError ? <p className="text-destructive text-xs p-2 text-center">Error al cargar mapa</p> : <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />}
                               </div>
                           )}
-                          <div className="absolute inset-0 bg-black/10 group-hover:bg-black/30 transition-colors flex items-center justify-center" aria-hidden="true">
-                              <div className="p-2 bg-background/80 rounded-md shadow-lg">
-                                  <p className="text-sm font-semibold">Ver en mapa</p>
-                              </div>
+                          <div className="absolute inset-0 bg-transparent group-hover:bg-black/30 transition-colors flex items-center justify-center" aria-hidden="true">
+                            <div className="p-2 bg-background/80 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                                <MapPin className="h-5 w-5 text-foreground" />
+                            </div>
                           </div>
                       </div>
                   </DialogTrigger>
@@ -572,7 +648,7 @@ export default function ListingDetailPage() {
                                 fullscreenControl: false
                               }}
                           >
-                              <Marker position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }} />
+                              <Marker position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }} icon={carMarkerIcon} />
                           </GoogleMap>
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-muted">
