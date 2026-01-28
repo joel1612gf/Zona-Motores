@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Bike, Car, Truck, UploadCloud, X, Loader2, ShieldAlert, Phone, ExternalLink, AlertTriangle } from 'lucide-react';
+import { Bike, Car, Truck, UploadCloud, X, Loader2, ShieldAlert, Phone, ExternalLink, AlertTriangle, MapPin, LocateFixed } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -39,9 +39,11 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { formatCurrency } from '@/lib/utils';
+import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
+
 
 type VehicleType = 'Moto' | 'Carro' | 'Camioneta';
-type Step = 'selection' | 'details' | 'photos';
+type Step = 'selection' | 'details' | 'location' | 'photos';
 
 const vehicleTypeOptions: {
   id: VehicleType;
@@ -56,6 +58,9 @@ const vehicleTypeOptions: {
 const LISTING_LIMIT = 3;
 const ADMIN_EMAIL = 'zonamotores.ve@gmail.com';
 
+const libraries: ('places' | 'drawing' | 'geometry' | 'visualization')[] = ['places'];
+const defaultCenter = { lat: 6.4238, lng: -66.5897 }; // Center of Venezuela
+
 export default function NewListingPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -63,6 +68,11 @@ export default function NewListingPage() {
   const firestore = useFirestore();
   const storage = useStorage();
   const { vehicles: allVehicles } = useVehicles();
+
+  const { isLoaded, loadError } = useJsApiLoader({
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
+    libraries,
+  });
 
   const isAdmin = user?.email === ADMIN_EMAIL;
 
@@ -104,6 +114,12 @@ export default function NewListingPage() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
+  
+  const [location, setLocation] = useState<{ lat: number; lon: number; city: string; state: string; } | null>(null);
+  const [markerPosition, setMarkerPosition] = useState<{ lat: number; lng: number } | null>(null);
+  const [isGeocoding, setIsGeocoding] = useState(false);
+  const [mapCenter, setMapCenter] = useState(defaultCenter);
+
 
   const [details, setDetails] = useState({
     price: '',
@@ -132,6 +148,52 @@ export default function NewListingPage() {
     sellerPhone: '',
     marketplaceUrl: '',
   });
+
+   useEffect(() => {
+    if (!markerPosition || !isLoaded) {
+      return;
+    }
+    
+    setIsGeocoding(true);
+    setLocation(null);
+
+    const geocoder = new window.google.maps.Geocoder();
+    geocoder.geocode({ location: markerPosition }, (results, status) => {
+      if (status === 'OK' && results?.[0]) {
+        const address = results[0];
+        let city = '';
+        let state = '';
+        
+        for (const component of address.address_components) {
+          const componentType = component.types[0];
+          if (componentType === 'locality') {
+            city = component.long_name;
+          }
+          if (componentType === 'administrative_area_level_1') {
+            state = component.long_name;
+          }
+        }
+        
+        if (!city) {
+            city = address.address_components.find(c => c.types.includes("administrative_area_level_2"))?.long_name || "Ubicación";
+        }
+        if (!state) {
+            state = address.address_components.find(c => c.types.includes("country"))?.long_name || "Desconocida";
+        }
+
+        setLocation({
+          lat: markerPosition.lat,
+          lon: markerPosition.lng,
+          city: city,
+          state: state,
+        });
+      } else {
+        console.error(`Geocode was not successful for the following reason: ${status}`);
+        toast({ title: "Error de Geocodificación", description: "No se pudo determinar la ciudad y estado. Intenta con otro punto.", variant: "destructive"});
+      }
+      setIsGeocoding(false);
+    });
+  }, [markerPosition, isLoaded, toast]);
 
   const allMakesForSelectedType = useMemo(() => {
     if (!makesByType || !selectedType || !makesByType[selectedType]) return [];
@@ -278,9 +340,6 @@ export default function NewListingPage() {
     }
   };
 
-  // This function is for future implementation as requested.
-  // It validates the listing price against similar vehicles in the market.
-  // It is currently NOT ACTIVE.
   const validatePriceAgainstMarket = (price: number): boolean => {
     if (!selectedBrand || !selectedModel || !selectedYear || !allVehicles) return true;
 
@@ -291,26 +350,20 @@ export default function NewListingPage() {
       v.status === 'active'
     );
 
-    // We need a reasonable number of vehicles to create a valid price range.
     if (similarVehicles.length < 3) {
       console.log("Not enough market data to validate price.");
-      return true; // Not enough data, so we allow any price.
+      return true; 
     }
 
     const prices = similarVehicles.map(v => v.priceUSD);
     const minPrice = Math.min(...prices);
     const maxPrice = Math.max(...prices);
     
-    // Define a tolerance margin (e.g., 30% from the edges of the range)
     const lowerBound = minPrice * 0.7;
     const upperBound = maxPrice * 1.3;
 
-    // Case 1: Price is significantly lower than the market
     if (price < lowerBound) {
       if (details.isOperational) {
-        // The vehicle runs, so a very low price is suspicious. 
-        // A confirmation dialog would be shown to the user here.
-        // For now, we just show a toast and allow it.
         toast({
             title: "Precio Sospechosamente Bajo",
             description: `El precio que ingresaste es muy bajo comparado con el rango del mercado (${formatCurrency(minPrice)} - ${formatCurrency(maxPrice)}). Asegúrate de que es correcto.`,
@@ -318,24 +371,20 @@ export default function NewListingPage() {
         });
         return true; 
       } else {
-        // The vehicle does not run, so a low price is expected.
         return true;
       }
     }
 
-    // Case 2: Price is significantly higher than the market
     if (price > upperBound) {
-      // A price that is too high is likely an error or misleading. We block this.
       toast({
         variant: "destructive",
         title: "Precio Fuera de Rango",
-        description: `El precio ingresado es muy superior al rango del mercado para este vehículo (${formatCurrency(minPrice)} - ${formatcurrency(maxprice)}). Por favor, introduce un precio realista.`,
+        description: `El precio ingresado es muy superior al rango del mercado para este vehículo (${formatCurrency(minPrice)} - ${formatCurrency(maxPrice)}). Por favor, introduce un precio realista.`,
         duration: 8000,
       });
       return false;
     }
 
-    // Price is within the acceptable range
     return true;
   };
 
@@ -427,12 +476,8 @@ export default function NewListingPage() {
     }
 
     /*
-    // --- FUTURE IMPLEMENTATION BLOCK ---
-    // To activate market price validation, uncomment the following lines.
-    // This checks the entered price against other similar vehicles.
     const isPriceValid = validatePriceAgainstMarket(price);
     if (!isPriceValid) {
-      // The function `validatePriceAgainstMarket` already shows a toast for errors.
       return;
     }
     */
@@ -526,7 +571,7 @@ export default function NewListingPage() {
                 phone: isAdmin ? details.sellerPhone : (user.phoneNumber || ''),
                 accountType: (profileData as any)?.accountType || 'personal'
             },
-            location: { city: 'Caracas', state: 'Distrito Capital', lat: 10.4806, lon: -66.9036 },
+            location: location!,
             createdAt: serverTimestamp(),
             status: 'active' as 'active' | 'paused' | 'sold',
         };
@@ -606,7 +651,6 @@ export default function NewListingPage() {
         return;
     }
 
-    // Handle 2-digit year
     if (year >= 0 && year < 100) {
         if (year > (new Date().getFullYear() % 100) + 1) { 
             year += 1900;
@@ -903,16 +947,82 @@ export default function NewListingPage() {
                 </div>
             </div>
             <div className="flex justify-end mt-8">
-                <Button onClick={() => setStep('photos')} size="lg">Siguiente</Button>
+                <Button onClick={() => setStep('location')} size="lg">Siguiente</Button>
             </div>
         </Card>
     </div>
   );
 
- const renderPhotosStep = () => (
+ const renderLocationStep = () => (
     <div className="animate-in fade-in-50 duration-500">
         <Button variant="ghost" onClick={() => setStep('details')} className="mb-4 pl-0">
             &larr; Volver a detalles
+        </Button>
+        <h2 className="text-2xl font-bold font-headline mb-2 text-center">
+            Selecciona la ubicación de tu vehículo
+        </h2>
+         <p className="text-center text-muted-foreground mb-6">
+            Haz clic en el mapa para fijar un punto o usa tu ubicación actual.
+        </p>
+
+        <Card className="p-4">
+            <div className='rounded-lg overflow-hidden border h-[400px] mb-4'>
+              {loadError && <div className="text-destructive p-4">Error al cargar el mapa.</div>}
+              {!isLoaded && !loadError && <div className="h-full flex items-center justify-center bg-muted"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>}
+              {isLoaded && (
+                <GoogleMap
+                  mapContainerStyle={{ width: '100%', height: '100%' }}
+                  center={mapCenter}
+                  zoom={mapCenter === defaultCenter ? 5 : 12}
+                  onClick={(e) => e.latLng && setMarkerPosition({ lat: e.latLng.lat(), lng: e.latLng.lng() })}
+                   options={{ streetViewControl: false, mapTypeControl: false, fullscreenControl: false }}
+                >
+                  {markerPosition && <Marker position={markerPosition} />}
+                </GoogleMap>
+              )}
+            </div>
+            
+             <div className="flex flex-col sm:flex-row gap-4 items-center">
+                <Button variant="outline" className="w-full sm:w-auto" onClick={() => {
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                            const newPos = { lat: position.coords.latitude, lng: position.coords.longitude };
+                            setMarkerPosition(newPos);
+                            setMapCenter(newPos);
+                        },
+                        () => toast({ title: "Error de Ubicación", description: "No se pudo obtener tu ubicación. Por favor, actívala en tu navegador.", variant: "destructive"})
+                    )
+                }}>
+                    <LocateFixed className="mr-2" />
+                    Usar mi ubicación actual
+                </Button>
+                <div className="flex-grow h-12 flex items-center justify-center rounded-md border bg-muted px-4">
+                    {isGeocoding && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
+                    {!isGeocoding && location && (
+                        <div className="flex items-center text-sm font-medium">
+                            <MapPin className="h-5 w-5 mr-2 text-primary" />
+                            <span>{location.city}, {location.state}</span>
+                        </div>
+                    )}
+                     {!isGeocoding && !location && (
+                        <span className="text-sm text-muted-foreground">Ubicación no seleccionada</span>
+                     )}
+                </div>
+            </div>
+        </Card>
+
+        <div className="flex justify-end mt-8">
+            <Button onClick={() => setStep('photos')} size="lg" disabled={!location || isGeocoding}>
+                Siguiente
+            </Button>
+        </div>
+    </div>
+  );
+
+ const renderPhotosStep = () => (
+    <div className="animate-in fade-in-50 duration-500">
+        <Button variant="ghost" onClick={() => setStep('location')} className="mb-4 pl-0">
+            &larr; Volver a ubicación
         </Button>
         <h2 className="text-2xl font-bold font-headline mb-2 text-center">
             Vamos a seleccionar las mejores fotos de tu {selectedBrand} {selectedModel}
@@ -1059,6 +1169,7 @@ export default function NewListingPage() {
     <div className="container max-w-5xl mx-auto py-12">
         {step === 'selection' && renderSelectionStep()}
         {step === 'details' && renderDetailsStep()}
+        {step === 'location' && renderLocationStep()}
         {step === 'photos' && renderPhotosStep()}
     </div>
   );
