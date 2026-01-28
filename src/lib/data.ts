@@ -36,6 +36,15 @@ const getImage = (id: string): ImageInfo => {
     return { url: img.imageUrl, alt: img.description, hint: img.imageHint };
 }
 
+// Generate static, predictable timestamps to avoid hydration errors.
+const baseDate = new Date('2024-07-01T12:00:00Z');
+const staticTimestamps = Array.from({ length: 15 }, (_, i) => {
+    const d = new Date(baseDate);
+    d.setHours(baseDate.getHours() - i * 2); // Stagger creation times by 2 hours
+    return Timestamp.fromDate(d);
+});
+
+
 export const vehicles: Vehicle[] = [
   {
     id: '1',
@@ -62,7 +71,7 @@ export const vehicles: Vehicle[] = [
     images: [ getImage('corolla-main'), getImage('corolla-interior'), getImage('corolla-side') ],
     seller: userProfiles.user4,
     location: { city: 'Caracas', state: 'Distrito Capital', lat: 10.4806, lon: -66.9036 },
-    createdAt: Timestamp.now(),
+    createdAt: staticTimestamps[0],
   },
   {
     id: '2',
@@ -90,7 +99,7 @@ export const vehicles: Vehicle[] = [
     images: [ getImage('fortuner-main'), getImage('fortuner-interior') ],
     seller: userProfiles.user5,
     location: { city: 'Maracaibo', state: 'Zulia', lat: 10.6421, lon: -71.6125 },
-    createdAt: Timestamp.now(),
+    createdAt: staticTimestamps[1],
   },
   {
     id: '3',
@@ -119,7 +128,7 @@ export const vehicles: Vehicle[] = [
     images: [ getImage('machito-main') ],
     seller: userProfiles.user3,
     location: { city: 'Valencia', state: 'Carabobo', lat: 10.162, lon: -68.0076 },
-    createdAt: Timestamp.now(),
+    createdAt: staticTimestamps[2],
   },
   {
     id: '4',
@@ -146,7 +155,7 @@ export const vehicles: Vehicle[] = [
     images: [ getImage('cherokee-main') ],
     seller: userProfiles.user4,
     location: { city: 'Caracas', state: 'Distrito Capital', lat: 10.5000, lon: -66.9167 },
-    createdAt: Timestamp.now(),
+    createdAt: staticTimestamps[3],
   },
   {
     id: '5',
@@ -173,7 +182,7 @@ export const vehicles: Vehicle[] = [
     images: [ getImage('elantra-main') ],
     seller: userProfiles.user5,
     location: { city: 'Barquisimeto', state: 'Lara', lat: 10.0678, lon: -69.3572 },
-    createdAt: Timestamp.now(),
+    createdAt: staticTimestamps[4],
   },
   {
     id: '6',
@@ -199,7 +208,7 @@ export const vehicles: Vehicle[] = [
     images: [ getImage('motorcycle-new') ],
     seller: userProfiles.user1,
     location: { city: 'Caracas', state: 'Distrito Capital', lat: 10.4806, lon: -66.9036 },
-    createdAt: Timestamp.now(),
+    createdAt: staticTimestamps[5],
   },
   {
     id: '7',
@@ -227,7 +236,7 @@ export const vehicles: Vehicle[] = [
     images: [getImage('fiesta-main')],
     seller: userProfiles.user3,
     location: { city: 'Maracay', state: 'Aragua', lat: 10.2464, lon: -67.5957 },
-    createdAt: Timestamp.now(),
+    createdAt: staticTimestamps[6],
   },
   {
     id: '8',
@@ -254,7 +263,7 @@ export const vehicles: Vehicle[] = [
     images: [getImage('silverado-main')],
     seller: userProfiles.user4,
     location: { city: 'Puerto La Cruz', state: 'Anzoátegui', lat: 10.224, lon: -64.6394 },
-    createdAt: Timestamp.now(),
+    createdAt: staticTimestamps[7],
   },
   {
     id: '9',
@@ -281,7 +290,7 @@ export const vehicles: Vehicle[] = [
     images: [getImage('explorer-main')],
     seller: userProfiles.user5,
     location: { city: 'Lechería', state: 'Anzoátegui', lat: 10.1983, lon: -64.6931 },
-    createdAt: Timestamp.now(),
+    createdAt: staticTimestamps[8],
   },
   {
     id: '10',
@@ -308,7 +317,7 @@ export const vehicles: Vehicle[] = [
     images: [getImage('civic-main')],
     seller: userProfiles.user3,
     location: { city: 'Valencia', state: 'Carabobo', lat: 10.162, lon: -68.0076 },
-    createdAt: Timestamp.now(),
+    createdAt: staticTimestamps[9],
   },
   {
     id: '11',
@@ -334,7 +343,7 @@ export const vehicles: Vehicle[] = [
     images: [getImage('lancer-main')],
     seller: userProfiles.user1,
     location: { city: 'Caracas', state: 'Distrito Capital', lat: 10.4806, lon: -66.9036 },
-    createdAt: Timestamp.now(),
+    createdAt: staticTimestamps[10],
   },
   {
     id: '12',
@@ -363,7 +372,7 @@ export const vehicles: Vehicle[] = [
     images: [getImage('wrangler-main')],
     seller: userProfiles.user2,
     location: { city: 'Mérida', state: 'Mérida', lat: 8.5925, lon: -71.1444 },
-    createdAt: Timestamp.now(),
+    createdAt: staticTimestamps[11],
   },
   {
     id: '13',
@@ -390,7 +399,7 @@ export const vehicles: Vehicle[] = [
     images: [getImage('montero-main')],
     seller: userProfiles.user3,
     location: { city: 'Caracas', state: 'Distrito Capital', lat: 10.4806, lon: -66.9036 },
-    createdAt: Timestamp.now(),
+    createdAt: staticTimestamps[12],
   },
   {
     id: '14',
@@ -417,7 +426,7 @@ export const vehicles: Vehicle[] = [
     images: [getImage('fiat-uno-main')],
     seller: userProfiles.user1,
     location: { city: 'Valencia', state: 'Carabobo', lat: 10.162, lon: -68.0076 },
-    createdAt: Timestamp.now(),
+    createdAt: staticTimestamps[13],
   },
   {
     id: '15',
@@ -444,6 +453,6 @@ export const vehicles: Vehicle[] = [
     images: [getImage('fiesta-main')], // Re-using an existing image for this example
     seller: userProfiles.user2,
     location: { city: 'Maracay', state: 'Aragua', lat: 10.2464, lon: -67.5957 },
-    createdAt: Timestamp.now(),
+    createdAt: staticTimestamps[14],
   }
 ];
