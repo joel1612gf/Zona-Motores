@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, Circle } from '@react-google-maps/api';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from './ui/dialog';
@@ -40,17 +40,19 @@ export function MapLocationFilter({ currentFilter, onApply }: MapLocationFilterP
   const [radius, setRadius] = useState<number>(50);
   const [mapCenter, setMapCenter] = useState(defaultCenter);
 
-  // Sync internal state when dialog opens or currentFilter prop changes
-  useEffect(() => {
-    if (isOpen) {
-      // If an external filter is active, use it to populate the dialog state
+  const handleOpenChange = (open: boolean) => {
+    if (open) {
+      // When dialog opens, initialize its state
       if (currentFilter) {
         const currentMarker = { lat: currentFilter.lat, lng: currentFilter.lon };
         setMarker(currentMarker);
         setRadius(currentFilter.radius);
         setMapCenter(currentMarker);
       } else {
-        // If no filter, try to get user's location
+        // Reset to default and try to get user location
+        setMarker(null);
+        setRadius(50);
+        setMapCenter(defaultCenter);
         navigator.geolocation.getCurrentPosition(
           (position) => {
             const userLocation = {
@@ -58,20 +60,16 @@ export function MapLocationFilter({ currentFilter, onApply }: MapLocationFilterP
               lng: position.coords.longitude,
             };
             setMarker(userLocation);
-            setRadius(50); // Set default radius for user's location
-            setMapCenter(userLocation);
+            setMapCenter(userLocation); // Center map on user
           },
           (error) => {
             console.warn("Could not get user location", error.message);
-            // Fallback to default state if geolocation fails
-            setMarker(null);
-            setRadius(50);
-            setMapCenter(defaultCenter);
           }
         );
       }
     }
-  }, [isOpen, currentFilter]);
+    setIsOpen(open);
+  };
 
   const onMapClick = useCallback((event: google.maps.MapMouseEvent) => {
     if (event.latLng) {
@@ -151,7 +149,7 @@ export function MapLocationFilter({ currentFilter, onApply }: MapLocationFilterP
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button variant="outline" className="w-full justify-start text-left font-normal">
           <MapPin className="mr-2 h-4 w-4" />
