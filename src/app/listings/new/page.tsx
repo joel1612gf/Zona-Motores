@@ -318,15 +318,6 @@ export default function NewListingPage() {
       return;
     }
 
-    if (price % 50 !== 0) {
-        toast({
-            title: "Precio no redondeado",
-            description: "Para mantener la consistencia, por favor usa un precio en múltiplos de $50 (ej: $8500, $8550).",
-            variant: "destructive",
-        });
-        return;
-    }
-
      if (!user) {
         toast({
             title: "Necesitas iniciar sesión",
