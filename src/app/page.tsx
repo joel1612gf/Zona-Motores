@@ -87,38 +87,40 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="w-full py-12 md:py-24 lg:py-32 bg-background">
-        <div className="container px-4 md:px-6">
-          <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
-            <div className="inline-block rounded-lg bg-muted px-3 py-1 text-sm">Promocionados</div>
-            <h2 className="font-headline text-3xl font-bold tracking-tighter sm:text-5xl">
-              Publicaciones Destacadas
-            </h2>
-            <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
-              Descubre nuestras mejores ofertas y vehículos promocionados.
-            </p>
+      {featuredVehicles.length > 0 && (
+        <section className="w-full py-12 md:py-24 lg:py-32 bg-background">
+          <div className="container px-4 md:px-6">
+            <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
+              <div className="inline-block rounded-lg bg-muted px-3 py-1 text-sm">Promocionados</div>
+              <h2 className="font-headline text-3xl font-bold tracking-tighter sm:text-5xl">
+                Publicaciones Destacadas
+              </h2>
+              <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
+                Descubre nuestras mejores ofertas y vehículos promocionados.
+              </p>
+            </div>
+            <Carousel
+              opts={{ align: "start", loop: true }}
+              plugins={[autoplayPlugin.current]}
+              onMouseEnter={autoplayPlugin.current.stop}
+              onMouseLeave={autoplayPlugin.current.reset}
+              className="w-full"
+            >
+              <CarouselContent className="-ml-2 md:-ml-4">
+                {featuredVehicles.map((vehicle) => (
+                  <CarouselItem key={vehicle.id} className="pl-2 md:pl-4 basis-full sm:basis-1/2 lg:basis-1/3 xl:basis-1/4">
+                    <div className="p-1 h-full">
+                       <VehicleCard vehicle={vehicle} isFeatured={true} />
+                    </div>
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              <CarouselPrevious className="hidden sm:flex left-4 bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-primary/50" />
+              <CarouselNext className="hidden sm:flex right-4 bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-primary/50" />
+            </Carousel>
           </div>
-          <Carousel
-            opts={{ align: "start", loop: true }}
-            plugins={[autoplayPlugin.current]}
-            onMouseEnter={autoplayPlugin.current.stop}
-            onMouseLeave={autoplayPlugin.current.reset}
-            className="w-full"
-          >
-            <CarouselContent className="-ml-2 md:-ml-4">
-              {featuredVehicles.map((vehicle) => (
-                <CarouselItem key={vehicle.id} className="pl-2 md:pl-4 basis-full sm:basis-1/2 lg:basis-1/3 xl:basis-1/4">
-                  <div className="p-1 h-full">
-                     <VehicleCard vehicle={vehicle} isFeatured={true} />
-                  </div>
-                </CarouselItem>
-              ))}
-            </CarouselContent>
-            <CarouselPrevious className="hidden sm:flex left-4 bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-primary/50" />
-            <CarouselNext className="hidden sm:flex right-4 bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-primary/50" />
-          </Carousel>
-        </div>
-      </section>
+        </section>
+      )}
 
       <section className="w-full py-12 md:py-24 lg:py-32 bg-secondary/50">
         <div className="container px-4 md:px-6">
