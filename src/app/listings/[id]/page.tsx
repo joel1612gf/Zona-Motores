@@ -55,63 +55,6 @@ import {
   Play,
   Pause
 } from 'lucide-react';
-import {![CDATA['use client';
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { useParams, useRouter, notFound } from 'next/navigation';
-import Image from 'next/image';
-import Link from 'next/link';
-import { useVehicles } from '@/context/vehicle-context';
-import { useUser, useFirestore, useStorage } from '@/firebase';
-import { useTheme } from 'next-themes';
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
-import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger, DialogHeader, DialogClose } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle as CardTitleComponent } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
-import { ref, deleteObject } from 'firebase/storage';
-import { useToast } from '@/hooks/use-toast';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { 
-  Gauge, 
-  MapPin, 
-  Phone, 
-  ShieldCheck, 
-  User, 
-  Settings2, 
-  Palette,
-  Snowflake,
-  Speaker,
-  DoorOpen,
-  CircleCheck,
-  FileText,
-  PenSquare,
-  GitCompareArrows,
-  ArrowDownToLine,
-  ArrowUpFromLine,
-  LifeBuoy,
-  Shield,
-  ChevronLeft,
-  ChevronRight,
-  X,
-  Pencil as PencilIcon,
-  Trash2,
-  Loader2,
-  ShieldBan,
-  Play,
-  Pause
-} from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
 import { Skeleton } from '@/components/ui/skeleton';
