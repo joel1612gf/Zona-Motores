@@ -17,8 +17,9 @@ export function SiteFooter() {
               El mercado más confiable para comprar y vender vehículos en Venezuela.
             </p>
           </div>
-          <div className="flex gap-6 items-center">
+          <div className="flex gap-6 items-center flex-wrap justify-center">
             <Link href="#" className="text-sm font-medium hover:underline">Sobre nosotros</Link>
+            <Link href="/pricing" className="text-sm font-medium hover:underline">Costos</Link>
             <Link href="#" className="text-sm font-medium hover:underline">Contacto</Link>
             <Link href="#" className="text-sm font-medium hover:underline">Privacidad</Link>
           </div>
