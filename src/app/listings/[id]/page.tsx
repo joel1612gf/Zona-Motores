@@ -375,9 +375,10 @@ export default function ListingDetailPage() {
 
 
   return (
-    <div className="container mx-auto max-w-6xl py-8 flex flex-col">
-      <div className="grid md:grid-cols-3 gap-8 items-start order-1 md:order-2 mb-8">
-        <div className="md:col-span-2">
+    <div className="container mx-auto max-w-6xl py-8">
+      <div className="grid md:grid-cols-3 gap-8 items-start">
+        {/* Main Content */}
+        <div className="md:col-span-2 space-y-8">
           <Carousel className="w-full">
             <CarouselContent>
               {vehicle.images.map((image, index) => (
@@ -405,7 +406,29 @@ export default function ListingDetailPage() {
               </>
             )}
           </Carousel>
-          <Card className="mt-8">
+          
+          <Card>
+            <CardHeader>
+              <h1 className="font-headline text-2xl sm:text-3xl font-bold">{`${vehicle.year} ${vehicle.make} ${vehicle.model}`}</h1>
+              <div className="flex items-center gap-2 pt-2 text-muted-foreground">
+                <MapPin className="h-4 w-4" /> <span>{`${vehicle.location.city}, ${vehicle.location.state}`}</span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="text-3xl font-bold font-headline text-accent">{formatCurrency(vehicle.priceUSD)}</div>
+                <Separator />
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  <div className="font-semibold flex items-center gap-1"><Gauge className="h-4 w-4 text-muted-foreground" /> Kilometraje</div><div className="text-muted-foreground">{vehicle.mileage.toLocaleString()} km</div>
+                  <div className="font-semibold flex items-center gap-1"><Palette className="h-4 w-4 text-muted-foreground" /> Color</div><div className="text-muted-foreground">{vehicle.exteriorColor}</div>
+                  <div className="font-semibold flex items-center gap-1"><Settings2 className="h-4 w-4 text-muted-foreground" /> Motor</div><div className="text-muted-foreground">{vehicle.engine}</div>
+                  <div className="font-semibold flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 5h14v14H5V5z"/><path d="M12 5v14"/><path d="M19 12H5"/><path d="M12 12l5-5"/><path d="m7 12 5 5"/></svg> Transmisión</div><div className="text-muted-foreground">{vehicle.transmission}</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
             <CardHeader>
               <CardTitleComponent>Características</CardTitleComponent>
             </CardHeader>
@@ -422,7 +445,8 @@ export default function ListingDetailPage() {
               ))}
             </CardContent>
           </Card>
-          <Card className="mt-8">
+          
+          <Card>
             <CardHeader>
               <CardTitleComponent>Descripción del Vendedor</CardTitleComponent>
             </CardHeader>
@@ -431,6 +455,8 @@ export default function ListingDetailPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Sidebar */}
         <div className="md:col-span-1 space-y-6 md:sticky md:top-24">
           <Card>
             <CardHeader>
@@ -567,26 +593,6 @@ export default function ListingDetailPage() {
           )}
         </div>
       </div>
-      <Card className="order-2 md:order-1">
-        <CardHeader>
-          <h1 className="font-headline text-2xl sm:text-3xl font-bold">{`${vehicle.year} ${vehicle.make} ${vehicle.model}`}</h1>
-          <div className="flex items-center gap-2 pt-2 text-muted-foreground">
-            <MapPin className="h-4 w-4" /> <span>{`${vehicle.location.city}, ${vehicle.location.state}`}</span>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="text-3xl font-bold font-headline text-accent">{formatCurrency(vehicle.priceUSD)}</div>
-            <Separator />
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-              <div className="font-semibold flex items-center gap-1"><Gauge className="h-4 w-4 text-muted-foreground" /> Kilometraje</div><div className="text-muted-foreground">{vehicle.mileage.toLocaleString()} km</div>
-              <div className="font-semibold flex items-center gap-1"><Palette className="h-4 w-4 text-muted-foreground" /> Color</div><div className="text-muted-foreground">{vehicle.exteriorColor}</div>
-              <div className="font-semibold flex items-center gap-1"><Settings2 className="h-4 w-4 text-muted-foreground" /> Motor</div><div className="text-muted-foreground">{vehicle.engine}</div>
-              <div className="font-semibold flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 5h14v14H5V5z"/><path d="M12 5v14"/><path d="M19 12H5"/><path d="M12 12l5-5"/><path d="m7 12 5 5"/></svg> Transmisión</div><div className="text-muted-foreground">{vehicle.transmission}</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
       
       <Dialog open={isLightboxOpen} onOpenChange={handleLightboxOpenChange}>
         <DialogContent className="max-w-screen-xl w-full h-[90vh] p-0 border-none bg-black/90 flex items-center justify-center overflow-hidden">
