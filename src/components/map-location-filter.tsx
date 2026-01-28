@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, Circle } from '@react-google-maps/api';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from './ui/dialog';
@@ -34,8 +34,44 @@ export function MapLocationFilter({ currentFilter, onApply }: MapLocationFilterP
   });
 
   const [isOpen, setIsOpen] = useState(false);
-  const [marker, setMarker] = useState<{ lat: number; lng: number } | null>(currentFilter ? { lat: currentFilter.lat, lng: currentFilter.lon } : null);
-  const [radius, setRadius] = useState<number>(currentFilter?.radius || 50);
+  
+  // Internal state for the dialog
+  const [marker, setMarker] = useState<{ lat: number; lng: number } | null>(null);
+  const [radius, setRadius] = useState<number>(50);
+  const [mapCenter, setMapCenter] = useState(defaultCenter);
+
+  // Sync internal state when dialog opens or currentFilter prop changes
+  useEffect(() => {
+    if (isOpen) {
+      // If an external filter is active, use it to populate the dialog state
+      if (currentFilter) {
+        const currentMarker = { lat: currentFilter.lat, lng: currentFilter.lon };
+        setMarker(currentMarker);
+        setRadius(currentFilter.radius);
+        setMapCenter(currentMarker);
+      } else {
+        // If no filter, try to get user's location
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const userLocation = {
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+            };
+            setMarker(userLocation);
+            setRadius(50); // Set default radius for user's location
+            setMapCenter(userLocation);
+          },
+          (error) => {
+            console.warn("Could not get user location", error.message);
+            // Fallback to default state if geolocation fails
+            setMarker(null);
+            setRadius(50);
+            setMapCenter(defaultCenter);
+          }
+        );
+      }
+    }
+  }, [isOpen, currentFilter]);
 
   const onMapClick = useCallback((event: google.maps.MapMouseEvent) => {
     if (event.latLng) {
@@ -60,10 +96,8 @@ export function MapLocationFilter({ currentFilter, onApply }: MapLocationFilterP
   };
 
   const handleClear = () => {
-    setMarker(null);
-    setRadius(50);
-    onApply(null);
-    setIsOpen(false);
+    onApply(null); // Clear the external filter
+    setIsOpen(false); // Close the dialog
   };
 
   const triggerText = currentFilter 
@@ -87,7 +121,7 @@ export function MapLocationFilter({ currentFilter, onApply }: MapLocationFilterP
     return (
       <GoogleMap
         mapContainerStyle={containerStyle}
-        center={marker || defaultCenter}
+        center={mapCenter}
         zoom={marker ? 10 : 5}
         onClick={onMapClick}
         options={{
