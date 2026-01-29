@@ -17,7 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useFirestore, useUser, useMemoFirebase, useStorage } from '@/firebase';
 import { useDoc } from '@/firebase/firestore/use-doc';
-import { collection, doc, serverTimestamp, setDoc, query, where, getDocs } from 'firebase/firestore';
+import { collection, doc, serverTimestamp, setDoc, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { useMakes } from '@/context/makes-context';
 import { useVehicles } from '@/context/vehicle-context';
@@ -574,6 +574,7 @@ export default function NewListingPage() {
             location: location!,
             createdAt: serverTimestamp(),
             status: 'active' as 'active' | 'paused' | 'sold',
+            promotionExpiresAt: Timestamp.fromDate(new Date(0)),
         };
         
         if (isAdmin && details.marketplaceUrl) {
