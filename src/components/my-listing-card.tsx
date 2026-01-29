@@ -30,6 +30,8 @@ import {
   Loader2,
   Hand,
   ExternalLink,
+  RefreshCw,
+  AlertTriangle,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { doc, deleteDoc, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
@@ -47,6 +49,31 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
     const [isDeleting, setIsDeleting] = useState(false);
     const [isTogglingStatus, setIsTogglingStatus] = useState(false);
     const [isPromoting, setIsPromoting] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+
+    const handleRefresh = async () => {
+        if (!user) return;
+        setIsRefreshing(true);
+        try {
+            const vehicleRef = doc(firestore, 'users', user.uid, 'vehicleListings', vehicle.id);
+            await updateDoc(vehicleRef, {
+                promotionExpiresAt: Timestamp.fromDate(new Date(0)),
+            });
+            toast({
+                title: "¡Anuncio Actualizado!",
+                description: `Tu ${vehicle.make} ${vehicle.model} ahora aparecerá correctamente en todas las búsquedas.`,
+            });
+        } catch (error) {
+            console.error("Error refreshing legacy listing:", error);
+            toast({
+                variant: "destructive",
+                title: "Error al actualizar",
+                description: "No se pudo actualizar la publicación. Inténtalo de nuevo.",
+            });
+        } finally {
+            setIsRefreshing(false);
+        }
+    };
 
     const handleDelete = async () => {
         if (!user) return;
@@ -148,6 +175,7 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
 
     const currentStatus = statusMap[vehicle.status || 'active'];
     const isPromotionActive = vehicle.promotionExpiresAt && vehicle.promotionExpiresAt.toDate() > new Date();
+    const isLegacy = vehicle.promotionExpiresAt === undefined;
 
 
   return (
@@ -164,7 +192,7 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
       <div className="flex-grow">
         <div className="flex items-center gap-4">
             <h3 className="font-headline text-xl font-bold">{`${vehicle.year} ${vehicle.make} ${vehicle.model}`}</h3>
-            <Badge variant="secondary" className={cn(currentStatus.className)}>{currentStatus.text}</Badge>
+            {!isLegacy && <Badge variant="secondary" className={cn(currentStatus.className)}>{currentStatus.text}</Badge>}
             {isPromotionActive && (
                  <Badge variant="secondary" className="border-orange-300 bg-orange-100 text-orange-800 dark:border-orange-700 dark:bg-orange-900/50 dark:text-orange-300">
                     Promocionado
@@ -174,7 +202,21 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
         <p className="font-headline text-lg font-semibold text-primary mt-1">{formatCurrency(vehicle.priceUSD)}</p>
         <p className="text-sm text-muted-foreground mt-1">{vehicle.mileage.toLocaleString()} km &middot; {vehicle.location.city}</p>
 
-        {vehicle.status === 'paused' ? (
+        {isLegacy ? (
+            <Alert className="mt-4 border-amber-500 bg-amber-50 text-amber-900 dark:bg-amber-900/20 dark:text-amber-200 dark:border-amber-500/50">
+                <AlertTriangle className="h-4 w-4 !text-amber-600 dark:!text-amber-400" />
+                <AlertTitle className="font-bold">Actualización Requerida</AlertTitle>
+                <AlertDescription>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mt-2">
+                        <p className="text-sm flex-grow">Este anuncio necesita actualizarse para aparecer en las búsquedas.</p>
+                        <Button size="sm" onClick={handleRefresh} disabled={isRefreshing} variant="outline" className="bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/50 dark:hover:bg-amber-900/80">
+                            {isRefreshing ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
+                            Actualizar ahora
+                        </Button>
+                    </div>
+                </AlertDescription>
+            </Alert>
+        ) : vehicle.status === 'paused' ? (
              <Alert className="mt-4 border-amber-500 bg-amber-50 text-amber-900 dark:bg-amber-900/20 dark:text-amber-200 dark:border-amber-500/50">
                 <Hand className="h-4 w-4 !text-amber-600 dark:!text-amber-400" />
                 <AlertTitle className="font-bold">¡Tu publicación fue pausada!</AlertTitle>
