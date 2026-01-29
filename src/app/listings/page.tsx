@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { VehicleCard } from '@/components/vehicle-card';
 import { Filters, type FilterState } from '@/components/filters';
 import { Button } from '@/components/ui/button';
-import { Grid, List, Info, Search, Filter, Loader2 } from 'lucide-react';
+import { Grid, List, Search, Filter, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, getDistance } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
@@ -157,6 +157,7 @@ function ListingsPageContent() {
 
   // Effect to fetch vehicles when filters change
   useEffect(() => {
+      setLastDoc(null); // Reset pagination on filter change
       fetchVehicles(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
@@ -172,6 +173,22 @@ function ListingsPageContent() {
     const totalPrice = vehicles.reduce((sum, vehicle) => sum + vehicle.priceUSD, 0);
     return totalPrice / vehicles.length;
   }, [vehicles]);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.make !== 'all') count++;
+    if (filters.model !== 'all') count++;
+    if (filters.minPrice) count++;
+    if (filters.maxPrice) count++;
+    if (filters.minYear) count++;
+    if (filters.maxYear) count++;
+    if (filters.bodyType !== 'all') count++;
+    if (filters.transmission !== 'all') count++;
+    if (filters.location) count++;
+    return count;
+  }, [filters]);
+
+  const shouldShowAveragePrice = averagePrice && (filters.searchTerm.trim() !== '' || activeFilterCount >= 2);
   
   return (
     <div className="container mx-auto py-8 px-2 sm:px-6 lg:px-8">
@@ -210,7 +227,7 @@ function ListingsPageContent() {
                 </div>
             </div>
           </div>
-          <form className="flex space-x-2 mb-8 w-full" onSubmit={handleSearchSubmit}>
+          <form className="flex space-x-2 mb-4 w-full" onSubmit={handleSearchSubmit}>
             <Input
                 name="search"
                 id="search-input"
@@ -225,20 +242,13 @@ function ListingsPageContent() {
                 <span className="hidden sm:inline">Buscar</span>
             </Button>
           </form>
-          {averagePrice && (
-            <div className="mb-6 p-4 border-l-4 border-primary bg-primary/10 rounded-r-lg" role="alert">
-              <div className="flex">
-                <Info className="h-5 w-5 text-primary mr-3 mt-1 flex-shrink-0" />
-                <div>
-                    <p className="font-semibold text-sm sm:text-base">
-                        Precio Promedio: 
-                        <span className="font-headline text-xl sm:text-2xl font-bold text-primary ml-2">{formatCurrency(averagePrice)}</span>
-                    </p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                        Basado en los {vehicles.length} vehículos que coinciden con tu búsqueda.
-                    </p>
-                </div>
-              </div>
+
+          {shouldShowAveragePrice && (
+            <div className="mb-8 text-center">
+              <p className="text-sm text-muted-foreground">
+                El valor estimado de los vehículos en tu búsqueda es:{" "}
+                <span className="font-bold text-foreground">{formatCurrency(averagePrice)}</span>
+              </p>
             </div>
           )}
 
