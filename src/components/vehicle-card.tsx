@@ -24,7 +24,7 @@ export function VehicleCard({ vehicle, isFeatured = false }: { vehicle: Vehicle;
       }
   };
 
-  const isPromoted = vehicle.isPromoted;
+  const isPromoted = vehicle.promotionExpiresAt && vehicle.promotionExpiresAt.toDate() > new Date();
 
   return (
     <Card className={cn(

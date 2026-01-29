@@ -53,9 +53,9 @@ export default function MyListingsPage() {
             const vehicleRef = doc(firestore, 'users', user.uid, 'vehicleListings', listing.id);
 
             // Check for expired promotions
-            if (listing.isPromoted && listing.promotionExpiresAt && listing.promotionExpiresAt.toDate() < now) {
+            if (listing.promotionExpiresAt && listing.promotionExpiresAt.toDate() < now) {
                 demotedCount++;
-                return updateDoc(vehicleRef, { isPromoted: false });
+                return updateDoc(vehicleRef, { promotionExpiresAt: null });
             }
 
             if (!listing.createdAt) return; // Skip if no createdAt

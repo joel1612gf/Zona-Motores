@@ -124,7 +124,6 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
             const expiryDate = addDays(new Date(), days);
             
             await updateDoc(vehicleRef, {
-                isPromoted: true,
                 promotionExpiresAt: Timestamp.fromDate(expiryDate),
             });
             
@@ -148,7 +147,7 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
     };
 
     const currentStatus = statusMap[vehicle.status || 'active'];
-    const isPromotionActive = vehicle.isPromoted && vehicle.promotionExpiresAt && vehicle.promotionExpiresAt.toDate() > new Date();
+    const isPromotionActive = vehicle.promotionExpiresAt && vehicle.promotionExpiresAt.toDate() > new Date();
 
 
   return (
