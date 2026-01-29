@@ -246,7 +246,7 @@ function ListingsPageContent() {
           {shouldShowAveragePrice && (
             <div className="mb-8 text-center">
               <p className="text-sm text-muted-foreground">
-                El valor estimado de los vehículos en tu búsqueda es:{" "}
+                El valor promedio de los vehículos en tu búsqueda es:{" "}
                 <span className="font-bold text-foreground">{formatCurrency(averagePrice)}</span>
               </p>
             </div>
