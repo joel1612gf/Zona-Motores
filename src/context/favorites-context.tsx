@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, ReactNode, useMemo, useCallback } from 'react';
-import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
+import { useUser, useFirestore, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { doc, setDoc, deleteDoc, serverTimestamp, collection } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -30,7 +30,7 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
 
   const favoriteIds = useMemo(() => favorites?.map(f => f.vehicleId) || [], [favorites]);
 
-  const addFavorite = useCallback(async (vehicleId: string) => {
+  const addFavorite = useCallback((vehicleId: string) => {
     if (!user || !firestore) {
         toast({
             title: "Debes iniciar sesión",
@@ -40,27 +40,39 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
       return;
     }
     const favRef = doc(firestore, 'users', user.uid, 'favorites', vehicleId);
-    try {
-      await setDoc(favRef, { 
-          vehicleId: vehicleId,
-          createdAt: serverTimestamp() 
-      });
-    } catch (error) {
-      console.error("Error adding favorite:", error);
-      toast({ title: "Error al guardar", variant: "destructive" });
-    }
+    const favoriteData = { 
+        vehicleId: vehicleId,
+        createdAt: serverTimestamp() 
+    };
+
+    setDoc(favRef, favoriteData)
+        .catch(error => {
+            errorEmitter.emit(
+                'permission-error',
+                new FirestorePermissionError({
+                    path: favRef.path,
+                    operation: 'create',
+                    requestResourceData: favoriteData,
+                }, error)
+            );
+        });
   }, [user, firestore, toast]);
 
-  const removeFavorite = useCallback(async (vehicleId: string) => {
+  const removeFavorite = useCallback((vehicleId: string) => {
     if (!user || !firestore) return;
     const favRef = doc(firestore, 'users', user.uid, 'favorites', vehicleId);
-    try {
-      await deleteDoc(favRef);
-    } catch (error) {
-      console.error("Error removing favorite:", error);
-      toast({ title: "Error al eliminar", variant: "destructive" });
-    }
-  }, [user, firestore, toast]);
+    
+    deleteDoc(favRef)
+        .catch(error => {
+            errorEmitter.emit(
+                'permission-error',
+                new FirestorePermissionError({
+                    path: favRef.path,
+                    operation: 'delete',
+                }, error)
+            );
+        });
+  }, [user, firestore]);
 
   const isFavorite = useCallback((vehicleId: string) => {
       return favoriteIds.includes(vehicleId);
