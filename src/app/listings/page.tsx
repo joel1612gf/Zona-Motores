@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { VehicleCard } from '@/components/vehicle-card';
 import { Filters, type FilterState } from '@/components/filters';
@@ -52,6 +52,7 @@ function ListingsPageContent() {
   const [hasMore, setHasMore] = useState(true);
   
   const [layout, setLayout] = useState<'grid' | 'list'>('grid');
+  const loaderRef = useRef(null);
   
   const handleSearchSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -154,6 +155,13 @@ function ListingsPageContent() {
       setIsLoadingMore(false);
     }
   }, [firestore, filters, lastDoc]);
+  
+  const handleLoadMore = useCallback(() => {
+    if (hasMore && !isLoadingMore) {
+      fetchVehicles(true);
+    }
+  }, [hasMore, isLoadingMore, fetchVehicles]);
+
 
   // Effect to fetch vehicles when filters change
   useEffect(() => {
@@ -161,12 +169,30 @@ function ListingsPageContent() {
       fetchVehicles(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
+  
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const first = entries[0];
+        if (first.isIntersecting && hasMore && !isLoadingMore) {
+          handleLoadMore();
+        }
+      },
+      { threshold: 1.0 }
+    );
 
-  const handleLoadMore = () => {
-      if (hasMore && !isLoadingMore) {
-          fetchVehicles(true);
+    const currentLoader = loaderRef.current;
+    if (currentLoader) {
+      observer.observe(currentLoader);
+    }
+
+    return () => {
+      if (currentLoader) {
+        observer.unobserve(currentLoader);
       }
-  };
+    };
+  }, [handleLoadMore, hasMore, isLoadingMore]);
+
 
   const averagePrice = useMemo(() => {
     if (vehicles.length < 2) return null;
@@ -263,15 +289,10 @@ function ListingsPageContent() {
                   <VehicleCard key={vehicle.id} vehicle={vehicle} />
                 ))}
               </div>
-              {hasMore && (
-                  <div className="mt-8 text-center">
-                      <Button onClick={handleLoadMore} disabled={isLoadingMore}>
-                          {isLoadingMore ? <Loader2 className="mr-2 animate-spin"/> : null}
-                          {isLoadingMore ? 'Cargando...' : 'Cargar más'}
-                      </Button>
-                  </div>
-              )}
-              {vehicles.length > 0 && !hasMore && (
+              <div ref={loaderRef} className="mt-8 flex justify-center py-4">
+                  {hasMore && isLoadingMore && <Loader2 className="h-8 w-8 animate-spin text-primary" />}
+              </div>
+              {!isLoading && !hasMore && (
                 <p className="text-center text-muted-foreground mt-8">Has llegado al final de los resultados.</p>
               )}
             </>
