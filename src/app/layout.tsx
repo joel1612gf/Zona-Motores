@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { Inter, Oswald } from 'next/font/google';
 import './globals.css';
 import { cn } from '@/lib/utils';
 import { Toaster } from '@/components/ui/toaster';
@@ -8,6 +9,20 @@ import { FirebaseClientProvider } from '@/firebase';
 import { VehicleProvider } from '@/context/vehicle-context';
 import { ThemeProvider } from '@/components/theme-provider';
 import { MakesProvider } from '@/context/makes-context';
+
+const fontBody = Inter({
+  subsets: ['latin'],
+  variable: '--font-body',
+  weight: ['400', '500', '600', '700'],
+  display: 'swap',
+});
+
+const fontHeadline = Oswald({
+  subsets: ['latin'],
+  variable: '--font-headline',
+  weight: ['400', '500', '600', '700'],
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: {
@@ -31,19 +46,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" suppressHydrationWarning>
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+    <html lang="es" suppressHydrationWarning className={`${fontBody.variable} ${fontHeadline.variable}`}>
+      <head />
       <body className={cn('min-h-screen bg-background font-body antialiased')}>
         <ThemeProvider
           attribute="class"
