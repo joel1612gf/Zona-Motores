@@ -24,10 +24,12 @@ export function VehicleCard({ vehicle, isFeatured = false }: { vehicle: Vehicle;
       }
   };
 
+  const isPromoted = vehicle.isPromoted;
+
   return (
     <Card className={cn(
         "group overflow-hidden rounded-lg border h-full flex flex-col transition-all hover:shadow-xl hover:-translate-y-1 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
-        isFeatured && "border-orange-400/50 shadow-lg shadow-orange-500/10"
+        isPromoted && "border-orange-400/50 shadow-lg shadow-orange-500/10"
       )}>
       <Link href={`/listings/${vehicle.id}`} className="focus:outline-none block h-full flex flex-col">
         <div className="relative">
@@ -41,10 +43,10 @@ export function VehicleCard({ vehicle, isFeatured = false }: { vehicle: Vehicle;
           />
            <div className="absolute top-0 left-0 right-0 p-3 flex justify-between items-start z-10">
               <div className="flex flex-col gap-2">
-                {isFeatured && (
+                {isPromoted && (
                   <Badge className="border-transparent bg-orange-500 text-white hover:bg-orange-600 shadow-lg">
                     <Flame className="h-4 w-4 -ml-1 mr-1.5" />
-                    En Fuego
+                    Promocionado
                   </Badge>
                 )}
               </div>

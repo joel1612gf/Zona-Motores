@@ -63,7 +63,7 @@ function ListingsPageContent() {
 
   const applyClientSideFilters = (vehiclesToFilter: Vehicle[]): Vehicle[] => {
       return vehiclesToFilter.filter(vehicle => {
-          const { searchTerm, minYear, maxYear, location } = filters;
+          const { searchTerm, minYear, maxYear, location, minPrice, maxPrice } = filters;
 
           // Client-side search (on the fetched batch)
           const searchMatch = (() => {
@@ -84,6 +84,11 @@ function ListingsPageContent() {
           const minYearNum = minYear ? parseInt(minYear, 10) : 0;
           const maxYearNum = maxYear ? parseInt(maxYear, 10) : Infinity;
           const yearMatch = vehicle.year >= minYearNum && vehicle.year <= maxYearNum;
+          
+          // Client-side price filter
+          const minPriceNum = minPrice ? parseInt(minPrice, 10) : 0;
+          const maxPriceNum = maxPrice ? parseInt(maxPrice, 10) : Infinity;
+          const priceMatch = vehicle.priceUSD >= minPriceNum && vehicle.priceUSD <= maxPriceNum;
 
           // Client-side location filter
           const locationMatch = (() => {
@@ -92,7 +97,7 @@ function ListingsPageContent() {
               return distance <= location.radius;
           })();
 
-          return searchMatch && yearMatch && locationMatch;
+          return searchMatch && yearMatch && priceMatch && locationMatch;
       });
   };
 
@@ -113,14 +118,9 @@ function ListingsPageContent() {
       if (filters.model !== 'all') q = query(q, where('model', '==', filters.model));
       if (filters.bodyType !== 'all') q = query(q, where('bodyType', '==', filters.bodyType));
       if (filters.transmission !== 'all') q = query(q, where('transmission', '==', filters.transmission));
-      if (filters.minPrice) q = query(q, where('priceUSD', '>=', parseInt(filters.minPrice, 10)));
-      if (filters.maxPrice) q = query(q, where('priceUSD', '<=', parseInt(filters.maxPrice, 10)));
-
-      // Ordering
-      if (filters.minPrice || filters.maxPrice) {
-        q = query(q, orderBy('priceUSD', 'asc'));
-      }
-      q = query(q, orderBy('createdAt', 'desc'));
+      
+      // Ordering: Promoted first, then by creation date.
+      q = query(q, orderBy('isPromoted', 'desc'), orderBy('createdAt', 'desc'));
       
       // Pagination
       if (loadMore && lastDoc) {

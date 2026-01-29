@@ -32,10 +32,11 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { doc, deleteDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, deleteDoc, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { useFirestore, useUser, useStorage } from '@/firebase';
 import { ref, deleteObject } from 'firebase/storage';
 import { cn } from '@/lib/utils';
+import { addDays, format } from 'date-fns';
 
 
 export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
@@ -45,6 +46,7 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
     const { user } = useUser();
     const [isDeleting, setIsDeleting] = useState(false);
     const [isTogglingStatus, setIsTogglingStatus] = useState(false);
+    const [isPromoting, setIsPromoting] = useState(false);
 
     const handleDelete = async () => {
         if (!user) return;
@@ -113,6 +115,31 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
             setIsTogglingStatus(false);
         }
     };
+    
+    const handlePromote = async (days: number) => {
+        if (!user) return;
+        setIsPromoting(true);
+        try {
+            const vehicleRef = doc(firestore, 'users', user.uid, 'vehicleListings', vehicle.id);
+            const expiryDate = addDays(new Date(), days);
+            
+            await updateDoc(vehicleRef, {
+                isPromoted: true,
+                promotionExpiresAt: Timestamp.fromDate(expiryDate),
+            });
+            
+            toast({
+                title: "¡Vehículo Promocionado!",
+                description: `Tu ${vehicle.make} ${vehicle.model} aparecerá primero hasta el ${format(expiryDate, 'dd/MM/yyyy')}.`,
+            });
+        } catch (error) {
+            console.error("Error promoting vehicle:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo promocionar el vehículo.' });
+        } finally {
+            setIsPromoting(false);
+        }
+    };
+
 
     const statusMap = {
         active: { text: 'Activa', className: 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900/50 dark:text-green-300 dark:border-green-700' },
@@ -121,6 +148,7 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
     };
 
     const currentStatus = statusMap[vehicle.status || 'active'];
+    const isPromotionActive = vehicle.isPromoted && vehicle.promotionExpiresAt && vehicle.promotionExpiresAt.toDate() > new Date();
 
 
   return (
@@ -138,6 +166,11 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
         <div className="flex items-center gap-4">
             <h3 className="font-headline text-xl font-bold">{`${vehicle.year} ${vehicle.make} ${vehicle.model}`}</h3>
             <Badge variant="secondary" className={cn(currentStatus.className)}>{currentStatus.text}</Badge>
+            {isPromotionActive && (
+                 <Badge variant="secondary" className="border-orange-300 bg-orange-100 text-orange-800 dark:border-orange-700 dark:bg-orange-900/50 dark:text-orange-300">
+                    Promocionado
+                 </Badge>
+            )}
         </div>
         <p className="font-headline text-lg font-semibold text-primary mt-1">{formatCurrency(vehicle.priceUSD)}</p>
         <p className="text-sm text-muted-foreground mt-1">{vehicle.mileage.toLocaleString()} km &middot; {vehicle.location.city}</p>
@@ -187,7 +220,7 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
             </Alert>
         ) : (
             <div className="flex flex-wrap items-center gap-2 mt-4">
-            <Button asChild variant="outline" size="sm">
+                <Button asChild variant="outline" size="sm">
                     <Link href={`/listings/${vehicle.id}`}>
                         <Eye className="mr-1.5 h-4 w-4" />
                         Ver
@@ -232,10 +265,39 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>
-                <Button variant="secondary" size="sm" disabled>
-                    <Rocket className="mr-1.5 h-4 w-4" />
-                    Promocionar
-                </Button>
+                
+                 <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                        <Button variant="secondary" size="sm" disabled={isPromoting || isPromotionActive}>
+                            <Rocket className="mr-1.5 h-4 w-4" />
+                            {isPromotionActive ? 'Promocionado' : 'Promocionar'}
+                        </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                        <AlertDialogTitle>Promocionar Anuncio</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Destaca tu anuncio y llega a más compradores. Los anuncios promocionados aparecen al principio de los resultados de búsqueda.
+                             <br/><br/>
+                             <strong>Nota:</strong> Esta es una simulación. No se realizará ningún cobro real.
+                        </AlertDialogDescription>
+                        </AlertDialogHeader>
+                         <div className="grid grid-cols-2 gap-4 my-4">
+                            <Button variant="outline" onClick={() => handlePromote(7)} disabled={isPromoting}>
+                                {isPromoting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                                7 Días / $14
+                            </Button>
+                             <Button variant="outline" onClick={() => handlePromote(14)} disabled={isPromoting}>
+                                {isPromoting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                                14 Días / $28
+                            </Button>
+                        </div>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+
                 {vehicle.marketplaceUrl && (
                   <Button asChild variant="outline" size="sm">
                     <Link href={vehicle.marketplaceUrl} target="_blank" rel="noopener noreferrer">

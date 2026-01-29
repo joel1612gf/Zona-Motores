@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useFirestore, useUser, useMemoFirebase, useCollection, useStorage } from '@/firebase';
-import { collection, query, orderBy, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, orderBy, doc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
 import type { Vehicle } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -44,15 +44,23 @@ export default function MyListingsPage() {
     const processListings = async () => {
         let pausedCount = 0;
         let deletedCount = 0;
+        let demotedCount = 0;
         
         const PAUSE_THRESHOLD_DAYS = 7;
         const DELETE_THRESHOLD_DAYS = 14;
 
         const maintenancePromises = listings.map(async (listing) => {
+            const vehicleRef = doc(firestore, 'users', user.uid, 'vehicleListings', listing.id);
+
+            // Check for expired promotions
+            if (listing.isPromoted && listing.promotionExpiresAt && listing.promotionExpiresAt.toDate() < now) {
+                demotedCount++;
+                return updateDoc(vehicleRef, { isPromoted: false });
+            }
+
             if (!listing.createdAt) return; // Skip if no createdAt
             const createdAtDate = listing.createdAt.toDate();
             const daysSinceCreation = (now.getTime() - createdAtDate.getTime()) / (1000 * 60 * 60 * 24);
-            const vehicleRef = doc(firestore, 'users', user.uid, 'vehicleListings', listing.id);
 
             // Auto-pause active listings older than PAUSE_THRESHOLD_DAYS
             if (listing.status === 'active' && daysSinceCreation > PAUSE_THRESHOLD_DAYS) {
@@ -77,6 +85,12 @@ export default function MyListingsPage() {
 
         await Promise.all(maintenancePromises.filter(Boolean));
 
+        if (demotedCount > 0) {
+             toast({
+                title: "Mantenimiento Automático",
+                description: `${demotedCount} promoción(es) han expirado y vuelto a ser anuncios normales.`,
+            });
+        }
         if (pausedCount > 0) {
             toast({
                 title: "Mantenimiento Automático",

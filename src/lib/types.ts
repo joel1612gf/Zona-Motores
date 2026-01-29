@@ -65,4 +65,6 @@ export type Vehicle = {
   viewCount?: number;
   contactRequests?: number;
   marketplaceUrl?: string;
+  isPromoted?: boolean;
+  promotionExpiresAt?: Timestamp;
 };

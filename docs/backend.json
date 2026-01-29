@@ -76,6 +76,15 @@
         "contactRequests": {
           "type": "number",
           "description": "Number of times the seller's contact info has been revealed."
+        },
+        "isPromoted": {
+          "type": "boolean",
+          "description": "Indicates if the listing is currently promoted."
+        },
+        "promotionExpiresAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the promotion expires."
         }
       },
       "required": [
