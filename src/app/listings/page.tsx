@@ -1,19 +1,34 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useVehicles } from '@/context/vehicle-context';
 import { VehicleCard } from '@/components/vehicle-card';
 import { Filters, type FilterState } from '@/components/filters';
 import { Button } from '@/components/ui/button';
-import { Grid, List, Info, Search, Filter } from 'lucide-react';
+import { Grid, List, Info, Search, Filter, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, getDistance } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { useFirestore } from '@/firebase';
+import { 
+  collectionGroup, 
+  query, 
+  where, 
+  orderBy, 
+  limit, 
+  getDocs, 
+  startAfter, 
+  DocumentSnapshot, 
+  DocumentData,
+  Query
+} from 'firebase/firestore';
+import type { Vehicle } from '@/lib/types';
+
+const PAGE_SIZE = 12;
 
 function ListingsPageContent() {
-  const { vehicles: allVehicles, isLoading } = useVehicles();
+  const firestore = useFirestore();
   const searchParams = useSearchParams();
   const initialSearchTerm = searchParams.get('search') || '';
 
@@ -29,6 +44,13 @@ function ListingsPageContent() {
     transmission: 'all',
     location: null,
   });
+
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [lastDoc, setLastDoc] = useState<DocumentSnapshot<DocumentData> | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  
   const [layout, setLayout] = useState<'grid' | 'list'>('grid');
   
   const handleSearchSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -38,79 +60,119 @@ function ListingsPageContent() {
     setFilters(prev => ({ ...prev, searchTerm: searchTerm.trim() }));
   };
 
-  const filteredVehicles = useMemo(() => {
-    return allVehicles.filter(vehicle => {
-      const { searchTerm, make, model, minPrice, maxPrice, minYear, maxYear, bodyType, transmission, location } = filters;
+  const applyClientSideFilters = (vehiclesToFilter: Vehicle[]): Vehicle[] => {
+      return vehiclesToFilter.filter(vehicle => {
+          const { searchTerm, minYear, maxYear, location } = filters;
+
+          // Client-side search (on the fetched batch)
+          const searchMatch = (() => {
+              const normalizedSearch = searchTerm.trim().toLowerCase();
+              if (normalizedSearch === '') return true;
+              const vehicleText = [
+                  vehicle.make, vehicle.model, vehicle.year.toString(),
+                  vehicle.description, vehicle.bodyType, vehicle.transmission,
+                  vehicle.exteriorColor, vehicle.engine, vehicle.seller.displayName,
+                  vehicle.is4x4 ? '4x4' : '', vehicle.hasAC ? 'aire acondicionado ac' : '',
+                  vehicle.hasSoundSystem ? 'sonido' : '', vehicle.acceptsTradeIn ? 'acepta cambio trueque' : ''
+              ].join(' ').toLowerCase();
+              const searchWords = normalizedSearch.split(' ').filter(w => w.length > 0);
+              return searchWords.every(word => vehicleText.includes(word));
+          })();
+
+          // Client-side year filter
+          const minYearNum = minYear ? parseInt(minYear, 10) : 0;
+          const maxYearNum = maxYear ? parseInt(maxYear, 10) : Infinity;
+          const yearMatch = vehicle.year >= minYearNum && vehicle.year <= maxYearNum;
+
+          // Client-side location filter
+          const locationMatch = (() => {
+              if (!location) return true;
+              const distance = getDistance(location.lat, location.lon, vehicle.location.lat, vehicle.location.lon);
+              return distance <= location.radius;
+          })();
+
+          return searchMatch && yearMatch && locationMatch;
+      });
+  };
+
+  const fetchVehicles = useCallback(async (loadMore = false) => {
+    if (!firestore) return;
+
+    if (loadMore) setIsLoadingMore(true);
+    else setIsLoading(true);
+
+    try {
+      let q: Query<DocumentData> = query(
+        collectionGroup(firestore, 'vehicleListings'),
+        where('status', '==', 'active')
+      );
+
+      // Server-side filters
+      if (filters.make !== 'all') q = query(q, where('make', '==', filters.make));
+      if (filters.model !== 'all') q = query(q, where('model', '==', filters.model));
+      if (filters.bodyType !== 'all') q = query(q, where('bodyType', '==', filters.bodyType));
+      if (filters.transmission !== 'all') q = query(q, where('transmission', '==', filters.transmission));
+      if (filters.minPrice) q = query(q, where('priceUSD', '>=', parseInt(filters.minPrice, 10)));
+      if (filters.maxPrice) q = query(q, where('priceUSD', '<=', parseInt(filters.maxPrice, 10)));
+
+      // Ordering
+      if (filters.minPrice || filters.maxPrice) {
+        q = query(q, orderBy('priceUSD', 'asc'));
+      }
+      q = query(q, orderBy('createdAt', 'desc'));
       
-      const searchMatch = (() => {
-        const normalizedSearch = searchTerm.trim().toLowerCase();
-        if (normalizedSearch === '') return true;
+      // Pagination
+      if (loadMore && lastDoc) {
+        q = query(q, startAfter(lastDoc));
+      }
+      q = query(q, limit(PAGE_SIZE));
 
-        const vehicleText = [
-            vehicle.make,
-            vehicle.model,
-            vehicle.year.toString(),
-            vehicle.description,
-            vehicle.bodyType,
-            vehicle.transmission,
-            vehicle.exteriorColor,
-            vehicle.engine,
-            vehicle.seller.displayName,
-            vehicle.is4x4 ? '4x4' : '',
-            vehicle.hasAC ? 'aire acondicionado ac' : '',
-            vehicle.hasSoundSystem ? 'sonido' : '',
-            vehicle.acceptsTradeIn ? 'acepta cambio trueque' : ''
-        ].join(' ').toLowerCase();
-        
-        const searchWords = normalizedSearch.split(' ').filter(w => w.length > 0);
+      const querySnapshot = await getDocs(q);
+      const newVehicles = querySnapshot.docs.map(doc => ({ ...doc.data() as Omit<Vehicle, 'id'>, id: doc.id }));
+      const newLastDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
 
-        return searchWords.every(word => vehicleText.includes(word));
-      })();
-      
-      const makeMatch = make === 'all' || vehicle.make === make;
-      
-      const modelMatch = model === 'all' || vehicle.model === model;
+      // We apply remaining filters on the client
+      const clientFilteredVehicles = applyClientSideFilters(newVehicles);
 
-      const minPriceNum = minPrice ? parseInt(minPrice, 10) : 0;
-      const maxPriceNum = maxPrice ? parseInt(maxPrice, 10) : Infinity;
-      const priceMatch = vehicle.priceUSD >= minPriceNum && vehicle.priceUSD <= maxPriceNum;
-      
-      const minYearNum = minYear ? parseInt(minYear, 10) : 0;
-      const maxYearNum = maxYear ? parseInt(maxYear, 10) : Infinity;
-      const yearMatch = vehicle.year >= minYearNum && vehicle.year <= maxYearNum;
+      setLastDoc(newLastDoc || null);
+      setHasMore(querySnapshot.docs.length === PAGE_SIZE);
 
-      const bodyTypeMatch = bodyType === 'all' || vehicle.bodyType === bodyType;
+      if (loadMore) {
+        setVehicles(prev => [...prev, ...clientFilteredVehicles]);
+      } else {
+        setVehicles(clientFilteredVehicles);
+      }
 
-      const transmissionMatch = transmission === 'all' || vehicle.transmission === transmission;
+    } catch (error) {
+      console.error("Error fetching vehicles:", error);
+      // Inform the user about potential index issues.
+      if (error instanceof Error && error.message.includes('firestore/failed-precondition')) {
+          console.error("This query requires a Firestore index. Please check the developer console for a link to create it.");
+      }
+    } finally {
+      setIsLoading(false);
+      setIsLoadingMore(false);
+    }
+  }, [firestore, filters, lastDoc]);
 
-      const locationMatch = (() => {
-        if (!location) return true;
-        const distance = getDistance(
-          location.lat,
-          location.lon,
-          vehicle.location.lat,
-          vehicle.location.lon
-        );
-        return distance <= location.radius;
-      })();
+  // Effect to fetch vehicles when filters change
+  useEffect(() => {
+      fetchVehicles(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]);
 
-
-      return searchMatch && makeMatch && modelMatch && priceMatch && yearMatch && bodyTypeMatch && transmissionMatch && locationMatch;
-    });
-  }, [filters, allVehicles]);
+  const handleLoadMore = () => {
+      if (hasMore && !isLoadingMore) {
+          fetchVehicles(true);
+      }
+  };
 
   const averagePrice = useMemo(() => {
-    if (filteredVehicles.length < 2) {
-      return null;
-    }
-    const totalPrice = filteredVehicles.reduce((sum, vehicle) => sum + vehicle.priceUSD, 0);
-    return totalPrice / filteredVehicles.length;
-  }, [filteredVehicles]);
-
-  if (isLoading) {
-    return <LoadingSkeleton />;
-  }
-
+    if (vehicles.length < 2) return null;
+    const totalPrice = vehicles.reduce((sum, vehicle) => sum + vehicle.priceUSD, 0);
+    return totalPrice / vehicles.length;
+  }, [vehicles]);
+  
   return (
     <div className="container mx-auto py-8 px-2 sm:px-6 lg:px-8">
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
@@ -121,7 +183,7 @@ function ListingsPageContent() {
         </div>
         <div className="lg:col-span-3">
           <div className="flex justify-between items-center mb-6">
-            <h1 className="font-headline text-2xl md:text-3xl font-bold">Todos los Anuncios ({filteredVehicles.length})</h1>
+            <h1 className="font-headline text-2xl md:text-3xl font-bold">Todos los Anuncios</h1>
             <div className="flex items-center gap-2">
                 <div className="hidden sm:flex items-center gap-2">
                     <Button variant={layout === 'grid' ? 'secondary' : 'ghost'} size="icon" onClick={() => setLayout('grid')} aria-label="Vista de cuadrícula">
@@ -173,18 +235,36 @@ function ListingsPageContent() {
                         <span className="font-headline text-xl sm:text-2xl font-bold text-primary ml-2">{formatCurrency(averagePrice)}</span>
                     </p>
                     <p className="text-sm text-muted-foreground mt-1">
-                        Basado en {filteredVehicles.length} vehículos que coinciden con tu búsqueda.
+                        Basado en los {vehicles.length} vehículos que coinciden con tu búsqueda.
                     </p>
                 </div>
               </div>
             </div>
           )}
-          {filteredVehicles.length > 0 ? (
+
+          {isLoading ? (
             <div className={`gap-2 sm:gap-6 ${layout === 'grid' ? 'grid grid-cols-2 xl:grid-cols-3' : 'flex flex-col'}`}>
-              {filteredVehicles.map(vehicle => (
-                <VehicleCard key={vehicle.id} vehicle={vehicle} />
-              ))}
+              {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-[300px] sm:h-[380px] w-full" />)}
             </div>
+          ) : vehicles.length > 0 ? (
+            <>
+              <div className={`gap-2 sm:gap-6 ${layout === 'grid' ? 'grid grid-cols-2 xl:grid-cols-3' : 'flex flex-col'}`}>
+                {vehicles.map(vehicle => (
+                  <VehicleCard key={vehicle.id} vehicle={vehicle} />
+                ))}
+              </div>
+              {hasMore && (
+                  <div className="mt-8 text-center">
+                      <Button onClick={handleLoadMore} disabled={isLoadingMore}>
+                          {isLoadingMore ? <Loader2 className="mr-2 animate-spin"/> : null}
+                          {isLoadingMore ? 'Cargando...' : 'Cargar más'}
+                      </Button>
+                  </div>
+              )}
+              {vehicles.length > 0 && !hasMore && (
+                <p className="text-center text-muted-foreground mt-8">Has llegado al final de los resultados.</p>
+              )}
+            </>
           ) : (
             <div className="text-center py-16 border rounded-lg bg-card">
               <h2 className="text-2xl font-semibold font-headline">No se encontraron vehículos</h2>
@@ -197,34 +277,9 @@ function ListingsPageContent() {
   );
 }
 
-function LoadingSkeleton() {
-  return (
-    <div className="container mx-auto py-8">
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
-        <div className="lg:col-span-1 hidden lg:block">
-          <div className="sticky top-20">
-             <Skeleton className="h-[700px] w-full" />
-          </div>
-        </div>
-        <div className="lg:col-span-3">
-          <div className="flex justify-between items-center mb-6">
-            <Skeleton className="h-8 w-48" />
-            <div className="flex items-center gap-2">
-              <Skeleton className="h-10 w-24" />
-            </div>
-          </div>
-           <div className="grid grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
-             {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-[300px] sm:h-[380px] w-full" />)}
-           </div>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 export default function ListingsPage() {
   return (
-    // Suspense is no longer needed as we handle loading state inside
     <ListingsPageContent />
   )
 }
