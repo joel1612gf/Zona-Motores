@@ -16,7 +16,7 @@ import {
   getAdditionalUserInfo,
 } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
-import { LogIn, LogOut, User as UserIcon, Loader2, List, Store } from 'lucide-react';
+import { LogIn, LogOut, User as UserIcon, Loader2, List, Store, Heart } from 'lucide-react';
 
 import { useAuth, useUser, useFirestore } from '@/firebase';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -239,6 +239,12 @@ export function AuthButton({ open, onOpenChange }: AuthButtonProps) {
             <Link href="/profile/listings">
               <List className="mr-2 h-4 w-4" />
               <span>Mis Publicaciones</span>
+            </Link>
+          </DropdownMenuItem>
+           <DropdownMenuItem asChild>
+            <Link href="/profile/favorites">
+              <Heart className="mr-2 h-4 w-4" />
+              <span>Mis Favoritos</span>
             </Link>
           </DropdownMenuItem>
           <DropdownMenuSeparator />

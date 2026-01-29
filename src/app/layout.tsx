@@ -9,6 +9,7 @@ import { FirebaseClientProvider } from '@/firebase';
 import { VehicleProvider } from '@/context/vehicle-context';
 import { ThemeProvider } from '@/components/theme-provider';
 import { MakesProvider } from '@/context/makes-context';
+import { FavoritesProvider } from '@/context/favorites-context';
 
 const fontBody = Inter({
   subsets: ['latin'],
@@ -58,12 +59,14 @@ export default function RootLayout({
           <FirebaseClientProvider>
             <MakesProvider>
               <VehicleProvider>
-                <div className="relative flex min-h-dvh flex-col">
-                  <SiteHeader />
-                  <main className="flex-1">{children}</main>
-                  <SiteFooter />
-                </div>
-                <Toaster />
+                <FavoritesProvider>
+                  <div className="relative flex min-h-dvh flex-col">
+                    <SiteHeader />
+                    <main className="flex-1">{children}</main>
+                    <SiteFooter />
+                  </div>
+                  <Toaster />
+                </FavoritesProvider>
               </VehicleProvider>
             </MakesProvider>
           </FirebaseClientProvider>

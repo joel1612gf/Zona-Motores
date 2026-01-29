@@ -5,11 +5,25 @@ import Link from 'next/link';
 import type { Vehicle } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Star, Flame } from 'lucide-react';
+import { MapPin, Star, Flame, Heart } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { cn } from '@/lib/utils';
+import { useFavorites } from '@/context/favorites-context';
 
 export function VehicleCard({ vehicle, isFeatured = false }: { vehicle: Vehicle; isFeatured?: boolean }) {
+  const { isFavorite, addFavorite, removeFavorite } = useFavorites();
+  const isVehicleFavorite = isFavorite(vehicle.id);
+
+  const handleFavoriteToggle = (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (isVehicleFavorite) {
+          removeFavorite(vehicle.id);
+      } else {
+          addFavorite(vehicle.id);
+      }
+  };
+
   return (
     <Card className={cn(
         "group overflow-hidden rounded-lg border h-full flex flex-col transition-all hover:shadow-xl hover:-translate-y-1 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
@@ -34,11 +48,23 @@ export function VehicleCard({ vehicle, isFeatured = false }: { vehicle: Vehicle;
                   </Badge>
                 )}
               </div>
-              {vehicle.seller.isVerified && (
-                <div className="p-1.5 bg-background/80 rounded-full backdrop-blur-sm shadow-lg">
-                  <Star className="h-4 w-4 text-primary fill-primary" />
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                <button
+                    onClick={handleFavoriteToggle}
+                    className="p-1.5 bg-background/80 rounded-full backdrop-blur-sm shadow-lg transition-colors hover:bg-red-100 dark:hover:bg-red-900/50"
+                    aria-label="Guardar en favoritos"
+                >
+                    <Heart className={cn(
+                        "h-5 w-5 text-destructive transition-all",
+                        isVehicleFavorite ? 'fill-destructive' : 'fill-transparent'
+                    )} />
+                </button>
+                {vehicle.seller.isVerified && (
+                  <div className="p-1.5 bg-background/80 rounded-full backdrop-blur-sm shadow-lg">
+                    <Star className="h-4 w-4 text-primary fill-primary" />
+                  </div>
+                )}
+              </div>
             </div>
         </div>
         <CardContent className="p-2 sm:p-4 space-y-1 flex flex-col flex-grow">

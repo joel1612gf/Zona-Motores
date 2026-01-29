@@ -156,6 +156,27 @@
         "rate",
         "lastUpdated"
       ]
+    },
+    "Favorite": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Favorite",
+      "type": "object",
+      "description": "Represents a user's favorited vehicle listing. The document ID is the same as the vehicleId.",
+      "properties": {
+        "vehicleId": {
+          "type": "string",
+          "description": "The ID of the favorited VehicleListing."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp when the vehicle was favorited."
+        }
+      },
+      "required": [
+        "vehicleId",
+        "createdAt"
+      ]
     }
   },
   "auth": {
@@ -179,6 +200,12 @@
         "$ref": "#/entities/VehicleListing"
       },
       "description": "Stores vehicle listings as a subcollection of a user. Leverages path-based ownership."
+    },
+    "/users/{userId}/favorites/{vehicleId}": {
+      "schema": {
+        "$ref": "#/entities/Favorite"
+      },
+      "description": "Stores a user's favorite vehicle listings. The document ID is the vehicleId."
     },
     "/exchangeRates/{exchangeRateId}": {
       "schema": {

@@ -26,6 +26,11 @@ service cloud.firestore {
         // Only the owner of the user document or an admin can manage their own listings
         allow create, update, delete: if isOwner(userId) || isAdmin();
       }
+
+      match /favorites/{vehicleId} {
+        // A user can only manage their own favorites
+        allow read, write, delete: if isOwner(userId);
+      }
     }
 
     // This rule allows a collection group query on 'vehicleListings'.

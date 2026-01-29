@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useVehicles } from '@/context/vehicle-context';
 import { useUser, useFirestore, useStorage } from '@/firebase';
 import { useTheme } from 'next-themes';
+import { useFavorites } from '@/context/favorites-context';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger, DialogHeader, DialogClose } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
@@ -53,7 +54,8 @@ import {
   Loader2,
   ShieldBan,
   Play,
-  Pause
+  Pause,
+  Heart,
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
@@ -121,6 +123,8 @@ export default function ListingDetailPage() {
   const [isBlocking, setIsBlocking] = useState(false);
   
   const isAdmin = adminUser?.email === 'zonamotores.ve@gmail.com';
+  
+  const { isFavorite, addFavorite, removeFavorite } = useFavorites();
 
 
   useEffect(() => {
@@ -186,6 +190,17 @@ export default function ListingDetailPage() {
   if (!vehicle) {
     notFound();
   }
+
+  const isVehicleFavorite = isFavorite(vehicle.id);
+
+  const handleFavoriteToggle = () => {
+      if (isVehicleFavorite) {
+          removeFavorite(vehicle.id);
+      } else {
+          addFavorite(vehicle.id);
+      }
+  };
+
 
   const handleImageClick = (index: number) => {
     setCurrentImageIndex(index);
@@ -445,7 +460,16 @@ export default function ListingDetailPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="text-3xl font-bold font-headline text-accent">{formatCurrency(vehicle.priceUSD)}</div>
+                <div className="flex justify-between items-start">
+                    <div className="text-3xl font-bold font-headline text-accent">{formatCurrency(vehicle.priceUSD)}</div>
+                    <Button variant="outline" size="lg" onClick={handleFavoriteToggle}>
+                        <Heart className={cn(
+                            "mr-2 h-5 w-5 text-destructive transition-all",
+                            isVehicleFavorite ? 'fill-destructive' : 'fill-transparent'
+                        )}/>
+                        {isVehicleFavorite ? 'Guardado' : 'Guardar'}
+                    </Button>
+                </div>
                 <Separator />
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                   <div className="font-semibold flex items-center gap-1"><Gauge className="h-4 w-4 text-muted-foreground" /> Kilometraje</div><div className="text-muted-foreground">{vehicle.mileage.toLocaleString()} km</div>
