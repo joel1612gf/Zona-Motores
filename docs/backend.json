@@ -68,6 +68,14 @@
         "marketplaceUrl": {
           "type": "string",
           "description": "Optional URL to an external marketplace listing for status checking."
+        },
+        "viewCount": {
+          "type": "number",
+          "description": "Number of times the listing has been viewed."
+        },
+        "contactRequests": {
+          "type": "number",
+          "description": "Number of times the seller's contact info has been revealed."
         }
       },
       "required": [

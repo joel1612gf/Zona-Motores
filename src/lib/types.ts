@@ -62,5 +62,7 @@ export type Vehicle = {
   };
   createdAt: Timestamp;
   status?: 'active' | 'paused' | 'sold';
+  viewCount?: number;
+  contactRequests?: number;
   marketplaceUrl?: string;
 };

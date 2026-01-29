@@ -4,7 +4,7 @@ import { useParams, useRouter, notFound } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useVehicles } from '@/context/vehicle-context';
-import { useUser, useFirestore, useStorage } from '@/firebase';
+import { useUser, useFirestore, useStorage, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { useTheme } from 'next-themes';
 import { useFavorites } from '@/context/favorites-context';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle as CardTitleComponent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, deleteDoc, serverTimestamp, increment } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -126,6 +126,32 @@ export default function ListingDetailPage() {
   
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
 
+  useEffect(() => {
+    if (!firestore || !vehicle) return;
+
+    const viewedKey = `viewed_${vehicle.id}`;
+    const hasViewed = sessionStorage.getItem(viewedKey);
+
+    if (!hasViewed) {
+        const vehicleRef = doc(firestore, 'users', vehicle.sellerId, 'vehicleListings', vehicle.id);
+        updateDoc(vehicleRef, {
+            viewCount: increment(1)
+        }).then(() => {
+            sessionStorage.setItem(viewedKey, 'true');
+        }).catch(error => {
+            console.error("Error incrementing view count:", error);
+            errorEmitter.emit(
+                'permission-error',
+                new FirestorePermissionError({
+                    path: vehicleRef.path,
+                    operation: 'update',
+                    requestResourceData: { viewCount: 'increment(1)' },
+                }, error)
+            );
+        });
+    }
+  }, [firestore, vehicle]);
+
 
   useEffect(() => {
     if (isContactDialogOpen) {
@@ -165,6 +191,25 @@ export default function ListingDetailPage() {
     const message = `Hola ${sellerName}, te escribo para más información sobre el ${vehicleInfo} que tienes publicado en Zona Motores en ${price}.${summaryText}`;
 
     return `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
+  };
+  
+  const handleContactClick = () => {
+    if (!firestore || !vehicle || countdown > 0) return;
+
+    const vehicleRef = doc(firestore, 'users', vehicle.sellerId, 'vehicleListings', vehicle.id);
+    updateDoc(vehicleRef, {
+        contactRequests: increment(1)
+    }).catch(error => {
+        console.error("Error incrementing contact requests:", error);
+         errorEmitter.emit(
+            'permission-error',
+            new FirestorePermissionError({
+                path: vehicleRef.path,
+                operation: 'update',
+                requestResourceData: { contactRequests: 'increment(1)' },
+            }, error)
+        );
+    });
   };
 
   // State and refs for zoom/pan
@@ -544,7 +589,7 @@ export default function ListingDetailPage() {
                       (Espacio para anuncio de Google)
                     </div>
 
-                    <Button asChild size="lg" className="w-full bg-green-500 hover:bg-green-600 text-white" disabled={countdown > 0}>
+                    <Button asChild size="lg" className="w-full bg-green-500 hover:bg-green-600 text-white" onClick={handleContactClick} disabled={countdown > 0}>
                         <a href={countdown === 0 ? createWhatsAppLink() : undefined} target="_blank" rel="noopener noreferrer">
                             {countdown > 0 ? (
                                 `Espera ${countdown} segundos...`
