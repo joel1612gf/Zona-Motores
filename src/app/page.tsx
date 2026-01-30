@@ -32,31 +32,18 @@ export default function Home() {
   const latestVehicles = isClient ? vehicles.slice(0, 8) : initialVehicles.slice(0, 8);
   const showSkeletons = isLoading && isClient;
 
-  const heroImage = PlaceHolderImages.find((p) => p.id === 'hero-car');
-
   const autoplayPlugin = React.useRef(
     Autoplay({ delay: 5000, stopOnInteraction: true })
   );
 
   return (
     <div className="flex flex-col">
-      <section className="relative w-full h-[60vh] md:h-[70vh] flex items-center justify-center text-center text-white">
-        <Image
-          src={
-            heroImage?.imageUrl ||
-            'https://picsum.photos/seed/hero-car/1800/1200'
-          }
-          fill
-          alt={heroImage?.description || 'Auto de portada'}
-          data-ai-hint={heroImage?.imageHint || 'modern car'}
-          className="object-cover -z-10 brightness-50"
-          priority
-        />
+      <section className="relative w-full flex items-center justify-center text-center bg-primary text-primary-foreground py-20 md:py-32">
         <div className="container px-4 md:px-6 space-y-6">
           <h1 className="font-headline text-4xl font-bold tracking-tighter sm:text-6xl xl:text-7xl/none">
             Encuentra Tu Próximo Vehículo en Venezuela
           </h1>
-          <p className="max-w-[700px] mx-auto text-lg md:text-xl text-neutral-200">
+          <p className="max-w-[700px] mx-auto text-lg md:text-xl text-primary-foreground/80">
             El mercado más confiable para comprar y vender vehículos. Seguro, rápido y fácil.
           </p>
           <div className="w-full max-w-2xl mx-auto space-y-4">
@@ -67,7 +54,7 @@ export default function Home() {
                 placeholder="Busca por marca, modelo o palabra clave..."
                 className="max-w-lg flex-1 bg-white/90 text-foreground placeholder:text-muted-foreground focus:bg-white"
               />
-              <Button type="submit" size="lg">
+              <Button type="submit" size="lg" variant="secondary">
                 <Search className="mr-2 h-5 w-5" />
                 Buscar
               </Button>
@@ -76,7 +63,7 @@ export default function Home() {
               <Button asChild size="lg" variant="secondary">
                 <Link href="/listings">Ver Todos los Anuncios</Link>
               </Button>
-              <Button asChild size="lg">
+              <Button asChild size="lg" variant="secondary">
                 <Link href="/dealerships">
                   <Store className="mr-2 h-4 w-4" />
                   Concesionarios
@@ -86,6 +73,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <div className="h-24 md:h-32 bg-gradient-to-b from-primary to-background" />
 
       {featuredVehicles.length > 0 && (
         <section className="w-full py-12 md:py-24 lg:py-32 bg-background">

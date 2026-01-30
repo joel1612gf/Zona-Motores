@@ -24,22 +24,22 @@ export function SiteHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b bg-primary text-primary-foreground border-primary-foreground/20">
       <div className="container flex h-16 items-center">
         {/* Desktop Logo & Nav */}
         <div className="mr-4 hidden md:flex">
           <Link href="/" className="flex items-center space-x-2">
-            <Car className="h-6 w-6 text-primary" />
+            <Car className="h-6 w-6" />
             <span className="hidden font-headline text-xl font-bold sm:inline-block">
               Zona Motores
             </span>
           </Link>
         </div>
         <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
-          <Link href="/listings" className="text-foreground/60 transition-colors hover:text-foreground/80">
+          <Link href="/listings" className="text-primary-foreground/80 transition-colors hover:text-primary-foreground">
             Anuncios
           </Link>
-          <Link href="/dealerships" className="text-foreground/60 transition-colors hover:text-foreground/80">
+          <Link href="/dealerships" className="text-primary-foreground/80 transition-colors hover:text-primary-foreground">
             Concesionarios
           </Link>
         </nav>
@@ -48,26 +48,26 @@ export function SiteHeader() {
         <div className="flex w-full items-center md:hidden">
           <Sheet>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="-ml-4">
+              <Button variant="ghost" size="icon" className="-ml-4 hover:bg-primary-foreground/10">
                 <Menu className="h-6 w-6" />
                 <span className="sr-only">Abrir menú</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-[300px]">
+            <SheetContent side="left" className="w-[300px] bg-primary text-primary-foreground">
               <Link href="/" className="flex items-center space-x-2 mb-8">
-                <Car className="h-6 w-6 text-primary" />
+                <Car className="h-6 w-6 text-primary-foreground" />
                 <span className="font-headline text-xl font-bold">
                   Zona Motores
                 </span>
               </Link>
               <nav className="grid gap-6 text-lg font-medium">
                 <SheetClose asChild>
-                  <Link href="/listings" className="text-foreground/80 transition-colors hover:text-foreground">
+                  <Link href="/listings" className="text-primary-foreground/80 transition-colors hover:text-primary-foreground">
                     Anuncios
                   </Link>
                 </SheetClose>
                 <SheetClose asChild>
-                  <Link href="/dealerships" className="text-foreground/80 transition-colors hover:text-foreground">
+                  <Link href="/dealerships" className="text-primary-foreground/80 transition-colors hover:text-primary-foreground">
                     Concesionarios
                   </Link>
                 </SheetClose>
@@ -76,7 +76,7 @@ export function SiteHeader() {
           </Sheet>
           <div className="flex-1 text-center">
              <Link href="/" className="inline-flex items-center space-x-2" tabIndex={-1}>
-              <Car className="h-6 w-6 text-primary" />
+              <Car className="h-6 w-6" />
               <span className="font-headline text-xl font-bold">
                 Zona Motores
               </span>
@@ -85,7 +85,7 @@ export function SiteHeader() {
         </div>
 
         <div className="flex flex-1 items-center justify-end space-x-1 sm:space-x-2">
-          <Button variant="outline" size="sm" className="h-9 px-2 sm:px-3" onClick={handleNewListingClick}>
+          <Button variant="secondary" size="sm" className="h-9 px-2 sm:px-3" onClick={handleNewListingClick}>
               <PlusCircle className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Publicar</span>
           </Button>
