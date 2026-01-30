@@ -24,7 +24,7 @@ export function SiteHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-primary text-primary-foreground border-primary-foreground/20">
+    <header className="sticky top-0 z-50 w-full bg-primary text-primary-foreground">
       <div className="container flex h-16 items-center">
         {/* Desktop Logo & Nav */}
         <div className="mr-4 hidden md:flex">

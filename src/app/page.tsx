@@ -17,10 +17,24 @@ import { Skeleton } from '@/components/ui/skeleton';
 export default function Home() {
   const { vehicles, isLoading } = useVehicles();
   const [isClient, setIsClient] = React.useState(false);
+  const [showStickySearch, setShowStickySearch] = React.useState(false);
 
   React.useEffect(() => {
-    // This effect runs only on the client, after the initial render
     setIsClient(true);
+    
+    const handleScroll = () => {
+      if (window.scrollY > 300) {
+        setShowStickySearch(true);
+      } else {
+        setShowStickySearch(false);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
   }, []);
 
   // Use static data for featured vehicles
@@ -38,6 +52,26 @@ export default function Home() {
 
   return (
     <div className="flex flex-col">
+      {isClient && showStickySearch && (
+        <div className="sticky top-16 z-40 bg-background/95 py-3 shadow-md backdrop-blur-sm transition-all animate-in fade-in-50 duration-300">
+            <div className="container px-4 md:px-6">
+                <form action="/listings" className="w-full max-w-2xl mx-auto">
+                    <div className="flex w-full items-center rounded-full bg-card p-1.5 shadow-lg transition-all focus-within:ring-2 focus-within:ring-primary border">
+                        <Input
+                            name="search"
+                            type="search"
+                            placeholder="Busca por marca, modelo o palabra clave..."
+                            className="flex-1 bg-transparent border-none h-10 px-4 text-base text-foreground placeholder:text-muted-foreground focus:ring-0 focus-visible:ring-offset-0 focus-visible:ring-0"
+                        />
+                        <Button type="submit" size="lg" variant="secondary" className="rounded-full h-10 shadow-md">
+                            <Search className="mr-2 h-5 w-5" />
+                            Buscar
+                        </Button>
+                    </div>
+                </form>
+            </div>
+        </div>
+      )}
       <section className="relative w-full flex items-center justify-center text-center bg-primary text-primary-foreground py-20 md:py-32">
         <div className="container px-4 md:px-6 space-y-6">
           <h1 className="font-headline text-4xl font-bold tracking-tighter sm:text-6xl xl:text-7xl/none">
@@ -76,7 +110,7 @@ export default function Home() {
         </div>
       </section>
 
-      <div className="h-12 md:h-16 bg-gradient-to-b from-primary to-background" />
+      <div className="h-4 md:h-6 bg-gradient-to-b from-primary to-background" />
 
       {featuredVehicles.length > 0 && (
         <section className="w-full py-12 md:py-24 lg:py-32 bg-background">
