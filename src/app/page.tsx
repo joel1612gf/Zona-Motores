@@ -64,8 +64,8 @@ export default function Home() {
     <div className="flex flex-col">
       <div
         className={cn(
-          'fixed top-16 left-0 right-0 z-40 bg-primary py-3 shadow-md',
-          showStickySearch ? 'visible' : 'invisible'
+          'fixed top-16 left-0 right-0 z-40 bg-primary py-3 shadow-md transition-transform duration-300',
+          showStickySearch ? 'translate-y-0' : '-translate-y-full'
         )}
       >
         <div className="container px-4 md:px-6">
@@ -126,7 +126,7 @@ export default function Home() {
         </div>
       </section>
 
-      <div className="h-4 md:h-6 bg-gradient-to-b from-primary to-background" />
+      <div className="h-6 md:h-10 bg-gradient-to-b from-primary to-background" />
 
       {featuredVehicles.length > 0 && (
         <section className="w-full py-12 md:py-24 lg:py-32 bg-background">
@@ -141,7 +141,7 @@ export default function Home() {
               </p>
             </div>
             <Carousel
-              opts={{ align: "center", loop: true }}
+              opts={{ align: "center" }}
               plugins={[autoplayPlugin.current]}
               onMouseEnter={autoplayPlugin.current.stop}
               onMouseLeave={autoplayPlugin.current.reset}
@@ -175,7 +175,7 @@ export default function Home() {
                 </p>
             </div>
           <Carousel
-              opts={{ align: "center", loop: true }}
+              opts={{ align: "center" }}
               plugins={[autoplayPlugin.current]}
               onMouseEnter={autoplayPlugin.current.stop}
               onMouseLeave={autoplayPlugin.current.reset}
