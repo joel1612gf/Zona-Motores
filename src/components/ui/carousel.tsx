@@ -75,6 +75,14 @@ const Carousel = React.forwardRef<
 
       setCanScrollPrev(api.canScrollPrev())
       setCanScrollNext(api.canScrollNext())
+
+      api.slideNodes().forEach((node, index) => {
+        if (api.selectedScrollSnap() === index) {
+          node.classList.add("is-active")
+        } else {
+          node.classList.remove("is-active")
+        }
+      })
     }, [])
 
     const scrollPrev = React.useCallback(() => {
