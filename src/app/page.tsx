@@ -141,7 +141,7 @@ export default function Home() {
               </p>
             </div>
             <Carousel
-              opts={{ align: "center" }}
+              opts={{ align: "center", loop: true }}
               plugins={[autoplayPlugin.current]}
               onMouseEnter={autoplayPlugin.current.stop}
               onMouseLeave={autoplayPlugin.current.reset}
@@ -175,7 +175,7 @@ export default function Home() {
                 </p>
             </div>
           <Carousel
-              opts={{ align: "center" }}
+              opts={{ align: "center", loop: true }}
               plugins={[autoplayPlugin.current]}
               onMouseEnter={autoplayPlugin.current.stop}
               onMouseLeave={autoplayPlugin.current.reset}
