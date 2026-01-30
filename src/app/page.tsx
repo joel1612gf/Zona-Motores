@@ -76,7 +76,7 @@ export default function Home() {
         </div>
       </section>
 
-      <div className="h-24 md:h-32 bg-gradient-to-b from-primary to-background" />
+      <div className="h-12 md:h-16 bg-gradient-to-b from-primary to-background" />
 
       {featuredVehicles.length > 0 && (
         <section className="w-full py-12 md:py-24 lg:py-32 bg-background">
