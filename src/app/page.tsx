@@ -53,7 +53,7 @@ export default function Home() {
   return (
     <div className="flex flex-col">
       {isClient && showStickySearch && (
-        <div className="sticky top-16 z-40 bg-background/95 py-3 shadow-md backdrop-blur-sm transition-all animate-in fade-in-50 duration-300">
+        <div className="sticky top-16 z-40 bg-primary py-3 shadow-md transition-all animate-in fade-in-50 duration-300">
             <div className="container px-4 md:px-6">
                 <form action="/listings" className="w-full max-w-2xl mx-auto">
                     <div className="flex w-full items-center rounded-full bg-card p-1.5 shadow-lg transition-all focus-within:ring-2 focus-within:ring-primary border">
