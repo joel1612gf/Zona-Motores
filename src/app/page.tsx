@@ -47,17 +47,19 @@ export default function Home() {
             El mercado más confiable para comprar y vender vehículos. Seguro, rápido y fácil.
           </p>
           <div className="w-full max-w-2xl mx-auto space-y-4">
-            <form className="flex space-x-2" action="/listings">
-              <Input
-                name="search"
-                type="search"
-                placeholder="Busca por marca, modelo o palabra clave..."
-                className="max-w-lg flex-1 bg-white/90 text-foreground placeholder:text-muted-foreground focus:bg-white"
-              />
-              <Button type="submit" size="lg" variant="secondary">
-                <Search className="mr-2 h-5 w-5" />
-                Buscar
-              </Button>
+            <form action="/listings">
+              <div className="flex w-full items-center rounded-full bg-white/90 p-1.5 shadow-lg transition-all focus-within:ring-2 focus-within:ring-white">
+                <Input
+                    name="search"
+                    type="search"
+                    placeholder="Busca por marca, modelo o palabra clave..."
+                    className="flex-1 bg-transparent border-none h-10 px-4 text-base text-foreground placeholder:text-muted-foreground focus:ring-0 focus-visible:ring-offset-0 focus-visible:ring-0"
+                />
+                <Button type="submit" size="lg" variant="secondary" className="rounded-full h-10 shadow-md">
+                    <Search className="mr-2 h-5 w-5" />
+                    Buscar
+                </Button>
+              </div>
             </form>
             <div className="flex flex-wrap gap-4 justify-center">
               <Button asChild size="lg" variant="secondary">
