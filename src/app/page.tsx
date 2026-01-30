@@ -47,13 +47,21 @@ export default function Home() {
     };
   }, []);
 
-  // Use static data for featured vehicles
-  const featuredVehicles = initialVehicles.slice(0, 5);
+  const promotedVehicles = React.useMemo(() => {
+    if (isClient) {
+        return vehicles.filter(v => v.promotionExpiresAt && v.promotionExpiresAt.toDate() > new Date());
+    }
+    return []; // Return empty for SSR to avoid hydration mismatch
+  }, [isClient, vehicles]);
 
-  // Determine which vehicles to show in the "latest" section
-  // - On the server and initial client render, use static data to match the server-rendered HTML.
-  // - After the component mounts on the client, use the live data from the context.
-  const latestVehicles = isClient ? vehicles.slice(0, 8) : initialVehicles.slice(0, 8);
+  const latestVehicles = React.useMemo(() => {
+    if (isClient) {
+        const promotedIds = new Set(promotedVehicles.map(v => v.id));
+        return vehicles.filter(v => !promotedIds.has(v.id)).slice(0, 8);
+    }
+    return []; // Return empty for SSR
+  }, [isClient, vehicles, promotedVehicles]);
+
   const showSkeletons = isLoading && isClient;
 
   const autoplayPlugin = React.useRef(
@@ -128,7 +136,7 @@ export default function Home() {
 
       <div className="h-20 bg-gradient-to-b from-primary to-background" />
 
-      {featuredVehicles.length > 0 && (
+      {((isClient && promotedVehicles.length > 0) || showSkeletons) && (
         <section className="w-full py-12 md:py-24 lg:py-32 bg-background">
           <div className="container px-4 md:px-6">
             <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
@@ -141,14 +149,22 @@ export default function Home() {
               </p>
             </div>
             <Carousel
-              opts={{ align: "center", loop: false }}
+              opts={{ align: "center", stopOnLastSnap: true }}
               plugins={[autoplayPlugin.current]}
               onMouseEnter={autoplayPlugin.current.stop}
               onMouseLeave={autoplayPlugin.current.reset}
               className="w-full"
             >
               <CarouselContent className="-ml-2 md:-ml-4">
-                {featuredVehicles.map((vehicle) => (
+                {showSkeletons
+                  ? [...Array(5)].map((_, i) => (
+                      <CarouselItem key={i} className="carousel-item-peek pl-2 md:pl-4 basis-4/5 sm:basis-1/2 lg:basis-1/3 xl:basis-1/4">
+                        <div className="p-1 h-full">
+                          <Skeleton className="h-[380px] w-full" />
+                        </div>
+                      </CarouselItem>
+                    ))
+                  : promotedVehicles.map((vehicle) => (
                   <CarouselItem key={vehicle.id} className="carousel-item-peek pl-2 md:pl-4 basis-4/5 sm:basis-1/2 lg:basis-1/3 xl:basis-1/4">
                     <div className="p-1 h-full">
                        <VehicleCard vehicle={vehicle} isFeatured={true} />
@@ -175,7 +191,7 @@ export default function Home() {
                 </p>
             </div>
           <Carousel
-              opts={{ align: "center", loop: false }}
+              opts={{ align: "center", stopOnLastSnap: true }}
               plugins={[autoplayPlugin.current]}
               onMouseEnter={autoplayPlugin.current.stop}
               onMouseLeave={autoplayPlugin.current.reset}
