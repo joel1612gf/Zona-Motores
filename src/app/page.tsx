@@ -13,20 +13,27 @@ import { Search, Store } from 'lucide-react';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 
 export default function Home() {
   const { vehicles, isLoading } = useVehicles();
   const [isClient, setIsClient] = React.useState(false);
   const [showStickySearch, setShowStickySearch] = React.useState(false);
+  const heroSearchRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     setIsClient(true);
     
+    const headerHeight = 64; // Corresponds to h-16 in tailwind
+
     const handleScroll = () => {
-      if (window.scrollY > 300) {
-        setShowStickySearch(true);
-      } else {
-        setShowStickySearch(false);
+      if (heroSearchRef.current) {
+        // When the bottom of the search bar container scrolls past the bottom of the header, show the sticky bar.
+        if (heroSearchRef.current.getBoundingClientRect().bottom < headerHeight) {
+          setShowStickySearch(true);
+        } else {
+          setShowStickySearch(false);
+        }
       }
     };
 
@@ -52,26 +59,30 @@ export default function Home() {
 
   return (
     <div className="flex flex-col">
-      {isClient && showStickySearch && (
-        <div className="sticky top-16 z-40 bg-primary py-3 shadow-md transition-all animate-in fade-in-50 duration-300">
-            <div className="container px-4 md:px-6">
-                <form action="/listings" className="w-full max-w-2xl mx-auto">
-                    <div className="flex w-full items-center rounded-full bg-card p-1.5 shadow-lg transition-all focus-within:ring-2 focus-within:ring-primary border">
-                        <Input
-                            name="search"
-                            type="search"
-                            placeholder="Busca por marca, modelo o palabra clave..."
-                            className="flex-1 bg-transparent border-none h-10 px-4 text-base text-foreground placeholder:text-muted-foreground focus:ring-0 focus-visible:ring-offset-0 focus-visible:ring-0"
-                        />
-                        <Button type="submit" size="lg" variant="secondary" className="rounded-full h-10 shadow-md">
-                            <Search className="mr-2 h-5 w-5" />
-                            Buscar
-                        </Button>
-                    </div>
-                </form>
+      <div
+        className={cn(
+          'fixed top-16 left-0 right-0 z-40 bg-primary py-3 shadow-md transition-transform duration-300 ease-in-out',
+          showStickySearch ? 'translate-y-0' : '-translate-y-full'
+        )}
+      >
+        <div className="container px-4 md:px-6">
+          <form action="/listings" className="w-full max-w-2xl mx-auto">
+            <div className="relative w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <Input
+                name="search"
+                type="search"
+                placeholder="Busca por marca, modelo o palabra clave..."
+                className="w-full rounded-full bg-card p-2 pl-10 pr-[6.5rem] shadow-lg h-12 text-base focus:ring-2 focus:ring-primary-foreground/50 border-none"
+              />
+              <Button type="submit" size="lg" variant="secondary" className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full h-9 shadow-md">
+                Buscar
+              </Button>
             </div>
+          </form>
         </div>
-      )}
+      </div>
+      
       <section className="relative w-full flex items-center justify-center text-center bg-primary text-primary-foreground py-20 md:py-32">
         <div className="container px-4 md:px-6 space-y-6">
           <h1 className="font-headline text-4xl font-bold tracking-tighter sm:text-6xl xl:text-7xl/none">
@@ -80,20 +91,20 @@ export default function Home() {
           <p className="max-w-[700px] mx-auto text-lg md:text-xl text-primary-foreground/80">
             El mercado más confiable para comprar y vender vehículos. Seguro, rápido y fácil.
           </p>
-          <div className="w-full max-w-2xl mx-auto space-y-4">
+          <div ref={heroSearchRef} className="w-full max-w-2xl mx-auto space-y-4">
             <form action="/listings">
-              <div className="flex w-full items-center rounded-full bg-white/90 p-1.5 shadow-lg transition-all focus-within:ring-2 focus-within:ring-white">
-                <Input
-                    name="search"
-                    type="search"
-                    placeholder="Busca por marca, modelo o palabra clave..."
-                    className="flex-1 bg-transparent border-none h-10 px-4 text-base text-foreground placeholder:text-muted-foreground focus:ring-0 focus-visible:ring-offset-0 focus-visible:ring-0"
-                />
-                <Button type="submit" size="lg" variant="secondary" className="rounded-full h-10 shadow-md">
-                    <Search className="mr-2 h-5 w-5" />
-                    Buscar
-                </Button>
-              </div>
+               <div className="relative w-full">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground/80" />
+                  <Input
+                      name="search"
+                      type="search"
+                      placeholder="Busca por marca, modelo o palabra clave..."
+                      className="w-full rounded-full bg-white/90 p-2 pl-10 pr-[6.5rem] shadow-lg text-foreground h-12 text-base focus:ring-2 focus:ring-primary-foreground/50 border-none"
+                  />
+                  <Button type="submit" size="lg" variant="secondary" className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full h-9 shadow-md">
+                      Buscar
+                  </Button>
+                </div>
             </form>
             <div className="flex flex-wrap gap-4 justify-center">
               <Button asChild size="lg" variant="secondary">
