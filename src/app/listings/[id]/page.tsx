@@ -462,11 +462,42 @@ export default function ListingDetailPage() {
     if (vehicle.tradeInForHigherValue) mainFeatures.push({ icon: ArrowUpFromLine, label: 'Da como parte de pago' });
   }
 
+  const MainInfoCard = () => (
+    <Card>
+      <CardHeader>
+        <h1 className="font-headline text-2xl sm:text-3xl font-bold">{`${vehicle.year} ${vehicle.make} ${vehicle.model}`}</h1>
+        <div className="flex items-center gap-2 pt-2 text-muted-foreground">
+          <MapPin className="h-4 w-4" /> <span>{`${vehicle.location.city}, ${vehicle.location.state}`}</span>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <div className="flex justify-between items-start">
+              <div className="text-3xl font-bold font-headline text-accent">{formatCurrency(vehicle.priceUSD)}</div>
+              <Button variant="outline" size="lg" onClick={handleFavoriteToggle}>
+                  <Heart className={cn(
+                      "mr-2 h-5 w-5 text-destructive transition-all",
+                      isVehicleFavorite ? 'fill-destructive' : 'fill-transparent'
+                  )}/>
+                  {isVehicleFavorite ? 'Guardado' : 'Guardar'}
+              </Button>
+          </div>
+          <Separator />
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+            <div className="font-semibold flex items-center gap-1"><Gauge className="h-4 w-4 text-muted-foreground" /> Kilometraje</div><div className="text-muted-foreground">{vehicle.mileage.toLocaleString()} km</div>
+            <div className="font-semibold flex items-center gap-1"><Palette className="h-4 w-4 text-muted-foreground" /> Color</div><div className="text-muted-foreground">{vehicle.exteriorColor}</div>
+            <div className="font-semibold flex items-center gap-1"><Settings2 className="h-4 w-4 text-muted-foreground" /> Motor</div><div className="text-muted-foreground">{vehicle.engine}</div>
+            <div className="font-semibold flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 5h14v14H5V5z"/><path d="M12 5v14"/><path d="M19 12H5"/><path d="M12 12l5-5"/><path d="m7 12 5 5"/></svg> Transmisión</div><div className="text-muted-foreground">{vehicle.transmission}</div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 
   return (
     <div className="container mx-auto max-w-6xl py-8">
       <div className="grid md:grid-cols-3 gap-8 items-start">
-        {/* Main Content */}
+        {/* Main Content Column */}
         <div className="md:col-span-2 space-y-8 flex flex-col">
           <Carousel className="w-full">
             <CarouselContent>
@@ -495,6 +526,11 @@ export default function ListingDetailPage() {
               </>
             )}
           </Carousel>
+          
+          {/* Main Info for Mobile */}
+          <div className="space-y-8 md:hidden">
+            <MainInfoCard />
+          </div>
 
           <Card>
             <CardHeader>
@@ -522,234 +558,334 @@ export default function ListingDetailPage() {
               <p className="text-muted-foreground">{vehicle.description}</p>
             </CardContent>
           </Card>
+          
+           {/* Seller info for mobile */}
+           <div className="md:hidden">
+                <Card className="overflow-hidden">
+                    <CardHeader>
+                        <CardTitleComponent>Información del Vendedor</CardTitleComponent>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                    <div className="flex items-center gap-3">
+                        <User className="h-8 w-8 text-muted-foreground" />
+                        <div>
+                        <div className="font-semibold flex items-center gap-2">
+                            {vehicle.seller.displayName}
+                            {vehicle.seller.isVerified && <Badge variant="secondary" className="border-green-300 bg-green-100 text-green-800 dark:border-green-700 dark:bg-green-900/50 dark:text-green-300"><ShieldCheck className="h-3 w-3 mr-1" />Verificado</Badge>}
+                        </div>
+                        {!vehicle.seller.isVerified && <Badge variant="destructive">No Verificado</Badge>}
+                        </div>
+                    </div>
+                    <Dialog open={isContactDialogOpen} onOpenChange={setIsContactDialogOpen}>
+                        <DialogTrigger asChild>
+                        <Button className="w-full">
+                            <Phone className="mr-2 h-4 w-4" /> Mostrar Número de Teléfono
+                        </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Contactar al Vendedor</DialogTitle>
+                            <DialogDescription>
+                            Estás a punto de contactar a {vehicle.seller.displayName} por WhatsApp.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="py-4 space-y-4">
+                            <div className="bg-muted h-24 flex items-center justify-center rounded-md text-muted-foreground text-sm">
+                            (Espacio para anuncio de Google)
+                            </div>
+
+                            <Button asChild size="lg" className="w-full bg-green-500 hover:bg-green-600 text-white" onClick={handleContactClick} disabled={countdown > 0}>
+                                <a href={countdown === 0 ? createWhatsAppLink() : undefined} target="_blank" rel="noopener noreferrer">
+                                    {countdown > 0 ? (
+                                        `Espera ${countdown} segundos...`
+                                    ) : (
+                                        <>
+                                            <WhatsAppIcon className="mr-2 h-5 w-5" />
+                                            Contactar por WhatsApp
+                                        </>
+                                    )}
+                                </a>
+                            </Button>
+
+                            <div className="bg-muted h-24 flex items-center justify-center rounded-md text-muted-foreground text-sm">
+                                (Espacio para anuncio de Google)
+                            </div>
+                        </div>
+                        </DialogContent>
+                    </Dialog>
+                    <p className="text-xs text-muted-foreground text-center">
+                        Los vendedores verificados han confirmado su identidad vía WhatsApp.
+                    </p>
+                    </CardContent>
+
+                    <div className="border-t">
+                    <Dialog open={isMapDialogOpen} onOpenChange={setIsMapDialogOpen}>
+                        <DialogTrigger asChild>
+                            <div className="h-40 w-full cursor-pointer relative group">
+                                {isLoaded && !loadError ? (
+                                    <GoogleMap
+                                        mapContainerStyle={{ width: '100%', height: '100%' }}
+                                        center={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
+                                        zoom={12}
+                                        options={{
+                                            gestureHandling: 'none',
+                                            zoomControl: false,
+                                            streetViewControl: false,
+                                            mapTypeControl: false,
+                                            fullscreenControl: false,
+                                            clickableIcons: false
+                                        }}
+                                    >
+                                        <Marker position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }} icon={carMarkerIcon} />
+                                    </GoogleMap>
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center bg-muted">
+                                    {loadError ? <p className="text-destructive text-xs p-2 text-center">Error al cargar mapa</p> : <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />}
+                                    </div>
+                                )}
+                                <div className="absolute inset-0 bg-transparent group-hover:bg-black/30 transition-colors flex items-center justify-center" aria-hidden="true">
+                                    <div className="p-2 bg-background/80 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <MapPin className="h-5 w-5 text-foreground" />
+                                    </div>
+                                </div>
+                            </div>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-4xl w-full h-[80vh] p-0">
+                            <DialogHeader className="p-4 absolute top-0 left-0 z-10 bg-gradient-to-b from-background via-background/80 to-transparent w-full">
+                                <DialogTitle>Ubicación del Vehículo</DialogTitle>
+                            </DialogHeader>
+                            {isLoaded && !loadError ? (
+                                <GoogleMap
+                                    mapContainerStyle={{ width: '100%', height: '100%' }}
+                                    center={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
+                                    zoom={15}
+                                    options={{
+                                    streetViewControl: false,
+                                    mapTypeControl: false,
+                                    fullscreenControl: false
+                                    }}
+                                >
+                                    <Marker position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }} icon={carMarkerIcon} />
+                                </GoogleMap>
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-muted">
+                                    {loadError ? <p className="text-destructive">Error al cargar mapa</p> : <Loader2 className="h-8 w-8 animate-spin" />}
+                                </div>
+                            )}
+                        </DialogContent>
+                    </Dialog>
+                    </div>
+                    <div className="px-4 py-2 bg-muted/30 border-t">
+                        <p className="text-xs text-muted-foreground text-center">La ubicación proporcionada por el vendedor es aproximada.</p>
+                    </div>
+                </Card>
+           </div>
         </div>
 
         {/* Sidebar */}
-        <div className="md:col-span-1 space-y-6 md:sticky md:top-24">
-          <Card>
-            <CardHeader>
-              <h1 className="font-headline text-2xl sm:text-3xl font-bold">{`${vehicle.year} ${vehicle.make} ${vehicle.model}`}</h1>
-              <div className="flex items-center gap-2 pt-2 text-muted-foreground">
-                <MapPin className="h-4 w-4" /> <span>{`${vehicle.location.city}, ${vehicle.location.state}`}</span>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex justify-between items-start">
-                    <div className="text-3xl font-bold font-headline text-accent">{formatCurrency(vehicle.priceUSD)}</div>
-                    <Button variant="outline" size="lg" onClick={handleFavoriteToggle}>
-                        <Heart className={cn(
-                            "mr-2 h-5 w-5 text-destructive transition-all",
-                            isVehicleFavorite ? 'fill-destructive' : 'fill-transparent'
-                        )}/>
-                        {isVehicleFavorite ? 'Guardado' : 'Guardar'}
-                    </Button>
+        <div className="md:col-span-1 space-y-6">
+            <div className="md:sticky md:top-24 space-y-6">
+                <div className="hidden md:block">
+                    <MainInfoCard />
                 </div>
-                <Separator />
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                  <div className="font-semibold flex items-center gap-1"><Gauge className="h-4 w-4 text-muted-foreground" /> Kilometraje</div><div className="text-muted-foreground">{vehicle.mileage.toLocaleString()} km</div>
-                  <div className="font-semibold flex items-center gap-1"><Palette className="h-4 w-4 text-muted-foreground" /> Color</div><div className="text-muted-foreground">{vehicle.exteriorColor}</div>
-                  <div className="font-semibold flex items-center gap-1"><Settings2 className="h-4 w-4 text-muted-foreground" /> Motor</div><div className="text-muted-foreground">{vehicle.engine}</div>
-                  <div className="font-semibold flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 5h14v14H5V5z"/><path d="M12 5v14"/><path d="M19 12H5"/><path d="M12 12l5-5"/><path d="m7 12 5 5"/></svg> Transmisión</div><div className="text-muted-foreground">{vehicle.transmission}</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-                    
-          <Card className="overflow-hidden">
-            <CardHeader>
-              <CardTitleComponent>Información del Vendedor</CardTitleComponent>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-3">
-                <User className="h-8 w-8 text-muted-foreground" />
-                <div>
-                  <div className="font-semibold flex items-center gap-2">
-                    {vehicle.seller.displayName}
-                    {vehicle.seller.isVerified && <Badge variant="secondary" className="border-green-300 bg-green-100 text-green-800 dark:border-green-700 dark:bg-green-900/50 dark:text-green-300"><ShieldCheck className="h-3 w-3 mr-1" />Verificado</Badge>}
-                  </div>
-                  {!vehicle.seller.isVerified && <Badge variant="destructive">No Verificado</Badge>}
-                </div>
-              </div>
-              <Dialog open={isContactDialogOpen} onOpenChange={setIsContactDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button className="w-full">
-                    <Phone className="mr-2 h-4 w-4" /> Mostrar Número de Teléfono
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Contactar al Vendedor</DialogTitle>
-                    <DialogDescription>
-                      Estás a punto de contactar a {vehicle.seller.displayName} por WhatsApp.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="py-4 space-y-4">
-                    <div className="bg-muted h-24 flex items-center justify-center rounded-md text-muted-foreground text-sm">
-                      (Espacio para anuncio de Google)
-                    </div>
-
-                    <Button asChild size="lg" className="w-full bg-green-500 hover:bg-green-600 text-white" onClick={handleContactClick} disabled={countdown > 0}>
-                        <a href={countdown === 0 ? createWhatsAppLink() : undefined} target="_blank" rel="noopener noreferrer">
-                            {countdown > 0 ? (
-                                `Espera ${countdown} segundos...`
-                            ) : (
-                                <>
-                                    <WhatsAppIcon className="mr-2 h-5 w-5" />
-                                    Contactar por WhatsApp
-                                </>
-                            )}
-                        </a>
-                    </Button>
-
-                    <div className="bg-muted h-24 flex items-center justify-center rounded-md text-muted-foreground text-sm">
-                        (Espacio para anuncio de Google)
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-               <p className="text-xs text-muted-foreground text-center">
-                 Los vendedores verificados han confirmado su identidad vía WhatsApp.
-               </p>
-            </CardContent>
-
-            <div className="border-t">
-              <Dialog open={isMapDialogOpen} onOpenChange={setIsMapDialogOpen}>
-                  <DialogTrigger asChild>
-                      <div className="h-40 w-full cursor-pointer relative group">
-                          {isLoaded && !loadError ? (
-                              <GoogleMap
-                                  mapContainerStyle={{ width: '100%', height: '100%' }}
-                                  center={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
-                                  zoom={12}
-                                  options={{
-                                    gestureHandling: 'none',
-                                    zoomControl: false,
-                                    streetViewControl: false,
-                                    mapTypeControl: false,
-                                    fullscreenControl: false,
-                                    clickableIcons: false
-                                  }}
-                              >
-                                  <Marker position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }} icon={carMarkerIcon} />
-                              </GoogleMap>
-                          ) : (
-                              <div className="w-full h-full flex items-center justify-center bg-muted">
-                                {loadError ? <p className="text-destructive text-xs p-2 text-center">Error al cargar mapa</p> : <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />}
-                              </div>
-                          )}
-                          <div className="absolute inset-0 bg-transparent group-hover:bg-black/30 transition-colors flex items-center justify-center" aria-hidden="true">
-                            <div className="p-2 bg-background/80 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
-                                <MapPin className="h-5 w-5 text-foreground" />
+                
+                <div className="hidden md:block">
+                    <Card className="overflow-hidden">
+                        <CardHeader>
+                        <CardTitleComponent>Información del Vendedor</CardTitleComponent>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                        <div className="flex items-center gap-3">
+                            <User className="h-8 w-8 text-muted-foreground" />
+                            <div>
+                            <div className="font-semibold flex items-center gap-2">
+                                {vehicle.seller.displayName}
+                                {vehicle.seller.isVerified && <Badge variant="secondary" className="border-green-300 bg-green-100 text-green-800 dark:border-green-700 dark:bg-green-900/50 dark:text-green-300"><ShieldCheck className="h-3 w-3 mr-1" />Verificado</Badge>}
                             </div>
-                          </div>
-                      </div>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-4xl w-full h-[80vh] p-0">
-                      <DialogHeader className="p-4 absolute top-0 left-0 z-10 bg-gradient-to-b from-background via-background/80 to-transparent w-full">
-                          <DialogTitle>Ubicación del Vehículo</DialogTitle>
-                      </DialogHeader>
-                       {isLoaded && !loadError ? (
-                          <GoogleMap
-                              mapContainerStyle={{ width: '100%', height: '100%' }}
-                              center={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
-                              zoom={15}
-                              options={{
-                                streetViewControl: false,
-                                mapTypeControl: false,
-                                fullscreenControl: false
-                              }}
-                          >
-                              <Marker position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }} icon={carMarkerIcon} />
-                          </GoogleMap>
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-muted">
-                            {loadError ? <p className="text-destructive">Error al cargar mapa</p> : <Loader2 className="h-8 w-8 animate-spin" />}
+                            {!vehicle.seller.isVerified && <Badge variant="destructive">No Verificado</Badge>}
+                            </div>
                         </div>
-                      )}
-                  </DialogContent>
-              </Dialog>
-            </div>
-            <div className="px-4 py-2 bg-muted/30 border-t">
-                <p className="text-xs text-muted-foreground text-center">La ubicación proporcionada por el vendedor es aproximada.</p>
-            </div>
-          </Card>
-          {isAdmin && (
-            <Card className="border-red-500/50">
-                <CardHeader>
-                    <CardTitleComponent className="text-red-600 dark:text-red-500">Herramientas de Administrador</CardTitleComponent>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-2">
-                    <Button asChild variant="outline">
-                        <Link href={`/listings/${vehicle.id}/edit`}>
-                            <PencilIcon className="mr-2" /> Editar Anuncio
-                        </Link>
-                    </Button>
-                    
-                    {vehicle.status === 'active' ? (
-                         <Button variant="outline" onClick={() => handleToggleStatus('paused')} disabled={isTogglingStatus}>
-                            {isTogglingStatus ? <Loader2 className="animate-spin mr-2"/> : <Pause className="mr-2"/>}
-                            Pausar Anuncio
-                         </Button>
-                    ) : (
-                         <Button variant="outline" onClick={() => handleToggleStatus('active')} disabled={isTogglingStatus}>
-                            {isTogglingStatus ? <Loader2 className="animate-spin mr-2"/> : <Play className="mr-2"/>}
-                            Reactivar Anuncio
-                         </Button>
-                    )}
-                    
-                    <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                            <Button variant="destructive">
-                                <Trash2 className="mr-2"/> Eliminar Anuncio
+                        <Dialog open={isContactDialogOpen} onOpenChange={setIsContactDialogOpen}>
+                            <DialogTrigger asChild>
+                            <Button className="w-full">
+                                <Phone className="mr-2 h-4 w-4" /> Mostrar Número de Teléfono
                             </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                            <AlertDialogHeader>
-                                <AlertDialogTitle>¿Eliminar este anuncio?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    Esta acción es permanente y no se puede deshacer. Se borrará el anuncio y todas sus imágenes.
-                                </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
-                                    {isDeleting && <Loader2 className="animate-spin mr-2"/>}
-                                    Sí, eliminar
-                                </AlertDialogAction>
-                            </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
+                            </DialogTrigger>
+                            <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Contactar al Vendedor</DialogTitle>
+                                <DialogDescription>
+                                Estás a punto de contactar a {vehicle.seller.displayName} por WhatsApp.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="py-4 space-y-4">
+                                <div className="bg-muted h-24 flex items-center justify-center rounded-md text-muted-foreground text-sm">
+                                (Espacio para anuncio de Google)
+                                </div>
 
-                    <Separator className="my-2"/>
+                                <Button asChild size="lg" className="w-full bg-green-500 hover:bg-green-600 text-white" onClick={handleContactClick} disabled={countdown > 0}>
+                                    <a href={countdown === 0 ? createWhatsAppLink() : undefined} target="_blank" rel="noopener noreferrer">
+                                        {countdown > 0 ? (
+                                            `Espera ${countdown} segundos...`
+                                        ) : (
+                                            <>
+                                                <WhatsAppIcon className="mr-2 h-5 w-5" />
+                                                Contactar por WhatsApp
+                                            </>
+                                        )}
+                                    </a>
+                                </Button>
 
-                    <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                            <Button variant={vehicle.seller.isBlocked ? 'secondary' : 'destructive'}>
-                                <ShieldBan className="mr-2"/> {vehicle.seller.isBlocked ? 'Desbloquear Vendedor' : 'Bloquear Vendedor'}
+                                <div className="bg-muted h-24 flex items-center justify-center rounded-md text-muted-foreground text-sm">
+                                    (Espacio para anuncio de Google)
+                                </div>
+                            </div>
+                            </DialogContent>
+                        </Dialog>
+                        <p className="text-xs text-muted-foreground text-center">
+                            Los vendedores verificados han confirmado su identidad vía WhatsApp.
+                        </p>
+                        </CardContent>
+
+                        <div className="border-t">
+                        <Dialog open={isMapDialogOpen} onOpenChange={setIsMapDialogOpen}>
+                            <DialogTrigger asChild>
+                                <div className="h-40 w-full cursor-pointer relative group">
+                                    {isLoaded && !loadError ? (
+                                        <GoogleMap
+                                            mapContainerStyle={{ width: '100%', height: '100%' }}
+                                            center={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
+                                            zoom={12}
+                                            options={{
+                                                gestureHandling: 'none',
+                                                zoomControl: false,
+                                                streetViewControl: false,
+                                                mapTypeControl: false,
+                                                fullscreenControl: false,
+                                                clickableIcons: false
+                                            }}
+                                        >
+                                            <Marker position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }} icon={carMarkerIcon} />
+                                        </GoogleMap>
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center bg-muted">
+                                        {loadError ? <p className="text-destructive text-xs p-2 text-center">Error al cargar mapa</p> : <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />}
+                                        </div>
+                                    )}
+                                    <div className="absolute inset-0 bg-transparent group-hover:bg-black/30 transition-colors flex items-center justify-center" aria-hidden="true">
+                                        <div className="p-2 bg-background/80 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <MapPin className="h-5 w-5 text-foreground" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-4xl w-full h-[80vh] p-0">
+                                <DialogHeader className="p-4 absolute top-0 left-0 z-10 bg-gradient-to-b from-background via-background/80 to-transparent w-full">
+                                    <DialogTitle>Ubicación del Vehículo</DialogTitle>
+                                </DialogHeader>
+                                {isLoaded && !loadError ? (
+                                    <GoogleMap
+                                        mapContainerStyle={{ width: '100%', height: '100%' }}
+                                        center={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
+                                        zoom={15}
+                                        options={{
+                                            streetViewControl: false,
+                                            mapTypeControl: false,
+                                            fullscreenControl: false
+                                        }}
+                                    >
+                                        <Marker position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }} icon={carMarkerIcon} />
+                                    </GoogleMap>
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center bg-muted">
+                                        {loadError ? <p className="text-destructive">Error al cargar mapa</p> : <Loader2 className="h-8 w-8 animate-spin" />}
+                                    </div>
+                                )}
+                            </DialogContent>
+                        </Dialog>
+                        </div>
+                        <div className="px-4 py-2 bg-muted/30 border-t">
+                            <p className="text-xs text-muted-foreground text-center">La ubicación proporcionada por el vendedor es aproximada.</p>
+                        </div>
+                    </Card>
+                </div>
+                {isAdmin && (
+                    <Card className="border-red-500/50">
+                        <CardHeader>
+                            <CardTitleComponent className="text-red-600 dark:text-red-500">Herramientas de Administrador</CardTitleComponent>
+                        </CardHeader>
+                        <CardContent className="flex flex-col gap-2">
+                            <Button asChild variant="outline">
+                                <Link href={`/listings/${vehicle.id}/edit`}>
+                                    <PencilIcon className="mr-2" /> Editar Anuncio
+                                </Link>
                             </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                            <AlertDialogHeader>
-                                <AlertDialogTitle>¿{vehicle.seller.isBlocked ? 'Desbloquear' : 'Bloquear'} a {vehicle.seller.displayName}?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    {vehicle.seller.isBlocked 
-                                        ? 'Esto permitirá que el vendedor vuelva a publicar y sus anuncios sean visibles.'
-                                        : 'Al bloquear a este vendedor, se ocultarán todos sus anuncios y no podrá publicar nuevos. ¿Deseas continuar?'}
-                                </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction onClick={handleToggleBlockSeller} disabled={isBlocking} className={cn(!vehicle.seller.isBlocked && 'bg-destructive hover:bg-destructive/90')}>
-                                    {isBlocking && <Loader2 className="animate-spin mr-2"/>}
-                                    {vehicle.seller.isBlocked ? 'Sí, desbloquear' : 'Sí, bloquear'}
-                                </AlertDialogAction>
-                            </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
-                </CardContent>
-            </Card>
-          )}
+                            
+                            {vehicle.status === 'active' ? (
+                                <Button variant="outline" onClick={() => handleToggleStatus('paused')} disabled={isTogglingStatus}>
+                                    {isTogglingStatus ? <Loader2 className="animate-spin mr-2"/> : <Pause className="mr-2"/>}
+                                    Pausar Anuncio
+                                </Button>
+                            ) : (
+                                <Button variant="outline" onClick={() => handleToggleStatus('active')} disabled={isTogglingStatus}>
+                                    {isTogglingStatus ? <Loader2 className="animate-spin mr-2"/> : <Play className="mr-2"/>}
+                                    Reactivar Anuncio
+                                </Button>
+                            )}
+                            
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="destructive">
+                                        <Trash2 className="mr-2"/> Eliminar Anuncio
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>¿Eliminar este anuncio?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            Esta acción es permanente y no se puede deshacer. Se borrará el anuncio y todas sus imágenes.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                                            {isDeleting && <Loader2 className="animate-spin mr-2"/>}
+                                            Sí, eliminar
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+
+                            <Separator className="my-2"/>
+
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant={vehicle.seller.isBlocked ? 'secondary' : 'destructive'}>
+                                        <ShieldBan className="mr-2"/> {vehicle.seller.isBlocked ? 'Desbloquear Vendedor' : 'Bloquear Vendedor'}
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>¿{vehicle.seller.isBlocked ? 'Desbloquear' : 'Bloquear'} a {vehicle.seller.displayName}?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            {vehicle.seller.isBlocked 
+                                                ? 'Esto permitirá que el vendedor vuelva a publicar y sus anuncios sean visibles.'
+                                                : 'Al bloquear a este vendedor, se ocultarán todos sus anuncios y no podrá publicar nuevos. ¿Deseas continuar?'}
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction onClick={handleToggleBlockSeller} disabled={isBlocking} className={cn(!vehicle.seller.isBlocked && 'bg-destructive hover:bg-destructive/90')}>
+                                            {isBlocking && <Loader2 className="animate-spin mr-2"/>}
+                                            {vehicle.seller.isBlocked ? 'Sí, desbloquear' : 'Sí, bloquear'}
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        </CardContent>
+                    </Card>
+                )}
+            </div>
         </div>
       </div>
       
