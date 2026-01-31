@@ -468,7 +468,7 @@ export default function ListingDetailPage() {
       <div className="grid md:grid-cols-3 gap-8 items-start">
         {/* Main Content */}
         <div className="md:col-span-2 space-y-8 flex flex-col">
-          <Carousel className="w-full order-1">
+          <Carousel className="w-full">
             <CarouselContent>
               {vehicle.images.map((image, index) => (
                 <CarouselItem key={index} onClick={() => handleImageClick(index)} className="cursor-pointer">
@@ -496,7 +496,7 @@ export default function ListingDetailPage() {
             )}
           </Carousel>
           
-          <Card className="order-2">
+          <Card>
             <CardHeader>
               <h1 className="font-headline text-2xl sm:text-3xl font-bold">{`${vehicle.year} ${vehicle.make} ${vehicle.model}`}</h1>
               <div className="flex items-center gap-2 pt-2 text-muted-foreground">
@@ -525,12 +525,24 @@ export default function ListingDetailPage() {
               </div>
             </CardContent>
           </Card>
-          
-          <Card className="order-3">
+                    
+          <Card>
+            <CardHeader>
+              <CardTitleComponent>Descripción del Vendedor</CardTitleComponent>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">{vehicle.description}</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Sidebar */}
+        <div className="md:col-span-1 space-y-6 md:sticky md:top-24">
+          <Card>
             <CardHeader>
               <CardTitleComponent>Características</CardTitleComponent>
             </CardHeader>
-            <CardContent className="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-2">
+            <CardContent className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 gap-y-4 gap-x-2">
               <div className="flex items-center gap-3">
                   <FileText className="h-6 w-6 text-accent flex-shrink-0" />
                   <span className="text-sm">{`Título ${vehicle.ownerCount}-1`}</span>
@@ -543,19 +555,7 @@ export default function ListingDetailPage() {
               ))}
             </CardContent>
           </Card>
-          
-          <Card className="order-4">
-            <CardHeader>
-              <CardTitleComponent>Descripción del Vendedor</CardTitleComponent>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">{vehicle.description}</p>
-            </CardContent>
-          </Card>
-        </div>
 
-        {/* Sidebar */}
-        <div className="md:col-span-1 space-y-6 md:sticky md:top-24">
           <Card className="overflow-hidden">
             <CardHeader>
               <CardTitleComponent>Información del Vendedor</CardTitleComponent>
