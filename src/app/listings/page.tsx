@@ -9,7 +9,7 @@ import { Grid, List, Search, Filter, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, getDistance } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { useFirestore } from '@/firebase';
 import {
   AlertDialog,
@@ -19,7 +19,7 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialogTitle as AlertDialogTitleComponent,
 } from "@/components/ui/alert-dialog";
 import { MapLocationFilter } from '@/components/map-location-filter';
 import { 
@@ -257,7 +257,7 @@ function ListingsPageContent() {
       <AlertDialog open={isLocationPromptOpen} onOpenChange={setIsLocationPromptOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Ver publicaciones cerca de ti?</AlertDialogTitle>
+            <AlertDialogTitleComponent>¿Ver publicaciones cerca de ti?</AlertDialogTitleComponent>
             <AlertDialogDescription>
               Actualmente estás viendo anuncios de todo el país. Activa el filtro de ubicación para encontrar vehículos más cercanos a ti.
             </AlertDialogDescription>
@@ -311,6 +311,9 @@ function ListingsPageContent() {
                             </Button>
                             </SheetTrigger>
                             <SheetContent side="left" className="w-[300px] sm:w-[340px]">
+                                <SheetHeader>
+                                    <SheetTitle className="sr-only">Filtros</SheetTitle>
+                                </SheetHeader>
                                 <div className="py-6 h-full overflow-y-auto">
                                     <Filters filters={filters} onFilterChange={setFilters} />
                                 </div>
