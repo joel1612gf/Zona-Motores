@@ -72,7 +72,7 @@ export default function Home() {
     <div className="flex flex-col">
       <div
         className={cn(
-          'fixed top-16 left-0 right-0 z-40 bg-primary py-3 shadow-md transition-transform duration-300',
+          'fixed top-16 left-0 right-0 z-40 bg-background/95 backdrop-blur-sm border-b py-3 shadow-md transition-transform duration-300',
           showStickySearch ? 'translate-y-0' : '-translate-y-full'
         )}
       >
@@ -84,7 +84,7 @@ export default function Home() {
                 name="search"
                 type="search"
                 placeholder="Busca por marca, modelo o palabra clave..."
-                className="w-full rounded-full bg-card p-2 pl-10 pr-[6.5rem] shadow-lg h-12 text-base focus:ring-2 focus:ring-primary-foreground/50 border-none"
+                className="w-full rounded-full bg-white/90 p-2 pl-10 pr-[6.5rem] shadow-lg text-foreground h-12 text-base focus:ring-2 focus:ring-primary-foreground/50 border-none"
               />
               <Button type="submit" size="lg" variant="secondary" className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full h-9 shadow-md">
                 Buscar
