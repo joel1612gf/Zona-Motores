@@ -69,11 +69,11 @@ export function VehicleCard({ vehicle, isFeatured = false }: { vehicle: Vehicle;
               </div>
             </div>
         </div>
-        <CardContent className="p-2 sm:p-4 space-y-1 flex flex-col flex-grow">
-          <h3 className="font-headline text-lg font-bold truncate">{`${vehicle.year} ${vehicle.make} ${vehicle.model}`}</h3>
-          <p className="text-sm text-muted-foreground">{vehicle.mileage.toLocaleString()} km</p>
+        <CardContent className="px-2 pt-1 pb-2 sm:p-4 space-y-1 flex flex-col flex-grow">
+          <h3 className="font-headline text-base sm:text-lg font-bold truncate">{`${vehicle.year} ${vehicle.make} ${vehicle.model}`}</h3>
+          <p className="text-xs sm:text-sm text-muted-foreground">{vehicle.mileage.toLocaleString()} km</p>
           <div className="flex-grow" />
-          <p className="font-headline text-2xl font-bold text-primary">
+          <p className="font-headline text-xl sm:text-2xl font-bold text-primary">
             {formatCurrency(vehicle.priceUSD)}
           </p>
           <div className="hidden sm:flex items-center text-sm text-muted-foreground pt-1">
