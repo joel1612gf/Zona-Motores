@@ -11,6 +11,8 @@ import { MapPin, Loader2 } from 'lucide-react';
 interface MapLocationFilterProps {
   currentFilter: { lat: number; lon: number; radius: number } | null;
   onApply: (filter: { lat: number; lon: number; radius: number } | null) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 const containerStyle = {
@@ -27,33 +29,35 @@ const defaultCenter = {
 const libraries: ('places' | 'drawing' | 'geometry' | 'visualization')[] = ['places'];
 
 
-export function MapLocationFilter({ currentFilter, onApply }: MapLocationFilterProps) {
+export function MapLocationFilter({ currentFilter, onApply, open, onOpenChange }: MapLocationFilterProps) {
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
     libraries,
   });
 
-  const [isOpen, setIsOpen] = useState(false);
-  const [mapInstanceKey, setMapInstanceKey] = useState(Date.now()); // Key to force remount
+  const isControlled = open !== undefined && onOpenChange !== undefined;
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+
+  const isOpen = isControlled ? open : uncontrolledOpen;
+  const setIsOpen = isControlled ? onOpenChange : setUncontrolledOpen;
+
+  const [mapInstanceKey, setMapInstanceKey] = useState(Date.now());
   
   // Internal state for the dialog
   const [marker, setMarker] = useState<{ lat: number; lng: number } | null>(null);
   const [radius, setRadius] = useState<number>(50);
   const [mapCenter, setMapCenter] = useState(defaultCenter);
 
-  const handleOpenChange = (open: boolean) => {
-    if (open) {
-      // Force remount the map component to ensure a clean state
+  const handleDialogStateChange = (openState: boolean) => {
+    if (openState) {
       setMapInstanceKey(Date.now()); 
       
-      // When dialog opens, initialize its state from the applied filter or defaults
       if (currentFilter) {
         const currentMarker = { lat: currentFilter.lat, lng: currentFilter.lon };
         setMarker(currentMarker);
         setRadius(currentFilter.radius);
         setMapCenter(currentMarker);
       } else {
-        // Reset to default and try to get user location
         setMarker(null);
         setRadius(50);
         setMapCenter(defaultCenter);
@@ -64,7 +68,7 @@ export function MapLocationFilter({ currentFilter, onApply }: MapLocationFilterP
               lng: position.coords.longitude,
             };
             setMarker(userLocation);
-            setMapCenter(userLocation); // Center map on user
+            setMapCenter(userLocation);
           },
           (error) => {
             console.warn("Could not get user location", error.message);
@@ -72,7 +76,7 @@ export function MapLocationFilter({ currentFilter, onApply }: MapLocationFilterP
         );
       }
     }
-    setIsOpen(open);
+    setIsOpen(openState);
   };
 
   const onMapClick = useCallback((event: google.maps.MapMouseEvent) => {
@@ -98,8 +102,8 @@ export function MapLocationFilter({ currentFilter, onApply }: MapLocationFilterP
   };
 
   const handleClear = () => {
-    onApply(null); // Clear the external filter
-    setIsOpen(false); // Close the dialog
+    onApply(null);
+    setIsOpen(false);
   };
 
   const triggerText = currentFilter 
@@ -122,7 +126,7 @@ export function MapLocationFilter({ currentFilter, onApply }: MapLocationFilterP
 
     return (
       <GoogleMap
-        key={mapInstanceKey} // Using a key to force remount
+        key={mapInstanceKey}
         mapContainerStyle={containerStyle}
         center={mapCenter}
         zoom={marker ? 10 : 5}
@@ -153,14 +157,20 @@ export function MapLocationFilter({ currentFilter, onApply }: MapLocationFilterP
     );
   };
 
+  const triggerButton = (
+    <Button variant="outline" className="w-full justify-start text-left font-normal">
+      <MapPin className="mr-2 h-4 w-4" />
+      <span className="truncate">{triggerText}</span>
+    </Button>
+  );
+
   return (
-    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
-        <Button variant="outline" className="w-full justify-start text-left font-normal">
-          <MapPin className="mr-2 h-4 w-4" />
-          <span className="truncate">{triggerText}</span>
-        </Button>
-      </DialogTrigger>
+    <Dialog open={isOpen} onOpenChange={handleDialogStateChange}>
+      {!isControlled && (
+        <DialogTrigger asChild>
+          {triggerButton}
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Filtrar por Ubicación en el Mapa</DialogTitle>

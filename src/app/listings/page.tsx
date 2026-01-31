@@ -11,6 +11,17 @@ import { formatCurrency, getDistance } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useFirestore } from '@/firebase';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { MapLocationFilter } from '@/components/map-location-filter';
 import { 
   collectionGroup, 
   query, 
@@ -53,6 +64,26 @@ function ListingsPageContent() {
   
   const [layout, setLayout] = useState<'grid' | 'list'>('grid');
   const loaderRef = useRef(null);
+
+  const [isLocationPromptOpen, setIsLocationPromptOpen] = useState(false);
+  const [isMapFilterOpen, setIsMapFilterOpen] = useState(false);
+
+  useEffect(() => {
+    const promptShown = sessionStorage.getItem('locationPromptShown');
+    if (promptShown) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      if (!filters.location) {
+         setIsLocationPromptOpen(true);
+         sessionStorage.setItem('locationPromptShown', 'true');
+      }
+    }, 2000);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   
   const handleSearchSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -216,95 +247,129 @@ function ListingsPageContent() {
 
   const shouldShowAveragePrice = averagePrice && (filters.searchTerm.trim() !== '' || activeFilterCount >= 2);
   
+  const handleLocationFilterApply = (location: FilterState['location']) => {
+    setFilters(prev => ({ ...prev, location }));
+    setIsMapFilterOpen(false);
+  };
+  
   return (
-    <div className="container mx-auto py-8 px-2 sm:px-6 lg:px-8">
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
-        <div className="lg:col-span-1 hidden lg:block">
-          <div className="sticky top-20">
-            <Filters filters={filters} onFilterChange={setFilters} />
-          </div>
-        </div>
-        <div className="lg:col-span-3">
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="font-headline text-2xl md:text-3xl font-bold">Todos los Anuncios</h1>
-            <div className="flex items-center gap-2">
-                <div className="hidden sm:flex items-center gap-2">
-                    <Button variant={layout === 'grid' ? 'secondary' : 'ghost'} size="icon" onClick={() => setLayout('grid')} aria-label="Vista de cuadrícula">
-                        <Grid className="h-4 w-4" />
-                    </Button>
-                    <Button variant={layout === 'list' ? 'secondary' : 'ghost'} size="icon" onClick={() => setLayout('list')} aria-label="Vista de lista">
-                        <List className="h-4 w-4" />
-                    </Button>
-                </div>
-                 <div className="lg:hidden">
-                    <Sheet>
-                        <SheetTrigger asChild>
-                        <Button variant="outline">
-                            <Filter className="mr-2 h-4 w-4" />
-                            Filtros
-                        </Button>
-                        </SheetTrigger>
-                        <SheetContent side="left" className="w-[300px] sm:w-[340px]">
-                            <div className="py-6 h-full overflow-y-auto">
-                                <Filters filters={filters} onFilterChange={setFilters} />
-                            </div>
-                        </SheetContent>
-                    </Sheet>
-                </div>
-            </div>
-          </div>
-          <form className="flex space-x-2 mb-4 w-full" onSubmit={handleSearchSubmit}>
-            <Input
-                name="search"
-                id="search-input"
-                type="search"
-                placeholder="Busca por marca, modelo..."
-                defaultValue={filters.searchTerm}
-                key={filters.searchTerm}
-                className="text-base flex-1"
-            />
-            <Button type="submit">
-                <Search className="mr-0 sm:mr-2 h-5 w-5" />
-                <span className="hidden sm:inline">Buscar</span>
-            </Button>
-          </form>
+    <>
+      <AlertDialog open={isLocationPromptOpen} onOpenChange={setIsLocationPromptOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Ver publicaciones cerca de ti?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Actualmente estás viendo anuncios de todo el país. Activa el filtro de ubicación para encontrar vehículos más cercanos a ti.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>No, gracias</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              setIsLocationPromptOpen(false);
+              setIsMapFilterOpen(true);
+            }}>
+              Sí, buscar cerca
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-          {shouldShowAveragePrice && (
-            <div className="mb-8 text-center">
-              <p className="text-sm text-muted-foreground">
-                El valor promedio de los vehículos en tu búsqueda es:{" "}
-                <span className="font-bold text-foreground">{formatCurrency(averagePrice)}</span>
-              </p>
-            </div>
-          )}
+      <MapLocationFilter
+        currentFilter={filters.location}
+        onApply={handleLocationFilterApply}
+        open={isMapFilterOpen}
+        onOpenChange={setIsMapFilterOpen}
+      />
 
-          {isLoading ? (
-            <div className={`gap-2 sm:gap-6 ${layout === 'grid' ? 'grid grid-cols-2 xl:grid-cols-3' : 'flex flex-col'}`}>
-              {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-[300px] sm:h-[380px] w-full" />)}
+      <div className="container mx-auto py-8 px-2 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
+          <div className="lg:col-span-1 hidden lg:block">
+            <div className="sticky top-20">
+              <Filters filters={filters} onFilterChange={setFilters} />
             </div>
-          ) : vehicles.length > 0 ? (
-            <>
+          </div>
+          <div className="lg:col-span-3">
+            <div className="flex justify-between items-center mb-6">
+              <h1 className="font-headline text-2xl md:text-3xl font-bold">Todos los Anuncios</h1>
+              <div className="flex items-center gap-2">
+                  <div className="hidden sm:flex items-center gap-2">
+                      <Button variant={layout === 'grid' ? 'secondary' : 'ghost'} size="icon" onClick={() => setLayout('grid')} aria-label="Vista de cuadrícula">
+                          <Grid className="h-4 w-4" />
+                      </Button>
+                      <Button variant={layout === 'list' ? 'secondary' : 'ghost'} size="icon" onClick={() => setLayout('list')} aria-label="Vista de lista">
+                          <List className="h-4 w-4" />
+                      </Button>
+                  </div>
+                  <div className="lg:hidden">
+                      <Sheet>
+                          <SheetTrigger asChild>
+                          <Button variant="outline">
+                              <Filter className="mr-2 h-4 w-4" />
+                              Filtros
+                          </Button>
+                          </SheetTrigger>
+                          <SheetContent side="left" className="w-[300px] sm:w-[340px]">
+                              <div className="py-6 h-full overflow-y-auto">
+                                  <Filters filters={filters} onFilterChange={setFilters} />
+                              </div>
+                          </SheetContent>
+                      </Sheet>
+                  </div>
+              </div>
+            </div>
+            <form className="flex space-x-2 mb-4 w-full" onSubmit={handleSearchSubmit}>
+              <Input
+                  name="search"
+                  id="search-input"
+                  type="search"
+                  placeholder="Busca por marca, modelo..."
+                  defaultValue={filters.searchTerm}
+                  key={filters.searchTerm}
+                  className="text-base flex-1"
+              />
+              <Button type="submit">
+                  <Search className="mr-0 sm:mr-2 h-5 w-5" />
+                  <span className="hidden sm:inline">Buscar</span>
+              </Button>
+            </form>
+
+            {shouldShowAveragePrice && (
+              <div className="mb-8 text-center">
+                <p className="text-sm text-muted-foreground">
+                  El valor promedio de los vehículos en tu búsqueda es:{" "}
+                  <span className="font-bold text-foreground">{formatCurrency(averagePrice)}</span>
+                </p>
+              </div>
+            )}
+
+            {isLoading ? (
               <div className={`gap-2 sm:gap-6 ${layout === 'grid' ? 'grid grid-cols-2 xl:grid-cols-3' : 'flex flex-col'}`}>
-                {vehicles.map(vehicle => (
-                  <VehicleCard key={vehicle.id} vehicle={vehicle} />
-                ))}
+                {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-[300px] sm:h-[380px] w-full" />)}
               </div>
-              <div ref={loaderRef} className="mt-8 flex justify-center py-4">
-                  {hasMore && isLoadingMore && <Loader2 className="h-8 w-8 animate-spin text-primary" />}
+            ) : vehicles.length > 0 ? (
+              <>
+                <div className={`gap-2 sm:gap-6 ${layout === 'grid' ? 'grid grid-cols-2 xl:grid-cols-3' : 'flex flex-col'}`}>
+                  {vehicles.map(vehicle => (
+                    <VehicleCard key={vehicle.id} vehicle={vehicle} />
+                  ))}
+                </div>
+                <div ref={loaderRef} className="mt-8 flex justify-center py-4">
+                    {hasMore && isLoadingMore && <Loader2 className="h-8 w-8 animate-spin text-primary" />}
+                </div>
+                {!isLoading && !hasMore && (
+                  <p className="text-center text-muted-foreground mt-8">Has llegado al final de los resultados.</p>
+                )}
+              </>
+            ) : (
+              <div className="text-center py-16 border rounded-lg bg-card">
+                <h2 className="text-2xl font-semibold font-headline">No se encontraron vehículos</h2>
+                <p className="text-muted-foreground mt-2">Intenta ajustar tus filtros de búsqueda.</p>
               </div>
-              {!isLoading && !hasMore && (
-                <p className="text-center text-muted-foreground mt-8">Has llegado al final de los resultados.</p>
-              )}
-            </>
-          ) : (
-            <div className="text-center py-16 border rounded-lg bg-card">
-              <h2 className="text-2xl font-semibold font-headline">No se encontraron vehículos</h2>
-              <p className="text-muted-foreground mt-2">Intenta ajustar tus filtros de búsqueda.</p>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
