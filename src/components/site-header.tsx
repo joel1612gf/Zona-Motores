@@ -8,7 +8,7 @@ import { AuthButton } from '@/components/auth-button';
 import { Car, PlusCircle, Menu } from 'lucide-react';
 import { useUser } from '@/firebase';
 import { ThemeToggle } from './theme-toggle';
-import { Sheet, SheetContent, SheetTrigger, SheetClose } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTrigger, SheetClose, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 
 export function SiteHeader() {
   const { user } = useUser();
@@ -54,6 +54,9 @@ export function SiteHeader() {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="w-[300px] bg-primary text-primary-foreground">
+              <SheetHeader>
+                <SheetTitle className="sr-only">Menú Principal</SheetTitle>
+              </SheetHeader>
               <Link href="/" className="flex items-center space-x-2 mb-8">
                 <Car className="h-6 w-6 text-primary-foreground" />
                 <span className="font-headline text-xl font-bold">
