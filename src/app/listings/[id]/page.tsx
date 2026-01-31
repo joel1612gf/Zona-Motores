@@ -495,15 +495,6 @@ export default function ListingDetailPage() {
               </>
             )}
           </Carousel>
-          
-          <Card>
-            <CardHeader>
-              <CardTitleComponent>Descripción del Vendedor</CardTitleComponent>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">{vehicle.description}</p>
-            </CardContent>
-          </Card>
 
           <Card>
             <CardHeader>
@@ -520,6 +511,15 @@ export default function ListingDetailPage() {
                   <span className="text-sm">{label}</span>
                 </div>
               ))}
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader>
+              <CardTitleComponent>Descripción del Vendedor</CardTitleComponent>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">{vehicle.description}</p>
             </CardContent>
           </Card>
         </div>
