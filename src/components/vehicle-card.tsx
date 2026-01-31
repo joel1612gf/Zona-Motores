@@ -45,8 +45,8 @@ export function VehicleCard({ vehicle, isFeatured = false }: { vehicle: Vehicle;
               <div className="flex flex-col gap-2">
                 {isPromoted && (
                   <Badge className="border-transparent bg-orange-500 text-white hover:bg-orange-600 shadow-lg">
-                    <Flame className="h-4 w-4 -ml-1 mr-1.5" />
-                    Promocionado
+                    <Flame className="h-4 w-4 sm:-ml-1 sm:mr-1.5" />
+                    <span className="hidden sm:inline">Promocionado</span>
                   </Badge>
                 )}
               </div>
