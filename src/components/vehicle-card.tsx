@@ -53,7 +53,7 @@ export function VehicleCard({ vehicle, isFeatured = false }: { vehicle: Vehicle;
               <div className="flex items-center gap-2">
                 <button
                     onClick={handleFavoriteToggle}
-                    className="p-1.5 bg-background/80 rounded-full backdrop-blur-sm shadow-lg transition-colors hover:bg-red-100 dark:hover:bg-red-900/50"
+                    className="p-1.5 bg-background/80 rounded-full backdrop-blur-sm shadow-lg transition-colors hover:bg-red-100 dark:hover:bg-red-900/50 hidden sm:block"
                     aria-label="Guardar en favoritos"
                 >
                     <Heart className={cn(
@@ -69,13 +69,27 @@ export function VehicleCard({ vehicle, isFeatured = false }: { vehicle: Vehicle;
               </div>
             </div>
         </div>
-        <CardContent className="px-2 pt-1 pb-2 sm:p-4 space-y-1 flex flex-col flex-grow">
-          <h3 className="font-headline text-base sm:text-lg font-bold truncate">{`${vehicle.year} ${vehicle.make} ${vehicle.model}`}</h3>
-          <p className="text-xs sm:text-sm text-muted-foreground">{vehicle.mileage.toLocaleString()} km</p>
+        <CardContent className="px-2 pt-1 pb-2 sm:p-4 flex flex-col flex-grow">
+          <div className="space-y-1">
+            <h3 className="font-headline text-base sm:text-lg font-bold truncate">{`${vehicle.year} ${vehicle.make} ${vehicle.model}`}</h3>
+            <p className="text-xs sm:text-sm text-muted-foreground">{vehicle.mileage.toLocaleString()} km</p>
+          </div>
           <div className="flex-grow" />
-          <p className="font-headline text-xl sm:text-2xl font-bold text-primary">
-            {formatCurrency(vehicle.priceUSD)}
-          </p>
+          <div className="flex justify-between items-end pt-2">
+              <p className="font-headline text-xl sm:text-2xl font-bold text-primary">
+                {formatCurrency(vehicle.priceUSD)}
+              </p>
+              <button
+                  onClick={handleFavoriteToggle}
+                  className="p-1.5 sm:hidden -mr-1"
+                  aria-label="Guardar en favoritos"
+              >
+                  <Heart className={cn(
+                      "h-6 w-6 text-destructive transition-all",
+                      isVehicleFavorite ? 'fill-destructive' : 'fill-transparent'
+                  )} />
+              </button>
+          </div>
           <div className="hidden sm:flex items-center text-sm text-muted-foreground pt-1">
             <MapPin className="h-4 w-4 mr-1.5" />
             <span>{`${vehicle.location.city}, ${vehicle.location.state}`}</span>
