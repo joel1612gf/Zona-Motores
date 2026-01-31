@@ -61,7 +61,7 @@
 @media (max-width: 639px) { /* corresponds to sm breakpoint */
   .carousel-item-peek {
     opacity: 0.5;
-    transform: scale(0.85);
+    transform: scale(0.9);
     transition: opacity 0.3s ease, transform 0.3s ease;
   }
   .carousel-item-peek.is-active {

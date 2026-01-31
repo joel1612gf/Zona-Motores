@@ -158,14 +158,14 @@ export default function Home() {
               <CarouselContent className="-ml-2 md:-ml-4">
                 {showSkeletons
                   ? [...Array(5)].map((_, i) => (
-                      <CarouselItem key={i} className="carousel-item-peek pl-2 md:pl-4 basis-4/5 sm:basis-1/2 lg:basis-1/3 xl:basis-1/4">
+                      <CarouselItem key={i} className="carousel-item-peek pl-2 md:pl-4 basis-3/4 sm:basis-1/2 lg:basis-1/3 xl:basis-1/4">
                         <div className="p-1 h-full">
                           <Skeleton className="h-[380px] w-full" />
                         </div>
                       </CarouselItem>
                     ))
                   : promotedVehicles.map((vehicle) => (
-                  <CarouselItem key={vehicle.id} className="carousel-item-peek pl-2 md:pl-4 basis-4/5 sm:basis-1/2 lg:basis-1/3 xl:basis-1/4">
+                  <CarouselItem key={vehicle.id} className="carousel-item-peek pl-2 md:pl-4 basis-3/4 sm:basis-1/2 lg:basis-1/3 xl:basis-1/4">
                     <div className="p-1 h-full">
                        <VehicleCard vehicle={vehicle} isFeatured={true} />
                     </div>
@@ -200,14 +200,14 @@ export default function Home() {
               <CarouselContent className="-ml-2 md:-ml-4">
                 {showSkeletons 
                   ? [...Array(8)].map((_, i) => (
-                      <CarouselItem key={i} className="carousel-item-peek pl-2 md:pl-4 basis-4/5 sm:basis-1/2 lg:basis-1/3 xl:basis-1/4">
+                      <CarouselItem key={i} className="carousel-item-peek pl-2 md:pl-4 basis-3/4 sm:basis-1/2 lg:basis-1/3 xl:basis-1/4">
                         <div className="p-1 h-full">
                           <Skeleton className="h-[380px] w-full" />
                         </div>
                       </CarouselItem>
                     ))
                   : latestVehicles.map((vehicle) => (
-                      <CarouselItem key={vehicle.id} className="carousel-item-peek pl-2 md:pl-4 basis-4/5 sm:basis-1/2 lg:basis-1/3 xl:basis-1/4">
+                      <CarouselItem key={vehicle.id} className="carousel-item-peek pl-2 md:pl-4 basis-3/4 sm:basis-1/2 lg:basis-1/3 xl:basis-1/4">
                         <div className="p-1 h-full">
                           <VehicleCard vehicle={vehicle} />
                         </div>
