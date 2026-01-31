@@ -289,33 +289,35 @@ function ListingsPageContent() {
             </div>
           </div>
           <div className="lg:col-span-3">
-            <div className="relative flex justify-center items-center mb-6 lg:justify-between">
-              <h1 className="font-headline text-2xl md:text-3xl font-bold">Todos los Anuncios</h1>
-              <div className="absolute right-0 lg:static flex items-center gap-2">
-                  <div className="hidden sm:flex items-center gap-2">
-                      <Button variant={layout === 'grid' ? 'secondary' : 'ghost'} size="icon" onClick={() => setLayout('grid')} aria-label="Vista de cuadrícula">
-                          <Grid className="h-4 w-4" />
-                      </Button>
-                      <Button variant={layout === 'list' ? 'secondary' : 'ghost'} size="icon" onClick={() => setLayout('list')} aria-label="Vista de lista">
-                          <List className="h-4 w-4" />
-                      </Button>
-                  </div>
-                  <div className="lg:hidden">
-                      <Sheet>
-                          <SheetTrigger asChild>
-                          <Button variant="outline">
-                              <Filter className="mr-2 h-4 w-4" />
-                              Filtros
-                          </Button>
-                          </SheetTrigger>
-                          <SheetContent side="left" className="w-[300px] sm:w-[340px]">
-                              <div className="py-6 h-full overflow-y-auto">
-                                  <Filters filters={filters} onFilterChange={setFilters} />
-                              </div>
-                          </SheetContent>
-                      </Sheet>
-                  </div>
-              </div>
+            <div className="flex justify-between items-center mb-6">
+                <h1 className="flex-1 lg:flex-none text-center lg:text-left font-headline text-2xl md:text-3xl font-bold">
+                    Todos los Anuncios
+                </h1>
+                <div className="flex items-center gap-2">
+                    <div className="hidden sm:flex items-center gap-2">
+                        <Button variant={layout === 'grid' ? 'secondary' : 'ghost'} size="icon" onClick={() => setLayout('grid')} aria-label="Vista de cuadrícula">
+                            <Grid className="h-4 w-4" />
+                        </Button>
+                        <Button variant={layout === 'list' ? 'secondary' : 'ghost'} size="icon" onClick={() => setLayout('list')} aria-label="Vista de lista">
+                            <List className="h-4 w-4" />
+                        </Button>
+                    </div>
+                    <div className="lg:hidden">
+                        <Sheet>
+                            <SheetTrigger asChild>
+                            <Button variant="outline">
+                                <Filter className="mr-2 h-4 w-4" />
+                                Filtros
+                            </Button>
+                            </SheetTrigger>
+                            <SheetContent side="left" className="w-[300px] sm:w-[340px]">
+                                <div className="py-6 h-full overflow-y-auto">
+                                    <Filters filters={filters} onFilterChange={setFilters} />
+                                </div>
+                            </SheetContent>
+                        </Sheet>
+                    </div>
+                </div>
             </div>
             <form className="flex space-x-2 mb-4 w-full" onSubmit={handleSearchSubmit}>
               <Input
