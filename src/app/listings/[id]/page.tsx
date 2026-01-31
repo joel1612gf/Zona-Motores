@@ -538,15 +538,6 @@ export default function ListingDetailPage() {
 
           <Card>
             <CardHeader>
-              <CardTitleComponent>Descripción del Vendedor</CardTitleComponent>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">{vehicle.description}</p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader>
               <CardTitleComponent>Características</CardTitleComponent>
             </CardHeader>
             <CardContent className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 gap-y-4 gap-x-2">
@@ -560,6 +551,15 @@ export default function ListingDetailPage() {
                   <span className="text-sm">{label}</span>
                 </div>
               ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitleComponent>Descripción del Vendedor</CardTitleComponent>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">{vehicle.description}</p>
             </CardContent>
           </Card>
           
