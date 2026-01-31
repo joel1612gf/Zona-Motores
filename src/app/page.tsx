@@ -84,7 +84,7 @@ export default function Home() {
                 name="search"
                 type="search"
                 placeholder="Busca por marca, modelo o palabra clave..."
-                className="w-full rounded-full bg-white/90 p-2 pl-10 pr-[6.5rem] shadow-lg text-foreground h-12 text-base focus:ring-2 focus:ring-primary-foreground/50 border-none"
+                className="w-full truncate rounded-full bg-white/90 p-2 pl-10 pr-[6.5rem] shadow-lg text-foreground h-12 text-base focus:ring-2 focus:ring-primary-foreground/50 border-none"
               />
               <Button type="submit" size="lg" variant="secondary" className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full h-9 shadow-md">
                 Buscar
@@ -111,7 +111,7 @@ export default function Home() {
                         name="search"
                         type="search"
                         placeholder="Busca por marca, modelo o palabra clave..."
-                        className="w-full rounded-full bg-white/90 p-2 pl-10 pr-[6.5rem] shadow-lg text-foreground h-12 text-base focus:ring-2 focus:ring-primary-foreground/50 border-none"
+                        className="w-full truncate rounded-full bg-white/90 p-2 pl-10 pr-[6.5rem] shadow-lg text-foreground h-12 text-base focus:ring-2 focus:ring-primary-foreground/50 border-none"
                     />
                     <Button type="submit" size="lg" variant="secondary" className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full h-9 shadow-md">
                         Buscar
