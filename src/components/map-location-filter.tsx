@@ -52,29 +52,29 @@ export function MapLocationFilter({ currentFilter, onApply, open, onOpenChange }
     if (openState) {
       setMapInstanceKey(Date.now()); 
       
-      if (currentFilter) {
-        const currentMarker = { lat: currentFilter.lat, lng: currentFilter.lon };
-        setMarker(currentMarker);
-        setRadius(currentFilter.radius);
-        setMapCenter(currentMarker);
-      } else {
-        setMarker(null);
-        setRadius(50);
-        setMapCenter(defaultCenter);
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const userLocation = {
-              lat: position.coords.latitude,
-              lng: position.coords.longitude,
-            };
-            setMarker(userLocation);
-            setMapCenter(userLocation);
-          },
-          (error) => {
-            console.warn("Could not get user location", error.message);
+      setRadius(currentFilter?.radius || 50);
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const userLocation = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          };
+          setMarker(userLocation);
+          setMapCenter(userLocation);
+        },
+        (error) => {
+          console.warn("Could not get user location", error.message);
+          if (currentFilter) {
+            const currentMarker = { lat: currentFilter.lat, lng: currentFilter.lon };
+            setMarker(currentMarker);
+            setMapCenter(currentMarker);
+          } else {
+            setMarker(null);
+            setMapCenter(defaultCenter);
           }
-        );
-      }
+        }
+      );
     }
     setIsOpen(openState);
   };
