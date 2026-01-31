@@ -498,6 +498,36 @@ export default function ListingDetailPage() {
           
           <Card>
             <CardHeader>
+              <CardTitleComponent>Descripción del Vendedor</CardTitleComponent>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">{vehicle.description}</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitleComponent>Características</CardTitleComponent>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 gap-y-4 gap-x-2">
+              <div className="flex items-center gap-3">
+                  <FileText className="h-6 w-6 text-accent flex-shrink-0" />
+                  <span className="text-sm">{`Título ${vehicle.ownerCount}-1`}</span>
+              </div>
+              {mainFeatures.map(({icon: Icon, label}) => (
+                <div key={label} className="flex items-center gap-3">
+                  <Icon className="h-6 w-6 text-accent flex-shrink-0" />
+                  <span className="text-sm">{label}</span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Sidebar */}
+        <div className="md:col-span-1 space-y-6 md:sticky md:top-24">
+          <Card>
+            <CardHeader>
               <h1 className="font-headline text-2xl sm:text-3xl font-bold">{`${vehicle.year} ${vehicle.make} ${vehicle.model}`}</h1>
               <div className="flex items-center gap-2 pt-2 text-muted-foreground">
                 <MapPin className="h-4 w-4" /> <span>{`${vehicle.location.city}, ${vehicle.location.state}`}</span>
@@ -526,36 +556,6 @@ export default function ListingDetailPage() {
             </CardContent>
           </Card>
                     
-          <Card>
-            <CardHeader>
-              <CardTitleComponent>Descripción del Vendedor</CardTitleComponent>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">{vehicle.description}</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Sidebar */}
-        <div className="md:col-span-1 space-y-6 md:sticky md:top-24">
-          <Card>
-            <CardHeader>
-              <CardTitleComponent>Características</CardTitleComponent>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 gap-y-4 gap-x-2">
-              <div className="flex items-center gap-3">
-                  <FileText className="h-6 w-6 text-accent flex-shrink-0" />
-                  <span className="text-sm">{`Título ${vehicle.ownerCount}-1`}</span>
-              </div>
-              {mainFeatures.map(({icon: Icon, label}) => (
-                <div key={label} className="flex items-center gap-3">
-                  <Icon className="h-6 w-6 text-accent flex-shrink-0" />
-                  <span className="text-sm">{label}</span>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
           <Card className="overflow-hidden">
             <CardHeader>
               <CardTitleComponent>Información del Vendedor</CardTitleComponent>
