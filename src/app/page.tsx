@@ -94,7 +94,7 @@ export default function Home() {
         </div>
       </div>
       
-      <section className="relative w-full flex items-center justify-center text-center bg-primary text-primary-foreground py-20 md:py-32">
+      <section className="relative w-full flex items-center justify-center text-center bg-primary text-primary-foreground py-20 md:py-32 -mt-px">
         <div className="container px-4 md:px-6 space-y-6">
           <h1 className="font-headline text-4xl font-bold tracking-tighter sm:text-6xl xl:text-7xl/none">
             Encuentra Tu Próximo Vehículo en Venezuela
