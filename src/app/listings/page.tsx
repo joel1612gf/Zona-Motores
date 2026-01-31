@@ -289,9 +289,9 @@ function ListingsPageContent() {
             </div>
           </div>
           <div className="lg:col-span-3">
-            <div className="flex justify-between items-center mb-6">
+            <div className="relative flex justify-center items-center mb-6 lg:justify-between">
               <h1 className="font-headline text-2xl md:text-3xl font-bold">Todos los Anuncios</h1>
-              <div className="flex items-center gap-2">
+              <div className="absolute right-0 lg:static flex items-center gap-2">
                   <div className="hidden sm:flex items-center gap-2">
                       <Button variant={layout === 'grid' ? 'secondary' : 'ghost'} size="icon" onClick={() => setLayout('grid')} aria-label="Vista de cuadrícula">
                           <Grid className="h-4 w-4" />
