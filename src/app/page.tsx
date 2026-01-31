@@ -134,7 +134,7 @@ export default function Home() {
         </div>
       </section>
 
-      <div className="h-32 bg-gradient-to-b from-primary to-background" />
+      <div className="h-32 bg-gradient-to-b from-primary to-background -mt-px" />
 
       {((isClient && promotedVehicles.length > 0) || showSkeletons) && (
         <section className="w-full py-12 md:py-24 lg:py-32 bg-background">
