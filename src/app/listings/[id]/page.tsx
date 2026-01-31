@@ -473,7 +473,7 @@ export default function ListingDetailPage() {
       <CardContent>
         <div className="space-y-4">
           <div className="flex justify-between items-start">
-              <div className="text-3xl font-bold font-headline text-accent">{formatCurrency(vehicle.priceUSD)}</div>
+              <div className="text-3xl font-bold font-headline text-primary">{formatCurrency(vehicle.priceUSD)}</div>
               <Button variant="outline" size="lg" onClick={handleFavoriteToggle}>
                   <Heart className={cn(
                       "mr-2 h-5 w-5 text-destructive transition-all",
@@ -534,27 +534,52 @@ export default function ListingDetailPage() {
           {/* Main Info for Mobile */}
           <div className="space-y-8 md:hidden">
             <MainInfoCard />
+            <Card>
+              <CardHeader>
+                <CardTitleComponent>Características</CardTitleComponent>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 gap-y-4 gap-x-2">
+                <div className="flex items-center gap-3">
+                    <FileText className="h-6 w-6 text-primary flex-shrink-0" />
+                    <span className="text-sm">{`Título ${vehicle.ownerCount}-1`}</span>
+                </div>
+                {mainFeatures.map(({icon: Icon, label}) => (
+                  <div key={label} className="flex items-center gap-3">
+                    <Icon className="h-6 w-6 text-primary flex-shrink-0" />
+                    <span className="text-sm">{label}</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitleComponent>Descripción del Vendedor</CardTitleComponent>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">{vehicle.description}</p>
+              </CardContent>
+            </Card>
           </div>
 
-          <Card>
+          <Card className="hidden md:block">
             <CardHeader>
               <CardTitleComponent>Características</CardTitleComponent>
             </CardHeader>
             <CardContent className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 gap-y-4 gap-x-2">
               <div className="flex items-center gap-3">
-                  <FileText className="h-6 w-6 text-accent flex-shrink-0" />
+                  <FileText className="h-6 w-6 text-primary flex-shrink-0" />
                   <span className="text-sm">{`Título ${vehicle.ownerCount}-1`}</span>
               </div>
               {mainFeatures.map(({icon: Icon, label}) => (
                 <div key={label} className="flex items-center gap-3">
-                  <Icon className="h-6 w-6 text-accent flex-shrink-0" />
+                  <Icon className="h-6 w-6 text-primary flex-shrink-0" />
                   <span className="text-sm">{label}</span>
                 </div>
               ))}
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="hidden md:block">
             <CardHeader>
               <CardTitleComponent>Descripción del Vendedor</CardTitleComponent>
             </CardHeader>
