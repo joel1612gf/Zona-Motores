@@ -62,7 +62,7 @@ export function VehicleCard({ vehicle, isFeatured = false }: { vehicle: Vehicle;
                     )} />
                 </button>
                 {vehicle.seller.isVerified && (
-                  <div className="p-1.5 bg-background/80 rounded-full backdrop-blur-sm shadow-lg">
+                  <div className="p-1.5 bg-background/80 rounded-full backdrop-blur-sm shadow-lg hidden sm:block">
                     <Star className="h-4 w-4 text-primary fill-primary" />
                   </div>
                 )}
