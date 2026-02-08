@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Grid, List, Search, Filter, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, getDistance } from '@/lib/utils';
-import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { useFirestore } from '@/firebase';
 import {
@@ -35,6 +34,7 @@ import {
   Query
 } from 'firebase/firestore';
 import type { Vehicle } from '@/lib/types';
+import { SearchWithHistory } from '@/components/search-with-history';
 
 const PAGE_SIZE = 12;
 
@@ -85,13 +85,6 @@ function ListingsPageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   
-  const handleSearchSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const searchTerm = formData.get('search') as string;
-    setFilters(prev => ({ ...prev, searchTerm: searchTerm.trim() }));
-  };
-
   const applyClientSideFilters = (vehiclesToFilter: Vehicle[]): Vehicle[] => {
       return vehiclesToFilter.filter(vehicle => {
           const { searchTerm, minYear, maxYear, location, minPrice, maxPrice } = filters;
@@ -290,7 +283,7 @@ function ListingsPageContent() {
           </div>
           <div className="lg:col-span-3">
             <div className="flex justify-between items-center mb-6">
-                <h1 className="flex-1 lg:flex-none text-center lg:text-left font-headline text-2xl md:text-3xl font-bold">
+                <h1 className="flex-1 text-center lg:text-left font-headline text-2xl md:text-3xl font-bold">
                     Todos los Anuncios
                 </h1>
                 <div className="flex items-center gap-2">
@@ -322,21 +315,15 @@ function ListingsPageContent() {
                     </div>
                 </div>
             </div>
-            <form className="flex space-x-2 mb-4 w-full" onSubmit={handleSearchSubmit}>
-              <Input
-                  name="search"
-                  id="search-input"
-                  type="search"
-                  placeholder="Busca por marca, modelo..."
-                  defaultValue={filters.searchTerm}
-                  key={filters.searchTerm}
-                  className="text-base flex-1"
+            <div className="mb-4">
+              <SearchWithHistory 
+                initialValue={initialSearchTerm}
+                onSearch={(term) => setFilters(prev => ({...prev, searchTerm: term}))}
+                inputClassName="bg-card"
+                buttonClassName="bg-primary text-primary-foreground"
               />
-              <Button type="submit">
-                  <Search className="mr-0 sm:mr-2 h-5 w-5" />
-                  <span className="hidden sm:inline">Buscar</span>
-              </Button>
-            </form>
+            </div>
+
 
             {shouldShowAveragePrice && (
               <div className="mb-8 text-center">
