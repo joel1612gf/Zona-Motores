@@ -100,7 +100,7 @@ export function SearchWithHistory({
             <PopoverContent
                 className="w-[--radix-popover-trigger-width] p-0 bg-card border-none shadow-lg rounded-t-none rounded-b-3xl"
                 onOpenAutoFocus={(e) => e.preventDefault()}
-                sideOffset={-1}
+                sideOffset={-5}
                 align="center"
             >
                 {history.length > 0 && (
