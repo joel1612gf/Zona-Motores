@@ -64,7 +64,7 @@ export function SearchWithHistory({
                  <form 
                     onSubmit={handleSubmit} 
                     className={cn(
-                        "relative w-full rounded-full bg-white/90 shadow-lg",
+                        "relative w-full rounded-full bg-card shadow-lg",
                         isPopoverOpen && history.length > 0 && "rounded-b-none",
                         className
                     )}
@@ -90,9 +90,9 @@ export function SearchWithHistory({
                 </form>
             </PopoverAnchor>
             <PopoverContent 
-                className="w-[--radix-popover-trigger-width] p-0 bg-white/90 border-none shadow-lg rounded-t-none rounded-b-3xl"
+                className="w-[--radix-popover-trigger-width] p-0 bg-card border-none shadow-lg rounded-t-none rounded-b-2xl"
                 onOpenAutoFocus={(e) => e.preventDefault()}
-                sideOffset={-2}
+                sideOffset={-1}
                 align="center"
             >
                 {history.length > 0 && (
