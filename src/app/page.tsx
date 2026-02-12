@@ -75,7 +75,7 @@ export default function Home() {
   );
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col -mt-px">
       <div
         className={cn(
           'fixed top-16 left-0 right-0 z-40 bg-primary py-3 shadow-md transition-transform duration-300',
@@ -83,11 +83,15 @@ export default function Home() {
         )}
       >
         <div className="container px-4 md:px-6">
-          <SearchWithHistory onSearch={handleSearch} className="w-full max-w-2xl mx-auto" />
+          <SearchWithHistory
+            onSearch={handleSearch}
+            className="w-full max-w-2xl mx-auto"
+            forceClose={!showStickySearch}
+          />
         </div>
       </div>
       
-      <section className="relative w-full flex items-center justify-center text-center bg-primary text-primary-foreground py-20 md:py-32 -mt-px">
+      <section className="relative w-full flex items-center justify-center text-center bg-primary text-primary-foreground py-20 md:py-32">
         <div className="container px-4 md:px-6 space-y-6">
           <h1 className="font-headline text-4xl font-bold tracking-tighter sm:text-6xl xl:text-7xl/none">
             Encuentra Tu Próximo Vehículo en Venezuela
@@ -114,7 +118,7 @@ export default function Home() {
         </div>
       </section>
 
-      <div className="h-32 bg-gradient-to-b from-primary to-background -mt-px" />
+      <div className="h-32 bg-gradient-to-b from-primary to-background" />
 
       {((isClient && promotedVehicles.length > 0) || showSkeletons) && (
         <section className="w-full py-12 md:py-24 lg:py-32 bg-background">
@@ -135,17 +139,17 @@ export default function Home() {
               onMouseLeave={autoplayPlugin.current.reset}
               className="w-full"
             >
-              <CarouselContent className="basis-3/4 sm:basis-1/2 lg:basis-1/3 xl:basis-1/4 -ml-2 md:-ml-4">
+              <CarouselContent className="-ml-2 md:-ml-4">
                 {showSkeletons
                   ? [...Array(5)].map((_, i) => (
-                      <CarouselItem key={i} className="pl-2 md:pl-4">
+                      <CarouselItem key={i} className="pl-2 md:pl-4 basis-3/4 sm:basis-1/2 lg:basis-1/3 xl:basis-1/4 carousel-item-peek">
                         <div className="p-1 h-full">
                           <Skeleton className="h-[380px] w-full" />
                         </div>
                       </CarouselItem>
                     ))
                   : promotedVehicles.map((vehicle) => (
-                  <CarouselItem key={vehicle.id} className="pl-2 md:pl-4">
+                  <CarouselItem key={vehicle.id} className="pl-2 md:pl-4 basis-3/4 sm:basis-1/2 lg:basis-1/3 xl:basis-1/4 carousel-item-peek">
                     <div className="p-1 h-full">
                        <VehicleCard vehicle={vehicle} isFeatured={true} />
                     </div>
@@ -177,17 +181,17 @@ export default function Home() {
               onMouseLeave={autoplayPlugin.current.reset}
               className="w-full"
             >
-              <CarouselContent className="basis-3/4 sm:basis-1/2 lg:basis-1/3 xl:basis-1/4 -ml-2 md:-ml-4">
+              <CarouselContent className="-ml-2 md:-ml-4">
                 {showSkeletons 
                   ? [...Array(8)].map((_, i) => (
-                      <CarouselItem key={i} className="pl-2 md:pl-4">
+                      <CarouselItem key={i} className="pl-2 md:pl-4 basis-3/4 sm:basis-1/2 lg:basis-1/3 xl:basis-1/4 carousel-item-peek">
                         <div className="p-1 h-full">
                           <Skeleton className="h-[380px] w-full" />
                         </div>
                       </CarouselItem>
                     ))
                   : latestVehicles.map((vehicle) => (
-                      <CarouselItem key={vehicle.id} className="pl-2 md:pl-4">
+                      <CarouselItem key={vehicle.id} className="pl-2 md:pl-4 basis-3/4 sm:basis-1/2 lg:basis-1/3 xl:basis-1/4 carousel-item-peek">
                         <div className="p-1 h-full">
                           <VehicleCard vehicle={vehicle} />
                         </div>

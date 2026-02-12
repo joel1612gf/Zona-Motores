@@ -14,6 +14,7 @@ interface SearchWithHistoryProps {
     className?: string;
     inputClassName?: string;
     buttonClassName?: string;
+    forceClose?: boolean;
 }
 
 export function SearchWithHistory({
@@ -22,6 +23,7 @@ export function SearchWithHistory({
     className,
     inputClassName,
     buttonClassName,
+    forceClose,
 }: SearchWithHistoryProps) {
     const { user } = useUser();
     const [searchTerm, setSearchTerm] = useState(initialValue);
@@ -36,6 +38,12 @@ export function SearchWithHistory({
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [initialValue]);
+
+    useEffect(() => {
+        if (forceClose) {
+            setIsPopoverOpen(false);
+        }
+    }, [forceClose]);
 
     const handleSearch = (term: string) => {
         const trimmedTerm = term.trim();
