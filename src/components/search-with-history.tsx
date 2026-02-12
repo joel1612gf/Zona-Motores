@@ -98,7 +98,7 @@ export function SearchWithHistory({
                 </form>
             </PopoverAnchor>
             <PopoverContent
-                className="w-[--radix-popover-trigger-width] p-0 bg-card border-none shadow-lg rounded-t-none rounded-b-3xl"
+                className="w-[--radix-popover-trigger-width] p-0 bg-card border-none shadow-lg rounded-t-none rounded-b-3xl -mt-px"
                 onOpenAutoFocus={(e) => e.preventDefault()}
                 sideOffset={-5}
                 align="center"
