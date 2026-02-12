@@ -76,7 +76,7 @@ export function SearchWithHistory({
                         type="search"
                         placeholder="Busca por marca, modelo o palabra clave..."
                         className={cn(
-                            "w-full truncate bg-transparent p-2 pl-10 pr-[6.5rem] text-foreground h-12 text-base border-none focus-visible:ring-0",
+                            "w-full truncate bg-transparent p-2 pl-10 pr-[6.5rem] text-foreground h-12 text-base border-none focus-visible:ring-0 focus-visible:ring-offset-0",
                             inputClassName
                         )}
                         value={searchTerm}
