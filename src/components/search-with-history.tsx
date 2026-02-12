@@ -61,14 +61,24 @@ export function SearchWithHistory({
     return (
         <Popover open={isPopoverOpen && history.length > 0} onOpenChange={setIsPopoverOpen}>
             <PopoverAnchor asChild>
-                 <form onSubmit={handleSubmit} className={cn("relative w-full", className)}>
+                 <form 
+                    onSubmit={handleSubmit} 
+                    className={cn(
+                        "relative w-full rounded-full bg-white/90 shadow-lg",
+                        isPopoverOpen && history.length > 0 && "rounded-b-none",
+                        className
+                    )}
+                >
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground/80" />
                     <Input
                         ref={inputRef}
                         name="search"
                         type="search"
                         placeholder="Busca por marca, modelo o palabra clave..."
-                        className={cn("w-full truncate rounded-full bg-white/90 p-2 pl-10 pr-[6.5rem] shadow-lg text-foreground h-12 text-base focus:ring-2 focus:ring-primary-foreground/50 border-none", inputClassName)}
+                        className={cn(
+                            "w-full truncate bg-transparent p-2 pl-10 pr-[6.5rem] text-foreground h-12 text-base border-none focus-visible:ring-0",
+                            inputClassName
+                        )}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         onFocus={() => setIsPopoverOpen(true)}
@@ -79,7 +89,12 @@ export function SearchWithHistory({
                     </Button>
                 </form>
             </PopoverAnchor>
-            <PopoverContent className="w-[--radix-popover-trigger-width] p-0" onOpenAutoFocus={(e) => e.preventDefault()}>
+            <PopoverContent 
+                className="w-[--radix-popover-trigger-width] p-0 bg-white/90 border-none shadow-lg rounded-t-none rounded-b-3xl"
+                onOpenAutoFocus={(e) => e.preventDefault()}
+                sideOffset={-2}
+                align="center"
+            >
                 {history.length > 0 && (
                     <div className="flex flex-col">
                         <div className="flex justify-between items-center px-4 py-2 border-b">
