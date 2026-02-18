@@ -310,7 +310,7 @@ function ListingsPageContent() {
       >
         <div className="container px-4 md:px-6">
           <SearchWithHistory
-            initialValue={initialSearchTerm}
+            initialValue={filters.searchTerm}
             onSearch={handleSearch}
             className="w-full max-w-2xl mx-auto"
             forceClose={!showStickySearch}
@@ -361,7 +361,7 @@ function ListingsPageContent() {
             </div>
             <div className="mb-4" ref={searchRef}>
               <SearchWithHistory 
-                initialValue={initialSearchTerm}
+                initialValue={filters.searchTerm}
                 onSearch={handleSearch}
                 inputClassName="bg-card"
                 buttonClassName="bg-primary text-primary-foreground"
