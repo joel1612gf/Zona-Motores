@@ -40,6 +40,8 @@ export function VehicleCard({ vehicle, isFeatured = false }: { vehicle: Vehicle;
             height={400}
             className="aspect-video w-full object-cover transition-transform group-hover:scale-105"
             data-ai-hint={vehicle.images[0].hint}
+            sizes="(max-width: 640px) 80vw, (max-width: 1024px) 50vw, 33vw"
+            priority={isFeatured}
           />
            <div className="absolute top-0 left-0 right-0 p-3 flex justify-between items-start z-10">
               <div className="flex flex-col gap-2">

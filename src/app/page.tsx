@@ -68,7 +68,7 @@ export default function Home() {
     return []; // Return empty for SSR
   }, [isClient, vehicles, promotedVehicles]);
 
-  const showSkeletons = isLoading && isClient;
+  const showSkeletons = isLoading || !isClient;
 
   const autoplayPlugin = React.useRef(
     Autoplay({ delay: 5000, stopOnInteraction: true, stopOnLastSnap: true })
@@ -120,8 +120,8 @@ export default function Home() {
 
       <div className="h-32 bg-gradient-to-b from-primary to-background" />
 
-      {((isClient && promotedVehicles.length > 0) || showSkeletons) && (
-        <section className="w-full py-12 md:py-24 lg:py-32 bg-background">
+      <section className="w-full py-12 md:py-24 lg:py-32 bg-background">
+        {((isClient && promotedVehicles.length > 0) || showSkeletons) && (
           <div className="container px-4 md:px-6">
             <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
               <div className="inline-block rounded-lg bg-muted px-3 py-1 text-sm">Promocionados</div>
@@ -160,8 +160,8 @@ export default function Home() {
               <CarouselNext className="hidden sm:flex right-4 bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-primary/50" />
             </Carousel>
           </div>
-        </section>
-      )}
+        )}
+      </section>
 
       <section className="w-full py-12 md:py-24 lg:py-32 bg-secondary/50">
         <div className="container px-4 md:px-6">
