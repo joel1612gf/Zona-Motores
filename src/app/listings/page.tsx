@@ -35,6 +35,7 @@ import {
 } from 'firebase/firestore';
 import type { Vehicle } from '@/lib/types';
 import { SearchWithHistory } from '@/components/search-with-history';
+import { cn } from '@/lib/utils';
 
 const PAGE_SIZE = 12;
 
@@ -64,6 +65,8 @@ function ListingsPageContent() {
   
   const [layout, setLayout] = useState<'grid' | 'list'>('grid');
   const loaderRef = useRef(null);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const [showStickySearch, setShowStickySearch] = useState(false);
 
   const [isLocationPromptOpen, setIsLocationPromptOpen] = useState(false);
   const [isMapFilterOpen, setIsMapFilterOpen] = useState(false);
@@ -85,6 +88,27 @@ function ListingsPageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   
+  useEffect(() => {
+    const headerHeight = 64; // Corresponds to h-16 in tailwind
+
+    const handleScroll = () => {
+      if (searchRef.current) {
+        if (searchRef.current.getBoundingClientRect().top <= headerHeight) {
+          setShowStickySearch(true);
+        } else {
+          setShowStickySearch(false);
+        }
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    handleScroll(); // Run on mount
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
   const applyClientSideFilters = (vehiclesToFilter: Vehicle[]): Vehicle[] => {
       return vehiclesToFilter.filter(vehicle => {
           const { searchTerm, minYear, maxYear, location, minPrice, maxPrice } = filters;
@@ -245,6 +269,10 @@ function ListingsPageContent() {
     setIsMapFilterOpen(false);
   };
   
+  const handleSearch = (term: string) => {
+    setFilters(prev => ({...prev, searchTerm: term}));
+  };
+
   return (
     <>
       <AlertDialog open={isLocationPromptOpen} onOpenChange={setIsLocationPromptOpen}>
@@ -273,6 +301,22 @@ function ListingsPageContent() {
         open={isMapFilterOpen}
         onOpenChange={setIsMapFilterOpen}
       />
+
+      <div
+        className={cn(
+          'fixed top-16 left-0 right-0 z-40 bg-primary py-3 shadow-md transition-transform duration-300',
+          showStickySearch ? 'translate-y-0' : '-translate-y-full'
+        )}
+      >
+        <div className="container px-4 md:px-6">
+          <SearchWithHistory
+            initialValue={initialSearchTerm}
+            onSearch={handleSearch}
+            className="w-full max-w-2xl mx-auto"
+            forceClose={!showStickySearch}
+          />
+        </div>
+      </div>
 
       <div className="container mx-auto py-8 px-2 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
@@ -315,10 +359,10 @@ function ListingsPageContent() {
                     </div>
                 </div>
             </div>
-            <div className="mb-4">
+            <div className="mb-4" ref={searchRef}>
               <SearchWithHistory 
                 initialValue={initialSearchTerm}
-                onSearch={(term) => setFilters(prev => ({...prev, searchTerm: term}))}
+                onSearch={handleSearch}
                 inputClassName="bg-card"
                 buttonClassName="bg-primary text-primary-foreground"
               />
