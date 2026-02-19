@@ -179,10 +179,10 @@ export default function ProfilePage() {
       };
       
       if (logoFile) {
-        newLogoUrl = await uploadFile(logoFile, `dealer-assets/${user.uid}/logo`);
+        newLogoUrl = await uploadFile(logoFile, `vehicle-images/${user.uid}/dealer_logo`);
       }
       if (heroFile) {
-        newHeroUrl = await uploadFile(heroFile, `dealer-assets/${user.uid}/hero`);
+        newHeroUrl = await uploadFile(heroFile, `vehicle-images/${user.uid}/dealer_hero`);
       }
 
       if (data.displayName !== user.displayName) {
