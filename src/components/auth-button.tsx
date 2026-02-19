@@ -172,15 +172,20 @@ export function AuthButton({ open, onOpenChange }: AuthButtonProps) {
     } catch (error: any) {
         console.error('Email/password auth error:', error);
         let description = 'Ocurrió un error. Por favor, inténtalo de nuevo.';
+        let title = mode === 'signUp' ? 'Error al Registrarse' : 'Error al Iniciar Sesión';
+
         if (error.code === 'auth/email-already-in-use') {
-          description = 'Este correo electrónico ya está en uso. Intenta iniciar sesión.';
+          title = 'Correo ya registrado';
+          description = 'Este correo ya tiene una cuenta. Te hemos cambiado a la pantalla de inicio de sesión.';
+          setMode('signIn');
         } else if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
           description = 'Correo electrónico o contraseña incorrectos.';
         } else if (error.code === 'auth/invalid-email') {
             description = 'El formato del correo electrónico es inválido.'
         }
+        
         toast({
-            title: mode === 'signUp' ? 'Error al Registrarse' : 'Error al Iniciar Sesión',
+            title: title,
             description,
             variant: 'destructive',
         });
