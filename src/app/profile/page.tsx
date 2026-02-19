@@ -152,7 +152,7 @@ export default function ProfilePage() {
   };
 
   const onSaveChanges: SubmitHandler<ProfileFormValues> = async (data) => {
-    if (!user || !profileRef || isProfileLoading) return;
+    if (!user || !profileRef || isProfileLoading || isFormLoading) return;
     
     setUploadProgress(0);
 
@@ -205,8 +205,6 @@ export default function ProfilePage() {
         return; 
     }
 
-    const isDealerAccount = (profileData as any)?.accountType === 'dealer';
-
     const updatePayload: any = {
       displayName: data.displayName,
       phoneNumber: data.phoneNumber || '',
@@ -214,7 +212,12 @@ export default function ProfilePage() {
       email: user.email,
     };
     
-    if(isDealerAccount) {
+    // Preserve accountType
+    if ((profileData as any)?.accountType) {
+        updatePayload.accountType = (profileData as any).accountType;
+    }
+    
+    if(updatePayload.accountType === 'dealer') {
       updatePayload.address = data.address || '';
       if (logoFile) updatePayload.logoUrl = newLogoUrl;
       if (heroFile) updatePayload.heroUrl = newHeroUrl;
@@ -312,13 +315,32 @@ export default function ProfilePage() {
         toast({ title: 'Código SMS Enviado', description: `Se ha enviado un código a ${phoneNumber}.` });
     } catch(error: any) {
         console.error("Error sending phone verification code:", error);
-        let description = 'No se pudo enviar el SMS. Verifica el número y el formato (+584121234567).';
-        if (error.code === 'auth/invalid-phone-number') {
-            description = 'El número de teléfono no es válido. Asegúrate de usar el formato internacional (ej: +584121234567).';
-        } else if (error.code === 'auth/too-many-requests') {
-            description = 'Demasiados intentos. Espera un momento antes de volver a intentarlo.';
+
+        if (error.code === 'auth/provider-already-linked') {
+            toast({
+                title: 'Número Ya Verificado',
+                description: 'Tu cuenta ya tiene un número de teléfono verificado. Estamos actualizando tu perfil.',
+            });
+            if (profileRef) {
+                const payload = { isVerified: true };
+                setDoc(profileRef, payload, { merge: true }).catch(err => {
+                     errorEmitter.emit('permission-error', new FirestorePermissionError({
+                        path: profileRef.path,
+                        operation: 'update',
+                        requestResourceData: payload,
+                    }, err));
+                });
+            }
+            setIsVerificationDialogOpen(false);
+        } else {
+            let description = 'No se pudo enviar el SMS. Verifica el número y el formato (+584121234567).';
+            if (error.code === 'auth/invalid-phone-number') {
+                description = 'El número de teléfono no es válido. Asegúrate de usar el formato internacional (ej: +584121234567).';
+            } else if (error.code === 'auth/too-many-requests') {
+                description = 'Demasiados intentos. Espera un momento antes de volver a intentarlo.';
+            }
+            toast({ title: 'Error de Verificación', description, variant: 'destructive' });
         }
-        toast({ title: 'Error al Enviar Código', description, variant: 'destructive' });
     } finally {
       if (isResend) setIsResending(false);
       else setIsSendingCode(false);
