@@ -200,9 +200,14 @@ export default function ProfilePage() {
         email: user.email,
         phoneNumber: data.phoneNumber || '',
         isVerified: (profileData as any)?.isVerified || false,
-        accountType: (profileData as any)?.accountType || 'personal'
       };
       
+      // Only set accountType for legacy users who don't have one.
+      // This prevents overwriting an existing 'dealer' status.
+      if (!(profileData as any)?.accountType) {
+        firestoreData.accountType = 'personal';
+      }
+
       if((profileData as any)?.accountType === 'dealer') {
           firestoreData.address = data.address || '';
           firestoreData.logoUrl = newLogoUrl;
