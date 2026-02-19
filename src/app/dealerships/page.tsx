@@ -5,29 +5,36 @@ import { Vehicle } from '@/lib/types';
 import { DealershipCard } from '@/components/dealership-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import React from 'react';
+import { useCollection } from '@/firebase/firestore/use-collection';
+import { query, collection, where } from 'firebase/firestore';
+import { useFirestore, useMemoFirebase } from '@/firebase';
+import { UserProfile } from '@/lib/types';
 
 export default function DealershipsPage() {
-  const { vehicles, isLoading } = useVehicles();
+  const { vehicles, isLoading: areVehiclesLoading } = useVehicles();
+  const firestore = useFirestore();
+
+  const dealersQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'users'), where('accountType', '==', 'dealer'));
+  }, [firestore]);
+
+  const { data: dealerProfiles, isLoading: areDealersLoading } = useCollection<UserProfile>(dealersQuery);
 
   const dealerships = React.useMemo(() => {
-    if (!vehicles) return [];
+    if (!dealerProfiles || !vehicles) return [];
 
-    const dealers: { [key: string]: { seller: Vehicle['seller'], vehicles: Vehicle[] } } = {};
+    return dealerProfiles.map(dealerProfile => {
+        const dealerVehicles = vehicles.filter(v => v.sellerId === dealerProfile.uid);
+        return {
+            seller: dealerProfile,
+            vehicles: dealerVehicles,
+        };
+    }).filter(d => d.vehicles.length > 0);
 
-    vehicles.forEach(vehicle => {
-      if (vehicle.seller.accountType === 'dealer') {
-        if (!dealers[vehicle.sellerId]) {
-          dealers[vehicle.sellerId] = {
-            seller: vehicle.seller,
-            vehicles: []
-          };
-        }
-        dealers[vehicle.sellerId].vehicles.push(vehicle);
-      }
-    });
+  }, [dealerProfiles, vehicles]);
 
-    return Object.values(dealers);
-  }, [vehicles]);
+  const isLoading = areVehiclesLoading || areDealersLoading;
 
 
   if (isLoading) {

@@ -1,4 +1,3 @@
-
 'use client';
 import { useParams, notFound } from 'next/navigation';
 import { useVehicles } from '@/context/vehicle-context';
@@ -10,22 +9,25 @@ import { MapPin } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useMemo } from 'react';
+import { useDoc } from '@/firebase/firestore/use-doc';
+import { doc } from 'firebase/firestore';
+import { useFirestore, useMemoFirebase } from '@/firebase';
 
 export default function DealershipPage() {
     const params = useParams<{ id: string }>();
-    const { vehicles, isLoading } = useVehicles();
+    const { vehicles, isLoading: areVehiclesLoading } = useVehicles();
+    const firestore = useFirestore();
+
+    const dealerProfileRef = useMemoFirebase(() => {
+        if (!firestore || !params.id) return null;
+        return doc(firestore, 'users', params.id);
+    }, [firestore, params.id]);
+
+    const { data: sellerInfo, isLoading: isSellerLoading } = useDoc<UserProfile>(dealerProfileRef);
 
     const dealerVehicles = useMemo(() => vehicles.filter(v => v.sellerId === params.id), [vehicles, params.id]);
 
-    const sellerInfo: UserProfile | undefined = useMemo(() => {
-        if(dealerVehicles.length > 0) {
-            return dealerVehicles[0].seller;
-        }
-        const vehicleFromAny = vehicles.find(v => v.seller.uid === params.id);
-        if (vehicleFromAny) return vehicleFromAny.seller;
-        return undefined;
-    }, [dealerVehicles, vehicles, params.id]);
-
+    const isLoading = areVehiclesLoading || isSellerLoading;
 
     if (isLoading) {
         return <LoadingSkeleton />;

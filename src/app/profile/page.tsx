@@ -431,32 +431,32 @@ export default function ProfilePage() {
                         <div className="space-y-4">
                            <Label>Logo (recomendado: 1:1, ej: 400x400px)</Label>
                            <div className="flex items-center gap-4">
-                               <div className="relative h-24 w-24 rounded-full border-2 border-dashed flex items-center justify-center bg-muted overflow-hidden">
+                               <div className="relative h-24 w-24 rounded-full border bg-muted overflow-hidden">
                                  {logoPreview ? (
                                    <Image src={logoPreview} alt="Vista previa del logo" layout="fill" objectFit="cover" />
                                  ) : (
-                                   <UploadCloud className="h-8 w-8 text-muted-foreground" />
+                                   <div className="h-full w-full flex items-center justify-center"><UploadCloud className="h-8 w-8 text-muted-foreground" /></div>
                                  )}
                                </div>
                                <Input id="logo-upload" type="file" accept="image/*" onChange={(e) => handleImageSelect(e, 'logo')} className="hidden" />
                                <Button type="button" variant="outline" onClick={() => document.getElementById('logo-upload')?.click()}>
-                                   Subir Logo
+                                   {logoPreview ? 'Cambiar Logo' : 'Subir Logo'}
                                 </Button>
                            </div>
                         </div>
                          <div className="space-y-4">
                            <Label>Imagen de Portada (recomendado: 16:9, ej: 1600x900px)</Label>
                            <div className="flex items-center gap-4">
-                               <div className="relative aspect-video w-full max-w-sm rounded-md border-2 border-dashed flex items-center justify-center bg-muted overflow-hidden">
+                               <div className="relative aspect-video w-full max-w-sm rounded-md border bg-muted overflow-hidden">
                                  {heroPreview ? (
                                    <Image src={heroPreview} alt="Vista previa de la portada" layout="fill" objectFit="cover" />
                                  ) : (
-                                   <UploadCloud className="h-8 w-8 text-muted-foreground" />
+                                   <div className="h-full w-full flex items-center justify-center"><UploadCloud className="h-8 w-8 text-muted-foreground" /></div>
                                  )}
                                </div>
                                <Input id="hero-upload" type="file" accept="image/*" onChange={(e) => handleImageSelect(e, 'hero')} className="hidden" />
                                <Button type="button" variant="outline" onClick={() => document.getElementById('hero-upload')?.click()}>
-                                Subir Portada
+                                {heroPreview ? 'Cambiar Portada' : 'Subir Portada'}
                                </Button>
                            </div>
                         </div>
