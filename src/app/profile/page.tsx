@@ -24,9 +24,13 @@ import { Loader2, MailCheck, MailWarning, ShieldCheck, Phone, FileText, UploadCl
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 
+const phoneRegex = new RegExp(/^\+[1-9]\d{1,14}$/);
+
 const profileSchema = z.object({
   displayName: z.string().min(3, { message: 'El nombre debe tener al menos 3 caracteres.' }).max(50),
-  phoneNumber: z.string().optional(),
+  phoneNumber: z.string().optional().refine((val) => !val || phoneRegex.test(val), {
+    message: "Formato inválido. Usa el formato internacional, ej: +584121234567."
+  }),
   address: z.string().optional(),
 });
 
@@ -77,6 +81,7 @@ export default function ProfilePage() {
     handleSubmit,
     reset,
     getValues,
+    trigger,
     formState: { isSubmitting, errors },
   } = form;
 
@@ -266,6 +271,19 @@ export default function ProfilePage() {
 
   const handleSendVerificationCode = async (isResend = false) => {
     if (!user) return;
+
+    // Manually trigger validation for the phone number field
+    const isValid = await trigger('phoneNumber');
+    if (!isValid) {
+      toast({
+        title: 'Número de teléfono inválido',
+        description: 'Por favor, corrige el número en tu perfil y vuelve a intentarlo.',
+        variant: 'destructive',
+      });
+      setIsVerificationDialogOpen(false); // Close dialog so user can see form error
+      return;
+    }
+    
     const phoneNumber = getValues('phoneNumber');
     if (!phoneNumber) {
         toast({ title: 'Número de teléfono requerido', description: 'Por favor, guarda un número de teléfono en tu perfil primero.', variant: 'destructive' });
