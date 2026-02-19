@@ -15,8 +15,9 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      // Any signed-in user can view any user profile (needed for dealer pages).
-      allow read: if isSignedIn();
+      // Any signed-in user can GET a single user profile or LIST all users.
+      // This is required for the dealerships page to function.
+      allow get, list: if isSignedIn();
       // Only the owner or an admin can make changes.
       allow write: if isOwner(userId) || isAdmin();
 
