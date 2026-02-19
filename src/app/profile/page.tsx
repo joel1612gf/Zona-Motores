@@ -151,14 +151,12 @@ export default function ProfilePage() {
     }
   };
 
-
   const onSaveChanges: SubmitHandler<ProfileFormValues> = async (data) => {
-    if (!user || !profileRef) return;
+    if (!user || !profileRef || isProfileLoading) return;
     
     setUploadProgress(0);
 
     try {
-      const promises: Promise<any>[] = [];
       let newLogoUrl: string | null = (profileData as any)?.logoUrl || null;
       let newHeroUrl: string | null = (profileData as any)?.heroUrl || null;
       const totalUploads = (logoFile ? 1 : 0) + (heroFile ? 1 : 0);
@@ -193,34 +191,29 @@ export default function ProfilePage() {
       }
 
       if (data.displayName !== user.displayName) {
-        promises.push(updateProfile(user, { displayName: data.displayName }));
+        await updateProfile(user, { displayName: data.displayName });
       }
 
-      const firestoreData: any = {
-        uid: user.uid,
+      const isDealerAccount = (profileData as any)?.accountType === 'dealer';
+
+      const updatePayload: any = {
         displayName: data.displayName,
-        email: user.email,
         phoneNumber: data.phoneNumber || '',
-        isVerified: (profileData as any)?.isVerified || false,
+        uid: user.uid,
+        email: user.email,
       };
-      
-      const existingAccountType = (profileData as any)?.accountType;
-      if (existingAccountType) {
-        firestoreData.accountType = existingAccountType;
-      } else {
-        firestoreData.accountType = 'personal';
+
+      if(isDealerAccount) {
+        updatePayload.address = data.address || '';
+        // Only include URL if a new file was uploaded to prevent overwriting with null
+        if (logoFile) updatePayload.logoUrl = newLogoUrl;
+        if (heroFile) updatePayload.heroUrl = newHeroUrl;
       }
-
-
-      if(firestoreData.accountType === 'dealer') {
-          firestoreData.address = data.address || '';
-          firestoreData.logoUrl = newLogoUrl;
-          firestoreData.heroUrl = newHeroUrl;
-      }
-
-      promises.push(setDoc(profileRef, firestoreData, { merge: true }));
       
-      await Promise.all(promises);
+      // Use setDoc with merge: true. This will create the document if it doesn't exist,
+      // or update it if it does. Crucially, it will NOT overwrite fields that
+      // are not in the updatePayload, like 'accountType'.
+      await setDoc(profileRef, updatePayload, { merge: true });
 
       toast({
         title: '¡Perfil Actualizado!',
@@ -507,7 +500,7 @@ export default function ProfilePage() {
 
             <CardFooter className="px-0">
                 <div className="flex items-center gap-4">
-                    <Button type="submit" disabled={isSubmitting || uploadProgress !== null}>
+                    <Button type="submit" disabled={isSubmitting || uploadProgress !== null || isProfileLoading}>
                       {(isSubmitting || uploadProgress !== null) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       Guardar Cambios
                     </Button>
