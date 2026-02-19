@@ -18,7 +18,7 @@ import {
 import { doc, setDoc } from 'firebase/firestore';
 import { LogIn, LogOut, User as UserIcon, Loader2, List, Store, Heart, BarChart } from 'lucide-react';
 
-import { useAuth, useUser, useFirestore } from '@/firebase';
+import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -39,6 +39,7 @@ import {
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
+import { UserProfile } from '@/lib/types';
 
 interface AuthButtonProps {
     open: boolean;
@@ -54,6 +55,12 @@ export function AuthButton({ open, onOpenChange }: AuthButtonProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [signUpStep, setSignUpStep] = useState<'type' | 'details'>('type');
   const [accountType, setAccountType] = useState<'personal' | 'dealer' | null>(null);
+
+  const profileRef = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [user, firestore]);
+  const { data: profileData } = useDoc<UserProfile>(profileRef);
 
   const formSchema = z.object({
     name: z.string().optional(),
@@ -210,7 +217,7 @@ export function AuthButton({ open, onOpenChange }: AuthButtonProps) {
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="relative h-8 w-8 rounded-full">
             <Avatar className="h-8 w-8">
-              <AvatarImage src={user.photoURL!} alt={user.displayName!} />
+              <AvatarImage src={(profileData as any)?.logoUrl || user.photoURL!} alt={user.displayName!} />
               <AvatarFallback>
                 <UserIcon />
               </AvatarFallback>

@@ -27,6 +27,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
   Gauge, 
   MapPin, 
@@ -596,7 +597,14 @@ export default function ListingDetailPage() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                     <div className="flex items-center gap-3">
-                        <User className="h-8 w-8 text-muted-foreground" />
+                        {vehicle.seller.accountType === 'dealer' && vehicle.seller.logoUrl ? (
+                            <Avatar className="h-10 w-10 border-2">
+                                <AvatarImage src={vehicle.seller.logoUrl} alt={`${vehicle.seller.displayName} logo`} />
+                                <AvatarFallback>{vehicle.seller.displayName?.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                        ) : (
+                            <User className="h-8 w-8 text-muted-foreground" />
+                        )}
                         <div>
                         <div className="font-semibold flex items-center gap-2">
                             {vehicle.seller.displayName}
@@ -725,7 +733,14 @@ export default function ListingDetailPage() {
                         </CardHeader>
                         <CardContent className="space-y-4">
                         <div className="flex items-center gap-3">
-                            <User className="h-8 w-8 text-muted-foreground" />
+                            {vehicle.seller.accountType === 'dealer' && vehicle.seller.logoUrl ? (
+                                <Avatar className="h-10 w-10 border-2">
+                                    <AvatarImage src={vehicle.seller.logoUrl} alt={`${vehicle.seller.displayName} logo`} />
+                                    <AvatarFallback>{vehicle.seller.displayName?.charAt(0)}</AvatarFallback>
+                                </Avatar>
+                            ) : (
+                                <User className="h-8 w-8 text-muted-foreground" />
+                            )}
                             <div>
                             <div className="font-semibold flex items-center gap-2">
                                 {vehicle.seller.displayName}
