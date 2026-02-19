@@ -59,6 +59,8 @@ export default function ProfilePage() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [heroPreview, setHeroPreview] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [isFixing, setIsFixing] = useState(false);
+
 
   const profileRef = useMemoFirebase(() => {
     if (!user) return null;
@@ -202,13 +204,15 @@ export default function ProfilePage() {
         isVerified: (profileData as any)?.isVerified || false,
       };
       
-      // Only set accountType for legacy users who don't have one.
-      // This prevents overwriting an existing 'dealer' status.
-      if (!(profileData as any)?.accountType) {
+      const existingAccountType = (profileData as any)?.accountType;
+      if (existingAccountType) {
+        firestoreData.accountType = existingAccountType;
+      } else {
         firestoreData.accountType = 'personal';
       }
 
-      if((profileData as any)?.accountType === 'dealer') {
+
+      if(firestoreData.accountType === 'dealer') {
           firestoreData.address = data.address || '';
           firestoreData.logoUrl = newLogoUrl;
           firestoreData.heroUrl = newHeroUrl;
@@ -277,7 +281,6 @@ export default function ProfilePage() {
   const handleSendVerificationCode = async (isResend = false) => {
     if (!user) return;
 
-    // Manually trigger validation for the phone number field
     const isValid = await trigger('phoneNumber');
     if (!isValid) {
       toast({
@@ -285,7 +288,7 @@ export default function ProfilePage() {
         description: 'Por favor, corrige el número en tu perfil y vuelve a intentarlo.',
         variant: 'destructive',
       });
-      setIsVerificationDialogOpen(false); // Close dialog so user can see form error
+      setIsVerificationDialogOpen(false);
       return;
     }
     
@@ -349,6 +352,23 @@ export default function ProfilePage() {
     }
   }
 
+  const handleFixAccountType = async () => {
+    if (!user || !profileRef) return;
+    setIsFixing(true);
+    try {
+        await setDoc(profileRef, { accountType: 'dealer' }, { merge: true });
+        toast({
+            title: "¡Cuenta Corregida!",
+            description: "Tu cuenta ha sido actualizada a Concesionario. Por favor, recarga la página para ver los cambios."
+        });
+    } catch (error) {
+        console.error("Error fixing account type:", error);
+        toast({ title: 'Error', description: 'No se pudo corregir el tipo de cuenta.', variant: 'destructive' });
+    } finally {
+        setIsFixing(false);
+    }
+  };
+
   if (isAuthLoading || isProfileLoading) {
     return (
         <div className="container max-w-4xl mx-auto py-12">
@@ -377,8 +397,6 @@ export default function ProfilePage() {
   }
   
   if (!user) {
-    // This part of the code should not be reached if the useEffect for redirection works correctly.
-    // It's a fallback.
     return (
       <div className="container max-w-4xl mx-auto py-12 text-center">
         <Loader2 className="mx-auto h-12 w-12 animate-spin" />
@@ -392,6 +410,24 @@ export default function ProfilePage() {
 
   return (
     <div className="container max-w-4xl mx-auto py-12">
+      {user.email === 'zonamotores.concesionario@gmail.com' && !isDealer && (
+        <Card className="mb-8 border-yellow-500 bg-yellow-50/50 dark:bg-yellow-900/20">
+            <CardHeader>
+                <CardTitle className="text-yellow-800 dark:text-yellow-300">Corrección de Cuenta de Concesionario</CardTitle>
+                <CardDescription className="text-yellow-700 dark:text-yellow-400">
+                    Detectamos que tu cuenta fue afectada por un error anterior que la marcó incorrectamente como "Personal".
+                    Haz clic aquí para corregirla y restaurar tu acceso de concesionario.
+                </CardDescription>
+            </CardHeader>
+            <CardFooter>
+                <Button onClick={handleFixAccountType} disabled={isFixing} variant="outline" className="bg-yellow-50 hover:bg-yellow-100 dark:bg-yellow-900/50 dark:hover:bg-yellow-900/80 border-yellow-500/50">
+                    {isFixing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Convertir mi cuenta a Concesionario
+                </Button>
+            </CardFooter>
+        </Card>
+      )}
+
       <h1 className="font-headline text-3xl font-bold mb-8">Mi Perfil</h1>
       <div className="grid gap-8 md:grid-cols-3 items-start">
         <div className="md:col-span-2">
@@ -438,7 +474,7 @@ export default function ProfilePage() {
                            <div className="flex items-center gap-4">
                                <div className="relative h-24 w-24 rounded-full border bg-muted overflow-hidden">
                                  {logoPreview ? (
-                                   <Image src={logoPreview} alt="Vista previa del logo" layout="fill" objectFit="cover" />
+                                   <Image src={logoPreview} alt="Vista previa del logo" fill objectFit="cover" />
                                  ) : (
                                    <div className="h-full w-full flex items-center justify-center"><UploadCloud className="h-8 w-8 text-muted-foreground" /></div>
                                  )}
@@ -454,7 +490,7 @@ export default function ProfilePage() {
                            <div className="flex items-center gap-4">
                                <div className="relative aspect-video w-full max-w-sm rounded-md border bg-muted overflow-hidden">
                                  {heroPreview ? (
-                                   <Image src={heroPreview} alt="Vista previa de la portada" layout="fill" objectFit="cover" />
+                                   <Image src={heroPreview} alt="Vista previa de la portada" fill objectFit="cover" />
                                  ) : (
                                    <div className="h-full w-full flex items-center justify-center"><UploadCloud className="h-8 w-8 text-muted-foreground" /></div>
                                  )}
