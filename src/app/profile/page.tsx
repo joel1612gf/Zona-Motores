@@ -6,7 +6,7 @@ import { useForm, type SubmitHandler } from 'react-hook-form';
 import Image from 'next/image';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, updateDoc } from 'firebase/firestore';
 import { updateProfile, sendEmailVerification, RecaptchaVerifier, linkWithPhoneNumber, type ConfirmationResult } from 'firebase/auth';
 import { ref, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import imageCompression from 'browser-image-compression';
@@ -93,6 +93,8 @@ export default function ProfilePage() {
     }
   }, [isAuthLoading, user, router]);
 
+  const isDealer = useMemo(() => (profileData as any)?.accountType === 'dealer', [profileData]);
+
   useEffect(() => {
     const data = profileData as any;
     if (user && data) {
@@ -152,7 +154,7 @@ export default function ProfilePage() {
   };
 
   const onSaveChanges: SubmitHandler<ProfileFormValues> = async (data) => {
-    if (!user || !profileRef || isProfileLoading || isFormLoading) return;
+    if (!user || !profileRef || isSubmitting || isProfileLoading || isFormLoading) return;
     
     setUploadProgress(0);
 
@@ -207,18 +209,11 @@ export default function ProfilePage() {
 
     const updatePayload: any = {
       displayName: data.displayName,
-      phoneNumber: data.phoneNumber || '',
-      uid: user.uid,
-      email: user.email,
+      phoneNumber: data.phoneNumber || null,
     };
     
-    // Preserve accountType
-    if ((profileData as any)?.accountType) {
-        updatePayload.accountType = (profileData as any).accountType;
-    }
-    
-    if(updatePayload.accountType === 'dealer') {
-      updatePayload.address = data.address || '';
+    if(isDealer) {
+      updatePayload.address = data.address || null;
       if (logoFile) updatePayload.logoUrl = newLogoUrl;
       if (heroFile) updatePayload.heroUrl = newHeroUrl;
     }
@@ -233,7 +228,7 @@ export default function ProfilePage() {
       .catch((error) => {
           errorEmitter.emit('permission-error', new FirestorePermissionError({
               path: profileRef.path,
-              operation: 'write',
+              operation: 'update',
               requestResourceData: updatePayload,
           }, error));
       })
@@ -442,7 +437,6 @@ export default function ProfilePage() {
     );
   }
   
-  const isDealer = (profileData as any)?.accountType === 'dealer';
   const isPhoneNumberVerified = (profileData as any)?.isVerified || false;
 
   return (
