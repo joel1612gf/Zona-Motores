@@ -15,8 +15,10 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      // The owner or an admin can read or write their own user profile
-      allow read, write: if isOwner(userId) || isAdmin();
+      // Any signed-in user can view any user profile (needed for dealer pages).
+      allow read: if isSignedIn();
+      // Only the owner or an admin can make changes.
+      allow write: if isOwner(userId) || isAdmin();
 
       // Vehicle listings are a subcollection of users
       match /vehicleListings/{listingId} {
