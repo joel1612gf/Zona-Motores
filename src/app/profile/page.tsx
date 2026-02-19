@@ -11,7 +11,7 @@ import { updateProfile, sendEmailVerification, RecaptchaVerifier, linkWithPhoneN
 import { ref, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import imageCompression from 'browser-image-compression';
 
-import { useUser, useFirestore, useAuth, useMemoFirebase, useStorage } from '@/firebase';
+import { useUser, useFirestore, useAuth, useMemoFirebase, useStorage, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { useDoc } from '@/firebase/firestore/use-doc';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -84,7 +84,7 @@ export default function ProfilePage() {
     reset,
     getValues,
     trigger,
-    formState: { isSubmitting, errors },
+    formState: { isSubmitting, errors, isLoading: isFormLoading },
   } = form;
 
   useEffect(() => {
@@ -156,79 +156,87 @@ export default function ProfilePage() {
     
     setUploadProgress(0);
 
+    let newLogoUrl: string | null = (profileData as any)?.logoUrl || null;
+    let newHeroUrl: string | null = (profileData as any)?.heroUrl || null;
+    
     try {
-      let newLogoUrl: string | null = (profileData as any)?.logoUrl || null;
-      let newHeroUrl: string | null = (profileData as any)?.heroUrl || null;
-      const totalUploads = (logoFile ? 1 : 0) + (heroFile ? 1 : 0);
-      let uploadsCompleted = 0;
-
-      const uploadFile = async (file: File, path: string): Promise<string> => {
-        const fileRef = ref(storage, path);
-        const uploadTask = uploadBytesResumable(fileRef, file, { contentType: file.type });
+        const totalUploads = (logoFile ? 1 : 0) + (heroFile ? 1 : 0);
+        let uploadsCompleted = 0;
         
-        return new Promise((resolve, reject) => {
-          uploadTask.on('state_changed', 
-            (snapshot) => {
-              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-              const overallProgress = ((uploadsCompleted * 100) + progress) / totalUploads;
-              setUploadProgress(overallProgress);
-            },
-            (error) => reject(error),
-            async () => {
-              uploadsCompleted++;
-              const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-              resolve(downloadURL);
-            }
-          );
+        const uploadFile = async (file: File, path: string): Promise<string> => {
+            const fileRef = ref(storage, path);
+            const uploadTask = uploadBytesResumable(fileRef, file, { contentType: file.type });
+            
+            return new Promise((resolve, reject) => {
+            uploadTask.on('state_changed', 
+                (snapshot) => {
+                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                const overallProgress = ((uploadsCompleted * 100) + progress) / totalUploads;
+                setUploadProgress(overallProgress);
+                },
+                (error) => reject(error),
+                async () => {
+                uploadsCompleted++;
+                const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                resolve(downloadURL);
+                }
+            );
+            });
+        };
+        
+        if (logoFile) {
+            newLogoUrl = await uploadFile(logoFile, `vehicle-images/${user.uid}/dealer_logo`);
+        }
+        if (heroFile) {
+            newHeroUrl = await uploadFile(heroFile, `vehicle-images/${user.uid}/dealer_hero`);
+        }
+
+        if (data.displayName !== user.displayName) {
+            await updateProfile(user, { displayName: data.displayName });
+        }
+    } catch (uploadError) {
+        console.error("Error uploading images:", uploadError);
+        toast({
+            title: 'Error de Subida',
+            description: 'No se pudieron subir las imágenes. Inténtalo de nuevo.',
+            variant: 'destructive',
         });
-      };
-      
-      if (logoFile) {
-        newLogoUrl = await uploadFile(logoFile, `vehicle-images/${user.uid}/dealer_logo`);
-      }
-      if (heroFile) {
-        newHeroUrl = await uploadFile(heroFile, `vehicle-images/${user.uid}/dealer_hero`);
-      }
-
-      if (data.displayName !== user.displayName) {
-        await updateProfile(user, { displayName: data.displayName });
-      }
-
-      const isDealerAccount = (profileData as any)?.accountType === 'dealer';
-
-      const updatePayload: any = {
-        displayName: data.displayName,
-        phoneNumber: data.phoneNumber || '',
-        uid: user.uid,
-        email: user.email,
-      };
-
-      if(isDealerAccount) {
-        updatePayload.address = data.address || '';
-        // Only include URL if a new file was uploaded to prevent overwriting with null
-        if (logoFile) updatePayload.logoUrl = newLogoUrl;
-        if (heroFile) updatePayload.heroUrl = newHeroUrl;
-      }
-      
-      // Use setDoc with merge: true. This will create the document if it doesn't exist,
-      // or update it if it does. Crucially, it will NOT overwrite fields that
-      // are not in the updatePayload, like 'accountType'.
-      await setDoc(profileRef, updatePayload, { merge: true });
-
-      toast({
-        title: '¡Perfil Actualizado!',
-        description: 'Tus cambios han sido guardados con éxito.',
-      });
-    } catch (error) {
-      console.error("Error updating profile:", error);
-      toast({
-        title: 'Error',
-        description: 'No se pudieron guardar los cambios. Inténtalo de nuevo.',
-        variant: 'destructive',
-      });
-    } finally {
         setUploadProgress(null);
+        return; 
     }
+
+    const isDealerAccount = (profileData as any)?.accountType === 'dealer';
+
+    const updatePayload: any = {
+      displayName: data.displayName,
+      phoneNumber: data.phoneNumber || '',
+      uid: user.uid,
+      email: user.email,
+    };
+    
+    if(isDealerAccount) {
+      updatePayload.address = data.address || '';
+      if (logoFile) updatePayload.logoUrl = newLogoUrl;
+      if (heroFile) updatePayload.heroUrl = newHeroUrl;
+    }
+
+    setDoc(profileRef, updatePayload, { merge: true })
+      .then(() => {
+          toast({
+              title: '¡Perfil Actualizado!',
+              description: 'Tus cambios han sido guardados con éxito.',
+          });
+      })
+      .catch((error) => {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({
+              path: profileRef.path,
+              operation: 'write',
+              requestResourceData: updatePayload,
+          }, error));
+      })
+      .finally(() => {
+          setUploadProgress(null);
+      });
   };
 
   const handleSendVerificationEmail = async () => {
@@ -323,7 +331,15 @@ export default function ProfilePage() {
       try {
         await confirmationResult.confirm(verificationCode);
         if (profileRef) {
-            await setDoc(profileRef, { isVerified: true }, { merge: true });
+            const payload = { isVerified: true };
+            setDoc(profileRef, payload, { merge: true })
+              .catch(error => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: profileRef.path,
+                    operation: 'update',
+                    requestResourceData: payload
+                }, error));
+            });
         }
         toast({ title: '¡Número Verificado!', description: 'Tu número ha sido verificado con éxito.', className: 'bg-green-100 dark:bg-green-900' });
         setIsVerificationDialogOpen(false);
@@ -348,18 +364,24 @@ export default function ProfilePage() {
   const handleFixAccountType = async () => {
     if (!user || !profileRef) return;
     setIsFixing(true);
-    try {
-        await setDoc(profileRef, { accountType: 'dealer' }, { merge: true });
+    const payload = { accountType: 'dealer' };
+    setDoc(profileRef, payload, { merge: true })
+    .then(() => {
         toast({
             title: "¡Cuenta Corregida!",
             description: "Tu cuenta ha sido actualizada a Concesionario. Por favor, recarga la página para ver los cambios."
         });
-    } catch (error) {
-        console.error("Error fixing account type:", error);
-        toast({ title: 'Error', description: 'No se pudo corregir el tipo de cuenta.', variant: 'destructive' });
-    } finally {
+    })
+    .catch((error) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: profileRef.path,
+            operation: 'update',
+            requestResourceData: payload,
+        }, error));
+    })
+    .finally(() => {
         setIsFixing(false);
-    }
+    });
   };
 
   if (isAuthLoading || isProfileLoading) {
@@ -465,7 +487,7 @@ export default function ProfilePage() {
                         <div className="space-y-4">
                            <Label>Logo (recomendado: 1:1, ej: 400x400px)</Label>
                            <div className="flex items-center gap-4">
-                               <div className="relative h-24 w-24 rounded-full border bg-muted overflow-hidden">
+                               <div className="relative h-24 w-24 rounded-full border-2 border-dashed bg-muted overflow-hidden">
                                  {logoPreview ? (
                                    <Image src={logoPreview} alt="Vista previa del logo" fill objectFit="cover" />
                                  ) : (
@@ -481,7 +503,7 @@ export default function ProfilePage() {
                          <div className="space-y-4">
                            <Label>Imagen de Portada (recomendado: 16:9, ej: 1600x900px)</Label>
                            <div className="flex items-center gap-4">
-                               <div className="relative aspect-video w-full max-w-sm rounded-md border bg-muted overflow-hidden">
+                               <div className="relative aspect-video w-full max-w-sm rounded-md border-2 border-dashed bg-muted overflow-hidden">
                                  {heroPreview ? (
                                    <Image src={heroPreview} alt="Vista previa de la portada" fill objectFit="cover" />
                                  ) : (
@@ -500,7 +522,7 @@ export default function ProfilePage() {
 
             <CardFooter className="px-0">
                 <div className="flex items-center gap-4">
-                    <Button type="submit" disabled={isSubmitting || uploadProgress !== null || isProfileLoading}>
+                    <Button type="submit" disabled={isSubmitting || uploadProgress !== null || isProfileLoading || isFormLoading}>
                       {(isSubmitting || uploadProgress !== null) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       Guardar Cambios
                     </Button>
