@@ -4,7 +4,7 @@ import { useParams, useRouter, notFound } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useVehicles } from '@/context/vehicle-context';
-import { useUser, useFirestore, useStorage, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { useUser, useFirestore, useStorage, errorEmitter, FirestorePermissionError, useDoc, useMemoFirebase } from '@/firebase';
 import { useTheme } from 'next-themes';
 import { useFavorites } from '@/context/favorites-context';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
@@ -61,6 +61,7 @@ import {
 import { formatCurrency, cn } from '@/lib/utils';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
 import { Skeleton } from '@/components/ui/skeleton';
+import { UserProfile } from '@/lib/types';
 
 
 function WhatsAppIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -90,6 +91,13 @@ export default function ListingDetailPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { resolvedTheme } = useTheme();
+
+  const sellerProfileRef = useMemoFirebase(() => {
+    if (!firestore || !vehicle) return null;
+    return doc(firestore, 'users', vehicle.sellerId);
+  }, [firestore, vehicle]);
+
+  const { data: sellerInfo, isLoading: isSellerLoading } = useDoc<UserProfile>(sellerProfileRef);
 
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
@@ -171,12 +179,12 @@ export default function ListingDetailPage() {
   }, [isContactDialogOpen]);
 
   const createWhatsAppLink = () => {
-    if (!vehicle || !vehicle.seller.phone) return '';
+    if (!vehicle || !displaySeller.phone) return '';
     
-    const sellerName = vehicle.seller.displayName;
+    const sellerName = displaySeller.displayName;
     const vehicleInfo = `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
     const price = formatCurrency(vehicle.priceUSD);
-    const phoneNumber = vehicle.seller.phone.replace(/[^0-9+]/g, '');
+    const phoneNumber = displaySeller.phone.replace(/[^0-9+]/g, '');
 
     const summaryItems: string[] = [];
     if (vehicle.hasAC) summaryItems.push("tiene aire acondicionado");
@@ -236,6 +244,8 @@ export default function ListingDetailPage() {
   if (!vehicle) {
     notFound();
   }
+
+  const displaySeller = sellerInfo || vehicle.seller;
 
   const isVehicleFavorite = isFavorite(vehicle.id);
 
@@ -405,13 +415,13 @@ export default function ListingDetailPage() {
   const handleToggleBlockSeller = async () => {
     if(!adminUser) return;
     setIsBlocking(true);
-    const newBlockedState = !vehicle.seller.isBlocked;
+    const newBlockedState = !displaySeller.isBlocked;
     try {
         const sellerRef = doc(firestore, 'users', vehicle.sellerId);
         await updateDoc(sellerRef, { isBlocked: newBlockedState });
         toast({
             title: `Vendedor ${newBlockedState ? 'Bloqueado' : 'Desbloqueado'}`,
-            description: `${vehicle.seller.displayName} ha sido ${newBlockedState ? 'bloqueado' : 'desbloqueado'}.`,
+            description: `${displaySeller.displayName} ha sido ${newBlockedState ? 'bloqueado' : 'desbloqueado'}.`,
         });
     } catch(error) {
         console.error("Error blocking/unblocking seller:", error);
@@ -494,6 +504,42 @@ export default function ListingDetailPage() {
       </CardContent>
     </Card>
   );
+
+  const SellerInfoBlock = () => {
+    const content = (
+        <div className="flex items-center gap-3">
+            {displaySeller.accountType === 'dealer' && displaySeller.logoUrl ? (
+                <Avatar className="h-10 w-10 border-2">
+                    <AvatarImage src={displaySeller.logoUrl} alt={`${displaySeller.displayName} logo`} />
+                    <AvatarFallback>{displaySeller.displayName?.charAt(0)}</AvatarFallback>
+                </Avatar>
+            ) : (
+                <User className="h-8 w-8 text-muted-foreground" />
+            )}
+            <div>
+                <div className="font-semibold flex items-center gap-2">
+                    {displaySeller.displayName}
+                    {displaySeller.isVerified && (
+                        <Badge variant="secondary" className="border-green-300 bg-green-100 text-green-800 dark:border-green-700 dark:bg-green-900/50 dark:text-green-300">
+                            <ShieldCheck className="h-3 w-3 mr-1" />Verificado
+                        </Badge>
+                    )}
+                </div>
+                {!displaySeller.isVerified && <Badge variant="destructive">No Verificado</Badge>}
+            </div>
+        </div>
+    );
+
+    if (displaySeller.accountType === 'dealer') {
+        return (
+            <Link href={`/dealerships/${displaySeller.uid}`} className="block hover:bg-muted/50 rounded-md -m-3 p-3 transition-colors">
+                {content}
+            </Link>
+        );
+    }
+
+    return <div className="-m-3 p-3">{content}</div>;
+  };
 
   return (
     <div className="container mx-auto max-w-6xl py-8">
@@ -596,23 +642,7 @@ export default function ListingDetailPage() {
                         <CardTitleComponent>Información del Vendedor</CardTitleComponent>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                    <div className="flex items-center gap-3">
-                        {vehicle.seller.accountType === 'dealer' && vehicle.seller.logoUrl ? (
-                            <Avatar className="h-10 w-10 border-2">
-                                <AvatarImage src={vehicle.seller.logoUrl} alt={`${vehicle.seller.displayName} logo`} />
-                                <AvatarFallback>{vehicle.seller.displayName?.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                        ) : (
-                            <User className="h-8 w-8 text-muted-foreground" />
-                        )}
-                        <div>
-                        <div className="font-semibold flex items-center gap-2">
-                            {vehicle.seller.displayName}
-                            {vehicle.seller.isVerified && <Badge variant="secondary" className="border-green-300 bg-green-100 text-green-800 dark:border-green-700 dark:bg-green-900/50 dark:text-green-300"><ShieldCheck className="h-3 w-3 mr-1" />Verificado</Badge>}
-                        </div>
-                        {!vehicle.seller.isVerified && <Badge variant="destructive">No Verificado</Badge>}
-                        </div>
-                    </div>
+                    <SellerInfoBlock />
                     <Dialog open={isContactDialogOpen} onOpenChange={setIsContactDialogOpen}>
                         <DialogTrigger asChild>
                         <Button className="w-full">
@@ -623,7 +653,7 @@ export default function ListingDetailPage() {
                         <DialogHeader>
                             <DialogTitle>Contactar al Vendedor</DialogTitle>
                             <DialogDescription>
-                            Estás a punto de contactar a {vehicle.seller.displayName} por WhatsApp.
+                            Estás a punto de contactar a {displaySeller.displayName} por WhatsApp.
                             </DialogDescription>
                         </DialogHeader>
                         <div className="py-4 space-y-4">
@@ -732,23 +762,7 @@ export default function ListingDetailPage() {
                         <CardTitleComponent>Información del Vendedor</CardTitleComponent>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                        <div className="flex items-center gap-3">
-                            {vehicle.seller.accountType === 'dealer' && vehicle.seller.logoUrl ? (
-                                <Avatar className="h-10 w-10 border-2">
-                                    <AvatarImage src={vehicle.seller.logoUrl} alt={`${vehicle.seller.displayName} logo`} />
-                                    <AvatarFallback>{vehicle.seller.displayName?.charAt(0)}</AvatarFallback>
-                                </Avatar>
-                            ) : (
-                                <User className="h-8 w-8 text-muted-foreground" />
-                            )}
-                            <div>
-                            <div className="font-semibold flex items-center gap-2">
-                                {vehicle.seller.displayName}
-                                {vehicle.seller.isVerified && <Badge variant="secondary" className="border-green-300 bg-green-100 text-green-800 dark:border-green-700 dark:bg-green-900/50 dark:text-green-300"><ShieldCheck className="h-3 w-3 mr-1" />Verificado</Badge>}
-                            </div>
-                            {!vehicle.seller.isVerified && <Badge variant="destructive">No Verificado</Badge>}
-                            </div>
-                        </div>
+                        <SellerInfoBlock />
                         <Dialog open={isContactDialogOpen} onOpenChange={setIsContactDialogOpen}>
                             <DialogTrigger asChild>
                             <Button className="w-full">
@@ -759,7 +773,7 @@ export default function ListingDetailPage() {
                             <DialogHeader>
                                 <DialogTitle>Contactar al Vendedor</DialogTitle>
                                 <DialogDescription>
-                                Estás a punto de contactar a {vehicle.seller.displayName} por WhatsApp.
+                                Estás a punto de contactar a {displaySeller.displayName} por WhatsApp.
                                 </DialogDescription>
                             </DialogHeader>
                             <div className="py-4 space-y-4">
@@ -904,24 +918,24 @@ export default function ListingDetailPage() {
 
                             <AlertDialog>
                                 <AlertDialogTrigger asChild>
-                                    <Button variant={vehicle.seller.isBlocked ? 'secondary' : 'destructive'}>
-                                        <ShieldBan className="mr-2"/> {vehicle.seller.isBlocked ? 'Desbloquear Vendedor' : 'Bloquear Vendedor'}
+                                    <Button variant={displaySeller.isBlocked ? 'secondary' : 'destructive'}>
+                                        <ShieldBan className="mr-2"/> {displaySeller.isBlocked ? 'Desbloquear Vendedor' : 'Bloquear Vendedor'}
                                     </Button>
                                 </AlertDialogTrigger>
                                 <AlertDialogContent>
                                     <AlertDialogHeader>
-                                        <AlertDialogTitle>¿{vehicle.seller.isBlocked ? 'Desbloquear' : 'Bloquear'} a {vehicle.seller.displayName}?</AlertDialogTitle>
+                                        <AlertDialogTitle>¿{displaySeller.isBlocked ? 'Desbloquear' : 'Bloquear'} a {displaySeller.displayName}?</AlertDialogTitle>
                                         <AlertDialogDescription>
-                                            {vehicle.seller.isBlocked 
+                                            {displaySeller.isBlocked 
                                                 ? 'Esto permitirá que el vendedor vuelva a publicar y sus anuncios sean visibles.'
                                                 : 'Al bloquear a este vendedor, se ocultarán todos sus anuncios y no podrá publicar nuevos. ¿Deseas continuar?'}
                                         </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
                                         <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                        <AlertDialogAction onClick={handleToggleBlockSeller} disabled={isBlocking} className={cn(!vehicle.seller.isBlocked && 'bg-destructive hover:bg-destructive/90')}>
+                                        <AlertDialogAction onClick={handleToggleBlockSeller} disabled={isBlocking} className={cn(!displaySeller.isBlocked && 'bg-destructive hover:bg-destructive/90')}>
                                             {isBlocking && <Loader2 className="animate-spin mr-2"/>}
-                                            {vehicle.seller.isBlocked ? 'Sí, desbloquear' : 'Sí, bloquear'}
+                                            {displaySeller.isBlocked ? 'Sí, desbloquear' : 'Sí, bloquear'}
                                         </AlertDialogAction>
                                     </AlertDialogFooter>
                                 </AlertDialogContent>
