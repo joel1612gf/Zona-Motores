@@ -1,0 +1,58 @@
+[
+  {
+    "estado": "Distrito Capital",
+    "ciudades": [
+      { "ciudad": "Caracas", "lat": 10.48059, "lon": -66.90361 }
+    ]
+  },
+  {
+    "estado": "Miranda",
+    "ciudades": [
+      { "ciudad": "Los Teques", "lat": 10.34444, "lon": -67.0425 },
+      { "ciudad": "Guarenas", "lat": 10.47028, "lon": -66.60694 },
+      { "ciudad": "Guatire", "lat": 10.47167, "lon": -66.54139 },
+      { "ciudad": "San Antonio de los Altos", "lat": 10.38333, "lon": -66.95 }
+    ]
+  },
+  {
+    "estado": "Carabobo",
+    "ciudades": [
+      { "ciudad": "Valencia", "lat": 10.16202, "lon": -68.00765 },
+      { "ciudad": "Puerto Cabello", "lat": 10.47306, "lon": -68.08333 }
+    ]
+  },
+  {
+    "estado": "Aragua",
+    "ciudades": [
+      { "ciudad": "Maracay", "lat": 10.24639, "lon": -67.59583 },
+      { "ciudad": "La Victoria", "lat": 10.22806, "lon": -67.33139 }
+    ]
+  },
+  {
+    "estado": "Zulia",
+    "ciudades": [
+        { "ciudad": "Maracaibo", "lat": 10.6421, "lon": -71.6125 },
+        { "ciudad": "Cabimas", "lat": 10.40472, "lon": -71.44278 }
+    ]
+  },
+  {
+    "estado": "Lara",
+    "ciudades": [
+        { "ciudad": "Barquisimeto", "lat": 10.06778, "lon": -69.35722 }
+    ]
+  },
+  {
+    "estado": "Anzoátegui",
+    "ciudades": [
+        { "ciudad": "Barcelona", "lat": 10.13639, "lon": -64.68694 },
+        { "ciudad": "Puerto La Cruz", "lat": 10.22389, "lon": -64.63944 },
+        { "ciudad": "Lechería", "lat": 10.1983, "lon": -64.6931 }
+    ]
+  },
+  {
+      "estado": "Mérida",
+      "ciudades": [
+          { "ciudad": "Mérida", "lat": 8.5925, "lon": -71.1444 }
+      ]
+  }
+]

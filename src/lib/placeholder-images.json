@@ -1,0 +1,124 @@
+{
+  "placeholderImages": [
+    {
+      "id": "hero-car",
+      "description": "Un auto moderno plateado en una carretera escénica",
+      "imageUrl": "https://images.unsplash.com/photo-1657549952432-d7a3c49e3e30?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxtb2Rlcm4lMjBjYXJ8ZW58MHx8fHwxNzY4OTUyNDA2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "modern car"
+    },
+    {
+      "id": "motorcycle-new",
+      "description": "Una motocicleta moderna en una carretera",
+      "imageUrl": "https://images.unsplash.com/photo-1558981403-c5f9899a28bc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3wzNzEyODF8MHwxfHNlYXJjaHwyfHxtb3RvcmN5Y2xlfGVufDB8fHx8MTY5OTU2MDk4N3ww&ixlib=rb-4.0.3&q=80&w=1080",
+      "imageHint": "motorcycle road"
+    },
+    {
+      "id": "car-new",
+      "description": "Un carro deportivo rojo",
+      "imageUrl": "https://images.unsplash.com/photo-1511919884226-fd3cad34687c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3wzNzEyODF8MHwxfHNlYXJjaHw0fHxjYXJ8ZW58MHx8fHwxNzAwNjA3MjY4fDA&ixlib=rb-4.0.3&q=80&w=1080",
+      "imageHint": "red car"
+    },
+    {
+      "id": "truck-new",
+      "description": "Una camioneta en un camino de tierra",
+      "imageUrl": "https://images.unsplash.com/photo-1543462879-a1723469c07a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3wzNzEyODF8MHwxfHNlYXJjaHwxfHx0cnVja3xlbnwwfHx8fDE3MDA2MDczMDR8MA&ixlib=rb-4.0.3&q=80&w=1080",
+      "imageHint": "truck dirt"
+    },
+    {
+      "id": "corolla-main",
+      "description": "Toyota Corolla Blanco",
+      "imageUrl": "https://images.unsplash.com/photo-1620882788693-cd891b20837d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHx3aGl0ZSUyMGNhcnxlbnwwfHx8fDE3Njg4OTY3NjZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "white car"
+    },
+    {
+      "id": "corolla-interior",
+      "description": "Interior de Toyota Corolla",
+      "imageUrl": "https://images.unsplash.com/photo-1606224103857-e4c74b0139df?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxjYXIlMjBpbnRlcmlvcnxlbnwwfHx8fDE3Njg4OTAxNTh8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "car interior"
+    },
+    {
+      "id": "corolla-side",
+      "description": "Vista lateral de Toyota Corolla",
+      "imageUrl": "https://images.unsplash.com/photo-1652368876768-ba817a44ef30?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHx3aGl0ZSUyMGNhciUyMHNpZGV8ZW58MHx8fHwxNzY4OTUyNDA2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "white car side"
+    },
+    {
+      "id": "fortuner-main",
+      "description": "Toyota Fortuner Plateada",
+      "imageUrl": "https://images.unsplash.com/photo-1705769944019-a490299946e8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxzaWx2ZXIlMjBzdXZ8ZW58MHx8fHwxNzY4OTUyNDA2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "silver suv"
+    },
+    {
+      "id": "fortuner-interior",
+      "description": "Interior de Toyota Fortuner",
+      "imageUrl": "https://images.unsplash.com/photo-1748214311678-5c080f1f50a0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxzdXYlMjBpbnRlcmlvcnxlbnwwfHx8fDE3Njg5NTI0MDZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "suv interior"
+    },
+    {
+      "id": "machito-main",
+      "description": "Toyota Land Cruiser Beige",
+      "imageUrl": "https://images.unsplash.com/photo-1762235634111-f1c8a719c9f1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxiZWlnZSUyMHRydWNrfGVufDB8fHx8MTc2ODk1MjQwNnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "beige truck"
+    },
+    {
+      "id": "cherokee-main",
+      "description": "Jeep Grand Cherokee Negro",
+      "imageUrl": "https://images.unsplash.com/photo-1735620731955-b047a7122892?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxibGFjayUyMHN1dnxlbnwwfHx8fDE3Njg5NTI0MDZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "black suv"
+    },
+    {
+      "id": "elantra-main",
+      "description": "Hyundai Elantra Azul",
+      "imageUrl": "https://images.unsplash.com/photo-1621601628445-ff13122a9caf?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8Ymx1ZSUyMHNlZGFufGVufDB8fHx8MTc2ODgzNjY1MXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "blue sedan"
+    },
+    {
+      "id": "fiesta-main",
+      "description": "Ford Fiesta Rojo",
+      "imageUrl": "https://images.unsplash.com/photo-1572278144794-282a814f09d8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxyZWQlMjBmb3JkJTIwZmllc3RhfGVufDB8fHx8MTc2ODk1MjQwNnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "red car"
+    },
+    {
+      "id": "silverado-main",
+      "description": "Chevrolet Silverado Negra",
+      "imageUrl": "https://images.unsplash.com/photo-1573352215953-155a9b085521?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxibGFjayUyMGNoZXZyb2xldCUyMHNpbHZlcmFkb3xlbnwwfHx8fDE3Njg5NTI0MDZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "black truck"
+    },
+    {
+      "id": "explorer-main",
+      "description": "Ford Explorer Blanca",
+      "imageUrl": "https://images.unsplash.com/photo-1622080721393-903b10b05a76?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHx3aGl0ZSUyMGZvcmQlMjBleHBsb3JlcnxlbnwwfHx8fDE3Njg5NTI0MDZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "white suv"
+    },
+    {
+      "id": "civic-main",
+      "description": "Honda Civic Gris",
+      "imageUrl": "https://images.unsplash.com/photo-1596482649643-5f72a68e07b8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxncmF5JTIwaG9uZGEuY2l2aWN8ZW58MHx8fHwxNzY4OTUyNDA2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "gray sedan"
+    },
+    {
+      "id": "lancer-main",
+      "description": "Mitsubishi Lancer Plateado",
+      "imageUrl": "https://images.unsplash.com/photo-1619429408236-a86f7b31b402?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxzaWx2ZXIlMjBtaXRzdWJpc2hpJTIwbGFuY2VyfGVufDB8fHx8fDE3Njg5NTI0MDZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "silver sedan"
+    },
+    {
+      "id": "wrangler-main",
+      "description": "Jeep Wrangler Amarillo",
+      "imageUrl": "https://images.unsplash.com/photo-1550348792-c2889e409b33?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxlbGxvdyUyMGplZXAlMjB3cmFuZ2xlcnxlbnwwfHx8fDE3Njg5NTI0MDZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "yellow jeep"
+    },
+    {
+      "id": "montero-main",
+      "description": "Mitsubishi Montero Gris Oscuro",
+      "imageUrl": "https://images.unsplash.com/photo-1603584883318-243202901968?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3wzNzEyODF8MHwxfHNlYXJjaHwxfHxncmF5JTIwTVRTVE9SRVQlMjBzdXZ8ZW58MHx8fHwxNzA4NTQzNTM4fDA&ixlib=rb-4.0.3&q=80&w=1080",
+      "imageHint": "gray suv"
+    },
+    {
+      "id": "fiat-uno-main",
+      "description": "Fiat Uno Rojo",
+      "imageUrl": "https://images.unsplash.com/photo-1631129323725-54b9b9423630?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3wzNzEyODF8MHwxfHNlYXJjaHwyfHxyZWQlMjBzbWFsbCUyMGNhcnxlbnwwfHx8fDE3MDYxOTU1MDV8MA&ixlib=rb-4.0.3&q=80&w=1080",
+      "imageHint": "red car"
+    }
+  ]
+}

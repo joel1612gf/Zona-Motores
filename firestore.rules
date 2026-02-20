@@ -1,0 +1,68 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return request.auth.token.email == 'zonamotores.ve@gmail.com';
+    }
+
+    match /users/{userId} {
+      // Any signed-in user can GET a single user profile or LIST all users.
+      // This is required for the dealerships page to function.
+      allow get, list: if isSignedIn();
+      // Only the owner or an admin can make changes.
+      allow write: if isOwner(userId) || isAdmin();
+
+      // Vehicle listings are a subcollection of users
+      match /vehicleListings/{listingId} {
+        // Anyone can get a single listing
+        allow get: if true;
+        
+        // Only the owner of the user document or an admin can create or delete their own listings
+        allow create, delete: if isOwner(userId) || isAdmin();
+        
+        // For updates:
+        // 1. The owner or an admin can update any field.
+        // 2. Any user can update ONLY the 'viewCount' or 'contactRequests' fields.
+        allow update: if (isOwner(userId) || isAdmin()) ||
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewCount']) ||
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['contactRequests']);
+      }
+
+      match /favorites/{vehicleId} {
+        // A user can only manage their own favorites
+        allow read, write, delete: if isOwner(userId);
+      }
+    }
+
+    // This rule allows a collection group query on 'vehicleListings'.
+    // It's required to let anyone list all vehicles across all users.
+    // A composite index will need to be created in Firestore for this to work.
+    match /{path=**}/vehicleListings/{listingId} {
+      allow list: if true;
+    }
+
+    // This collection is no longer used, so we deny all access to prevent confusion.
+    match /vehicle_listings/{listingId} {
+      allow read, write: if false;
+    }
+
+    // vehicle_meta can be read by anyone
+    match /vehicle_meta/{docId} {
+      allow get, list: if true;
+    }
+
+    // exchangeRates can be read by anyone
+    match /exchangeRates/{rateId} {
+        allow get, list: if true;
+    }
+  }
+}

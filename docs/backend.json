@@ -1,0 +1,230 @@
+{
+  "entities": {
+    "VehicleListing": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "VehicleListing",
+      "type": "object",
+      "description": "Represents a vehicle listing in the Motores Zone application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the VehicleListing entity."
+        },
+        "sellerId": {
+          "type": "string",
+          "description": "Reference to the User who is the seller."
+        },
+        "make": {
+          "type": "string",
+          "description": "The make of the vehicle (e.g., Toyota)."
+        },
+        "model": {
+          "type": "string",
+          "description": "The model of the vehicle (e.g., Corolla)."
+        },
+        "year": {
+          "type": "number",
+          "description": "The year the vehicle was manufactured."
+        },
+        "priceUSD": {
+          "type": "number",
+          "description": "The price of the vehicle in US dollars."
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description of the vehicle listing."
+        },
+        "imageUrls": {
+          "type": "array",
+          "description": "URLs of the images associated with the vehicle listing.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "is4x4": {
+          "type": "boolean",
+          "description": "Indicates if the vehicle has 4x4 traction."
+        },
+        "isArmored": {
+          "type": "boolean",
+          "description": "Indicates if the vehicle is armored."
+        },
+        "armorLevel": {
+          "type": "number",
+          "description": "The armor level of the vehicle, from 1 to 7."
+        },
+        "locationLatitude": {
+          "type": "number",
+          "description": "Latitude coordinate of the vehicle's location."
+        },
+        "locationLongitude": {
+          "type": "number",
+          "description": "Longitude coordinate of the vehicle's location."
+        },
+        "summary": {
+          "type": "string",
+          "description": "AI generated summary of the listing."
+        },
+        "marketplaceUrl": {
+          "type": "string",
+          "description": "Optional URL to an external marketplace listing for status checking."
+        },
+        "viewCount": {
+          "type": "number",
+          "description": "Number of times the listing has been viewed."
+        },
+        "contactRequests": {
+          "type": "number",
+          "description": "Number of times the seller's contact info has been revealed."
+        },
+        "promotionExpiresAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the promotion expires."
+        }
+      },
+      "required": [
+        "id",
+        "sellerId",
+        "make",
+        "model",
+        "year",
+        "priceUSD",
+        "description",
+        "imageUrls",
+        "locationLatitude",
+        "locationLongitude"
+      ]
+    },
+    "Seller": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Seller",
+      "type": "object",
+      "description": "Represents a seller of vehicles, which is essentially a user profile.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Seller entity, matches auth.uid."
+        },
+        "phoneNumber": {
+          "type": "string",
+          "description": "The seller's phone number used for verification."
+        },
+        "isVerified": {
+          "type": "boolean",
+          "description": "Indicates whether the seller has verified their phone number."
+        },
+        "isBlocked": {
+          "type": "boolean",
+          "description": "Indicates if the seller's account is blocked by an admin."
+        },
+        "accountType": {
+          "type": "string",
+          "description": "The type of seller account, for future features.",
+          "enum": [
+            "personal",
+            "dealer"
+          ]
+        },
+        "logoUrl": {
+            "type": "string",
+            "description": "URL for the dealership's logo image."
+        },
+        "heroUrl": {
+            "type": "string",
+            "description": "URL for the dealership's hero or cover image."
+        },
+        "address": {
+            "type": "string",
+            "description": "Physical address of the dealership."
+        }
+      },
+      "required": [
+        "id",
+        "isVerified"
+      ]
+    },
+    "ExchangeRate": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ExchangeRate",
+      "type": "object",
+      "description": "Represents the exchange rate between USD and VES (Bolivares).",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the ExchangeRate entity."
+        },
+        "rate": {
+          "type": "number",
+          "description": "The current exchange rate (VES per USD)."
+        },
+        "lastUpdated": {
+          "type": "string",
+          "description": "The date and time when the exchange rate was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "rate",
+        "lastUpdated"
+      ]
+    },
+    "Favorite": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Favorite",
+      "type": "object",
+      "description": "Represents a user's favorited vehicle listing. The document ID is the same as the vehicleId.",
+      "properties": {
+        "vehicleId": {
+          "type": "string",
+          "description": "The ID of the favorited VehicleListing."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp when the vehicle was favorited."
+        }
+      },
+      "required": [
+        "vehicleId",
+        "createdAt"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous",
+      "phone",
+      "google.com",
+      "apple.com"
+    ]
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/Seller"
+      },
+      "description": "Stores user profiles. 'userId' corresponds to the user's auth.uid."
+    },
+    "/users/{userId}/vehicleListings/{vehicleListingId}": {
+      "schema": {
+        "$ref": "#/entities/VehicleListing"
+      },
+      "description": "Stores vehicle listings as a subcollection of a user. Leverages path-based ownership."
+    },
+    "/users/{userId}/favorites/{vehicleId}": {
+      "schema": {
+        "$ref": "#/entities/Favorite"
+      },
+      "description": "Stores a user's favorite vehicle listings. The document ID is the vehicleId."
+    },
+    "/exchangeRates/{exchangeRateId}": {
+      "schema": {
+        "$ref": "#/entities/ExchangeRate"
+      },
+      "description": "Stores exchange rate data. This is likely an admin-managed collection."
+    }
+  }
+}
