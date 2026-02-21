@@ -5,13 +5,7 @@ import { cn } from '@/lib/utils';
 import { Toaster } from '@/components/ui/toaster';
 import { SiteHeader } from '@/components/site-header';
 import { SiteFooter } from '@/components/site-footer';
-import { FirebaseClientProvider } from '@/firebase';
-import { VehicleProvider } from '@/context/vehicle-context';
-import { ThemeProvider } from '@/components/theme-provider';
-import { MakesProvider } from '@/context/makes-context';
-import { FavoritesProvider } from '@/context/favorites-context';
-import { SubscriptionProvider } from '@/context/subscription-context';
-import { APIProvider } from '@vis.gl/react-google-maps';
+import { ClientProviders } from '@/components/client-providers';
 
 const fontBody = Inter({
   subsets: ['latin'],
@@ -52,31 +46,14 @@ export default function RootLayout({
     <html lang="es" suppressHydrationWarning className={`${fontBody.variable} ${fontHeadline.variable}`}>
       <head />
       <body className={cn('min-h-screen bg-background font-body antialiased')}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!}>
-            <FirebaseClientProvider>
-              <SubscriptionProvider>
-                <MakesProvider>
-                  <VehicleProvider>
-                    <FavoritesProvider>
-                      <div className="relative flex min-h-dvh flex-col">
-                        <SiteHeader />
-                        <main className="flex-1">{children}</main>
-                        <SiteFooter />
-                      </div>
-                      <Toaster />
-                    </FavoritesProvider>
-                  </VehicleProvider>
-                </MakesProvider>
-              </SubscriptionProvider>
-            </FirebaseClientProvider>
-          </APIProvider>
-        </ThemeProvider>
+        <ClientProviders>
+          <div className="relative flex min-h-dvh flex-col">
+            <SiteHeader />
+            <main className="flex-1">{children}</main>
+            <SiteFooter />
+          </div>
+          <Toaster />
+        </ClientProviders>
       </body>
     </html>
   );
