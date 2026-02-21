@@ -60,6 +60,16 @@ const ADMIN_EMAIL = 'zonamotores.ve@gmail.com';
 
 const defaultCenter = { lat: 6.4238, lng: -66.5897 }; // Center of Venezuela
 
+function CarMarker() {
+    const carIconDataUri = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImhzbCh2YXIoLS1wcmltYXJ5KSkiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBjbGFzcz0ibHVjaWRlIGx1Y2lkZS1jYXIiPjxwYXRoIGQ9Ik0xOSA5bDIgMGMuNiAwIDEgLjQgMSAxdjNjMCAuOS0uNyAxLjctMS41IDEuOUMxOC43IDE1LjQgMTYgMTUgMTYgMTVzLTEuMy0xLjQtMi4yLTIuM2MtLjUtLjQtMS4xLS43LTEuOC0uN0g1Yy0uNiAwLTEuMS40LTEuNC45TDEuNCAxNy45Yy0uMS4yLS4xLjQtLjEuNlYyMWMwIC42LjQgMSAxIDEiLz48cGF0aCBkPSJNNyAyMXYtMS4zIi8+PHBhdGggZD0iTTE3IDIxdi0xLjMiLz48cGF0aCBkPSJNNSAxNWgxNCIvPjxjaXJjbGUgY3g9IjciIGN5PSIxNyIgcj0iMiIvPjxjaXJjbGUgY3g9IjE3IiBjeT0iMTciIHI9IjIiLz48L3N2Zz4=';
+  
+    return (
+      <div style={{ width: 24, height: 24 }}>
+        <img src={carIconDataUri} alt="Car Marker" />
+      </div>
+    );
+  }
+
 export default function NewListingPage() {
     const router = useRouter();
     const { toast } = useToast();
@@ -974,7 +984,7 @@ export default function NewListingPage() {
                         fullscreenControl={false}
                         className="w-full h-full"
                     >
-                        {markerPosition && <AdvancedMarker position={markerPosition} />}
+                        {markerPosition && <AdvancedMarker position={markerPosition}><CarMarker /></AdvancedMarker>}
                     </Map>
                 </div>
 
@@ -1170,3 +1180,5 @@ export default function NewListingPage() {
         </div>
     );
 }
+
+    
