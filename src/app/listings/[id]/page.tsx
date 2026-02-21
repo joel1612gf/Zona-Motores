@@ -91,8 +91,15 @@ function CarMarker() {
         fill="none"
         stroke={color}
         strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       >
-        <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9L1.4 12.9A3.3 3.3 0 0 0 1 14.8V17c0 .6.4 1 1h2M7 17v-1.3M17 17v-1.3M5 11h14M5 17a2 2 0 1 0 4 0 2 2 0 1 0-4 0m10 0a2 2 0 1 0 4 0 2 2 0 1 0-4 0" />
+        <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9L1.4 12.9c-.1.2-.1.4-.1.6V17c0 .6.4 1 1 1h2" />
+        <path d="M7 17v-1.3" />
+        <path d="M17 17v-1.3" />
+        <path d="M5 11h14" />
+        <circle cx="7" cy="17" r="2" />
+        <circle cx="17" cy="17" r="2" />
       </svg>
     </div>
   );
@@ -684,6 +691,7 @@ export default function ListingDetailPage() {
                         <DialogTrigger asChild>
                             <div className="h-40 w-full cursor-pointer relative group">
                                 <Map
+                                    mapId="listing_detail_map_mobile"
                                     defaultCenter={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
                                     defaultZoom={12}
                                     gestureHandling={'none'}
@@ -710,6 +718,7 @@ export default function ListingDetailPage() {
                                 <DialogTitle>Ubicación del Vehículo</DialogTitle>
                             </DialogHeader>
                             <Map
+                                mapId="listing_detail_map_dialog"
                                 defaultCenter={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
                                 defaultZoom={15}
                                 streetViewControl={false}
@@ -792,6 +801,7 @@ export default function ListingDetailPage() {
                             <DialogTrigger asChild>
                                 <div className="h-40 w-full cursor-pointer relative group">
                                      <Map
+                                        mapId="listing_detail_map_desktop"
                                         defaultCenter={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
                                         defaultZoom={12}
                                         gestureHandling={'none'}
@@ -818,6 +828,7 @@ export default function ListingDetailPage() {
                                     <DialogTitle>Ubicación del Vehículo</DialogTitle>
                                 </DialogHeader>
                                 <Map
+                                    mapId="listing_detail_map_dialog_desktop"
                                     defaultCenter={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
                                     defaultZoom={15}
                                     streetViewControl={false}

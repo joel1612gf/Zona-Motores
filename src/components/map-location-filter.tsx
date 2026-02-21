@@ -126,6 +126,7 @@ export function MapLocationFilter({ currentFilter, onApply, open, onOpenChange }
     return (
         <Map
             key={mapInstanceKey}
+            mapId="map_location_filter"
             defaultCenter={mapCenter}
             defaultZoom={marker ? 10 : 5}
             onClick={onMapClick}

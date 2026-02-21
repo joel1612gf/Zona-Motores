@@ -965,6 +965,7 @@ export default function NewListingPage() {
             <Card className="p-4">
                 <div className='rounded-lg overflow-hidden border h-[400px] mb-4'>
                     <Map
+                        mapId="new_listing_map"
                         defaultCenter={mapCenter}
                         defaultZoom={mapCenter === defaultCenter ? 5 : 12}
                         onClick={(e) => e.detail.latLng && setMarkerPosition(e.detail.latLng)}
