@@ -37,10 +37,9 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-    AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { formatCurrency } from '@/lib/utils';
-import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
+import { Map, AdvancedMarker } from '@vis.gl/react-google-maps';
 
 
 type VehicleType = 'Moto' | 'Carro' | 'Camioneta';
@@ -59,7 +58,6 @@ const vehicleTypeOptions: {
 // LISTING_LIMIT is now dynamic, see useSubscription()
 const ADMIN_EMAIL = 'zonamotores.ve@gmail.com';
 
-const libraries: ('places' | 'drawing' | 'geometry' | 'visualization')[] = ['places'];
 const defaultCenter = { lat: 6.4238, lng: -66.5897 }; // Center of Venezuela
 
 export default function NewListingPage() {
@@ -70,11 +68,6 @@ export default function NewListingPage() {
     const storage = useStorage();
     const { vehicles: allVehicles } = useVehicles();
     const { limits: planLimits, planName: currentPlanName, plan: currentPlan } = useSubscription();
-
-    const { isLoaded, loadError } = useJsApiLoader({
-        googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
-        libraries,
-    });
 
     const isAdmin = user?.email === ADMIN_EMAIL;
 
@@ -153,7 +146,7 @@ export default function NewListingPage() {
     });
 
     useEffect(() => {
-        if (!markerPosition || !isLoaded) {
+        if (!markerPosition) {
             return;
         }
 
@@ -196,7 +189,7 @@ export default function NewListingPage() {
             }
             setIsGeocoding(false);
         });
-    }, [markerPosition, isLoaded, toast]);
+    }, [markerPosition, toast]);
 
     const allMakesForSelectedType = useMemo(() => {
         if (!makesByType || !selectedType || !makesByType[selectedType]) return [];
@@ -971,19 +964,17 @@ export default function NewListingPage() {
 
             <Card className="p-4">
                 <div className='rounded-lg overflow-hidden border h-[400px] mb-4'>
-                    {loadError && <div className="text-destructive p-4">Error al cargar el mapa.</div>}
-                    {!isLoaded && !loadError && <div className="h-full flex items-center justify-center bg-muted"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>}
-                    {isLoaded && (
-                        <GoogleMap
-                            mapContainerStyle={{ width: '100%', height: '100%' }}
-                            center={mapCenter}
-                            zoom={mapCenter === defaultCenter ? 5 : 12}
-                            onClick={(e) => e.latLng && setMarkerPosition({ lat: e.latLng.lat(), lng: e.latLng.lng() })}
-                            options={{ streetViewControl: false, mapTypeControl: false, fullscreenControl: false }}
-                        >
-                            {markerPosition && <Marker position={markerPosition} />}
-                        </GoogleMap>
-                    )}
+                    <Map
+                        defaultCenter={mapCenter}
+                        defaultZoom={mapCenter === defaultCenter ? 5 : 12}
+                        onClick={(e) => e.detail.latLng && setMarkerPosition(e.detail.latLng)}
+                        streetViewControl={false}
+                        mapTypeControl={false}
+                        fullscreenControl={false}
+                        className="w-full h-full"
+                    >
+                        {markerPosition && <AdvancedMarker position={markerPosition} />}
+                    </Map>
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-4 items-center">

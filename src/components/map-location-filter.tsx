@@ -1,12 +1,32 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { GoogleMap, useJsApiLoader, Marker, Circle } from '@react-google-maps/api';
+import { useState, useCallback, useEffect } from 'react';
+import { Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from './ui/dialog';
 import { Label } from './ui/label';
 import { Slider } from './ui/slider';
 import { MapPin, Loader2 } from 'lucide-react';
+
+interface MapCircleProps extends google.maps.CircleOptions {
+  center: google.maps.LatLngLiteral;
+}
+
+function MapCircle(props: MapCircleProps) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map) return;
+    const circle = new google.maps.Circle({
+      ...props,
+      map,
+    });
+    return () => circle.setMap(null);
+  }, [map, props]);
+
+  return null;
+}
+
 
 interface MapLocationFilterProps {
   currentFilter: { lat: number; lon: number; radius: number } | null;
@@ -26,20 +46,12 @@ const defaultCenter = {
   lng: -66.5897,
 };
 
-const libraries: ('places' | 'drawing' | 'geometry' | 'visualization')[] = ['places'];
-
-
 export function MapLocationFilter({ currentFilter, onApply, open, onOpenChange }: MapLocationFilterProps) {
-  const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
-    libraries,
-  });
-
   const isControlled = open !== undefined && onOpenChange !== undefined;
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
 
   const isOpen = isControlled ? open : uncontrolledOpen;
-  const setIsOpen = isControlled ? onOpenChange : setUncontrolledOpen;
+  const setIsOpen = isControlled ? onOpenChange ?? setUncontrolledOpen : setUncontrolledOpen;
 
   const [mapInstanceKey, setMapInstanceKey] = useState(Date.now());
   
@@ -111,49 +123,32 @@ export function MapLocationFilter({ currentFilter, onApply, open, onOpenChange }
     : 'Ubicación en Mapa';
 
   const renderMap = () => {
-    if (loadError) {
-      return <div className="text-destructive p-4 border border-destructive/50 rounded-md">Error al cargar el mapa. Asegúrate de que la clave de API de Google Maps es correcta y está configurada en el archivo .env</div>;
-    }
-
-    if (!isLoaded) {
-      return (
-        <div className="h-[400px] flex items-center justify-center bg-muted rounded-md">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            <p className="ml-2 text-muted-foreground">Cargando mapa...</p>
-        </div>
-      );
-    }
-
     return (
-      <GoogleMap
-        key={mapInstanceKey}
-        mapContainerStyle={containerStyle}
-        center={mapCenter}
-        zoom={marker ? 10 : 5}
-        onClick={onMapClick}
-        options={{
-            streetViewControl: false,
-            mapTypeControl: false,
-            fullscreenControl: false,
-        }}
-      >
-        {marker && (
-          <>
-            <Marker position={marker} />
-            <Circle
-              center={marker}
-              radius={radius * 1000} // Radius in meters
-              options={{
-                strokeColor: 'hsl(var(--primary))',
-                strokeOpacity: 0.8,
-                strokeWeight: 2,
-                fillColor: 'hsl(var(--primary))',
-                fillOpacity: 0.2,
-              }}
-            />
-          </>
-        )}
-      </GoogleMap>
+        <Map
+            key={mapInstanceKey}
+            defaultCenter={mapCenter}
+            defaultZoom={marker ? 10 : 5}
+            onClick={onMapClick}
+            streetViewControl={false}
+            mapTypeControl={false}
+            fullscreenControl={false}
+            className="w-full h-full"
+        >
+            {marker && (
+            <>
+                <AdvancedMarker position={marker} />
+                <MapCircle
+                    center={marker}
+                    radius={radius * 1000} // Radius in meters
+                    strokeColor='hsl(var(--primary))'
+                    strokeOpacity={0.8}
+                    strokeWeight={2}
+                    fillColor='hsl(var(--primary))'
+                    fillOpacity={0.2}
+                />
+            </>
+            )}
+      </Map>
     );
   };
 
@@ -179,7 +174,7 @@ export function MapLocationFilter({ currentFilter, onApply, open, onOpenChange }
           <p className="text-sm text-muted-foreground">
             Haz clic en el mapa para seleccionar un punto central y luego ajusta el radio de búsqueda.
           </p>
-          <div className='rounded-lg overflow-hidden border'>
+          <div className='rounded-lg overflow-hidden border h-[400px]'>
             {renderMap()}
           </div>
           <div className="space-y-2 pt-2">

@@ -25,7 +25,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
@@ -59,7 +58,7 @@ import {
   Heart,
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
-import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
+import { Map, AdvancedMarker } from '@vis.gl/react-google-maps';
 import { Skeleton } from '@/components/ui/skeleton';
 import { UserProfile } from '@/lib/types';
 
@@ -79,7 +78,25 @@ function WhatsAppIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
-const libraries: ('places' | 'drawing' | 'geometry' | 'visualization')[] = ['places'];
+function CarMarker() {
+  const { resolvedTheme } = useTheme();
+  const color = resolvedTheme === 'dark' ? '#FAFAFA' : '#2563EB';
+
+  return (
+    <div style={{ width: 24, height: 24 }}>
+      <svg
+        viewBox="0 0 24 24"
+        width="24"
+        height="24"
+        fill="none"
+        stroke={color}
+        strokeWidth="1.5"
+      >
+        <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9L1.4 12.9A3.3 3.3 0 0 0 1 14.8V17c0 .6.4 1 1h2M7 17v-1.3M17 17v-1.3M5 11h14M5 17a2 2 0 1 0 4 0 2 2 0 1 0-4 0m10 0a2 2 0 1 0 4 0 2 2 0 1 0-4 0" />
+      </svg>
+    </div>
+  );
+}
 
 export default function ListingDetailPage() {
   const params = useParams<{ id: string }>();
@@ -90,36 +107,13 @@ export default function ListingDetailPage() {
   const storage = useStorage();
   const router = useRouter();
   const { toast } = useToast();
-  const { resolvedTheme } = useTheme();
-
+  
   const sellerProfileRef = useMemoFirebase(() => {
     if (!firestore || !vehicle) return null;
     return doc(firestore, 'users', vehicle.sellerId);
   }, [firestore, vehicle]);
 
   const { data: sellerInfo, isLoading: isSellerLoading } = useDoc<UserProfile>(sellerProfileRef);
-
-  const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
-    libraries,
-  });
-
-  const carMarkerIcon = useMemo(() => {
-    if (typeof window === 'undefined' || !window.google?.maps?.Point) return undefined;
-    
-    const color = resolvedTheme === 'dark' ? '#FAFAFA' : '#2563EB';
-    
-    return {
-      path: 'M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9L1.4 12.9A3.3 3.3 0 0 0 1 14.8V17c0 .6.4 1 1h2M7 17v-1.3M17 17v-1.3M5 11h14M5 17a2 2 0 1 0 4 0 2 2 0 1 0-4 0m10 0a2 2 0 1 0 4 0 2 2 0 1 0-4 0',
-      fillColor: color,
-      fillOpacity: 1,
-      strokeWeight: 0,
-      rotation: 0,
-      scale: 1.2,
-      anchor: new window.google.maps.Point(12, 12),
-    };
-  }, [resolvedTheme]);
-
 
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -689,27 +683,21 @@ export default function ListingDetailPage() {
                     <Dialog open={isMapDialogOpen} onOpenChange={setIsMapDialogOpen}>
                         <DialogTrigger asChild>
                             <div className="h-40 w-full cursor-pointer relative group">
-                                {isLoaded && !loadError ? (
-                                    <GoogleMap
-                                        mapContainerStyle={{ width: '100%', height: '100%' }}
-                                        center={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
-                                        zoom={12}
-                                        options={{
-                                            gestureHandling: 'none',
-                                            zoomControl: false,
-                                            streetViewControl: false,
-                                            mapTypeControl: false,
-                                            fullscreenControl: false,
-                                            clickableIcons: false
-                                        }}
-                                    >
-                                        <Marker position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }} icon={carMarkerIcon} />
-                                    </GoogleMap>
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center bg-muted">
-                                    {loadError ? <p className="text-destructive text-xs p-2 text-center">Error al cargar mapa</p> : <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />}
-                                    </div>
-                                )}
+                                <Map
+                                    defaultCenter={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
+                                    defaultZoom={12}
+                                    gestureHandling={'none'}
+                                    zoomControl={false}
+                                    streetViewControl={false}
+                                    mapTypeControl={false}
+                                    fullscreenControl={false}
+                                    clickableIcons={false}
+                                    className="w-full h-full"
+                                >
+                                    <AdvancedMarker position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}>
+                                      <CarMarker />
+                                    </AdvancedMarker>
+                                </Map>
                                 <div className="absolute inset-0 bg-transparent group-hover:bg-black/30 transition-colors flex items-center justify-center" aria-hidden="true">
                                     <div className="p-2 bg-background/80 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
                                         <MapPin className="h-5 w-5 text-foreground" />
@@ -721,24 +709,18 @@ export default function ListingDetailPage() {
                             <DialogHeader className="p-4 absolute top-0 left-0 z-10 bg-gradient-to-b from-background via-background/80 to-transparent w-full">
                                 <DialogTitle>Ubicación del Vehículo</DialogTitle>
                             </DialogHeader>
-                            {isLoaded && !loadError ? (
-                                <GoogleMap
-                                    mapContainerStyle={{ width: '100%', height: '100%' }}
-                                    center={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
-                                    zoom={15}
-                                    options={{
-                                    streetViewControl: false,
-                                    mapTypeControl: false,
-                                    fullscreenControl: false
-                                    }}
-                                >
-                                    <Marker position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }} icon={carMarkerIcon} />
-                                </GoogleMap>
-                            ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-muted">
-                                    {loadError ? <p className="text-destructive">Error al cargar mapa</p> : <Loader2 className="h-8 w-8 animate-spin" />}
-                                </div>
-                            )}
+                            <Map
+                                defaultCenter={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
+                                defaultZoom={15}
+                                streetViewControl={false}
+                                mapTypeControl={false}
+                                fullscreenControl={false}
+                                className="w-full h-full"
+                            >
+                               <AdvancedMarker position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}>
+                                  <CarMarker />
+                                </AdvancedMarker>
+                            </Map>
                         </DialogContent>
                     </Dialog>
                     </div>
@@ -809,27 +791,21 @@ export default function ListingDetailPage() {
                         <Dialog open={isMapDialogOpen} onOpenChange={setIsMapDialogOpen}>
                             <DialogTrigger asChild>
                                 <div className="h-40 w-full cursor-pointer relative group">
-                                    {isLoaded && !loadError ? (
-                                        <GoogleMap
-                                            mapContainerStyle={{ width: '100%', height: '100%' }}
-                                            center={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
-                                            zoom={12}
-                                            options={{
-                                                gestureHandling: 'none',
-                                                zoomControl: false,
-                                                streetViewControl: false,
-                                                mapTypeControl: false,
-                                                fullscreenControl: false,
-                                                clickableIcons: false
-                                            }}
-                                        >
-                                            <Marker position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }} icon={carMarkerIcon} />
-                                        </GoogleMap>
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center bg-muted">
-                                        {loadError ? <p className="text-destructive text-xs p-2 text-center">Error al cargar mapa</p> : <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />}
-                                        </div>
-                                    )}
+                                     <Map
+                                        defaultCenter={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
+                                        defaultZoom={12}
+                                        gestureHandling={'none'}
+                                        zoomControl={false}
+                                        streetViewControl={false}
+                                        mapTypeControl={false}
+                                        fullscreenControl={false}
+                                        clickableIcons={false}
+                                        className="w-full h-full"
+                                    >
+                                      <AdvancedMarker position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}>
+                                          <CarMarker />
+                                        </AdvancedMarker>
+                                    </Map>
                                     <div className="absolute inset-0 bg-transparent group-hover:bg-black/30 transition-colors flex items-center justify-center" aria-hidden="true">
                                         <div className="p-2 bg-background/80 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
                                             <MapPin className="h-5 w-5 text-foreground" />
@@ -841,24 +817,18 @@ export default function ListingDetailPage() {
                                 <DialogHeader className="p-4 absolute top-0 left-0 z-10 bg-gradient-to-b from-background via-background/80 to-transparent w-full">
                                     <DialogTitle>Ubicación del Vehículo</DialogTitle>
                                 </DialogHeader>
-                                {isLoaded && !loadError ? (
-                                    <GoogleMap
-                                        mapContainerStyle={{ width: '100%', height: '100%' }}
-                                        center={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
-                                        zoom={15}
-                                        options={{
-                                            streetViewControl: false,
-                                            mapTypeControl: false,
-                                            fullscreenControl: false
-                                        }}
-                                    >
-                                        <Marker position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }} icon={carMarkerIcon} />
-                                    </GoogleMap>
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center bg-muted">
-                                        {loadError ? <p className="text-destructive">Error al cargar mapa</p> : <Loader2 className="h-8 w-8 animate-spin" />}
-                                    </div>
-                                )}
+                                <Map
+                                    defaultCenter={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
+                                    defaultZoom={15}
+                                    streetViewControl={false}
+                                    mapTypeControl={false}
+                                    fullscreenControl={false}
+                                    className="w-full h-full"
+                                >
+                                    <AdvancedMarker position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}>
+                                      <CarMarker />
+                                    </AdvancedMarker>
+                                </Map>
                             </DialogContent>
                         </Dialog>
                         </div>

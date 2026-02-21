@@ -11,6 +11,7 @@ import { ThemeProvider } from '@/components/theme-provider';
 import { MakesProvider } from '@/context/makes-context';
 import { FavoritesProvider } from '@/context/favorites-context';
 import { SubscriptionProvider } from '@/context/subscription-context';
+import { APIProvider } from '@vis.gl/react-google-maps';
 
 const fontBody = Inter({
   subsets: ['latin'],
@@ -57,22 +58,24 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <FirebaseClientProvider>
-            <SubscriptionProvider>
-              <MakesProvider>
-                <VehicleProvider>
-                  <FavoritesProvider>
-                    <div className="relative flex min-h-dvh flex-col">
-                      <SiteHeader />
-                      <main className="flex-1">{children}</main>
-                      <SiteFooter />
-                    </div>
-                    <Toaster />
-                  </FavoritesProvider>
-                </VehicleProvider>
-              </MakesProvider>
-            </SubscriptionProvider>
-          </FirebaseClientProvider>
+          <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!}>
+            <FirebaseClientProvider>
+              <SubscriptionProvider>
+                <MakesProvider>
+                  <VehicleProvider>
+                    <FavoritesProvider>
+                      <div className="relative flex min-h-dvh flex-col">
+                        <SiteHeader />
+                        <main className="flex-1">{children}</main>
+                        <SiteFooter />
+                      </div>
+                      <Toaster />
+                    </FavoritesProvider>
+                  </VehicleProvider>
+                </MakesProvider>
+              </SubscriptionProvider>
+            </FirebaseClientProvider>
+          </APIProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -9,8 +9,8 @@ import type { Vehicle } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { BarChart, Eye, PhoneForwarded, Car, LineChart } from 'lucide-react';
-import { ResponsiveContainer, BarChart as RechartsBarChart, XAxis, YAxis, Tooltip, Bar } from 'recharts';
+import { Eye, PhoneForwarded, Car, LineChart } from 'lucide-react';
+import { ResponsiveContainer, BarChart, XAxis, YAxis, Tooltip, Bar } from 'recharts';
 import { formatCurrency } from '@/lib/utils';
 import { useSubscription } from '@/context/subscription-context';
 import { Crown } from 'lucide-react';
@@ -185,7 +185,7 @@ export default function StatsPage() {
           <CardContent className="pl-2">
             {chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height={350}>
-                <RechartsBarChart data={chartData}>
+                <BarChart data={chartData}>
                   <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
                   <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}`} />
                   <Tooltip
@@ -196,7 +196,7 @@ export default function StatsPage() {
                     }}
                   />
                   <Bar dataKey="views" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                </RechartsBarChart>
+                </BarChart>
               </ResponsiveContainer>
             ) : (
               <div className="h-[350px] flex items-center justify-center text-muted-foreground">
