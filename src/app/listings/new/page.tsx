@@ -61,14 +61,26 @@ const ADMIN_EMAIL = 'zonamotores.ve@gmail.com';
 const defaultCenter = { lat: 6.4238, lng: -66.5897 }; // Center of Venezuela
 
 function CarMarker() {
-    const carIconDataUri = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImhzbCh2YXIoLS1wcmltYXJ5KSkiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBjbGFzcz0ibHVjaWRlIGx1Y2lkZS1jYXIiPjxwYXRoIGQ9Ik0xOSA5bDIgMGMuNiAwIDEgLjQgMSAxdjNjMCAuOS0uNyAxLjctMS41IDEuOUMxOC43IDE1LjQgMTYgMTUgMTYgMTVzLTEuMy0xLjQtMi4yLTIuM2MtLjUtLjQtMS4xLS43LTEuOC0uN0g1Yy0uNiAwLTEuMS40LTEuNC45TDEuNCAxNy45Yy0uMS4yLS4xLjQtLjEuNlYyMWMwIC42LjQgMSAxIDEiLz48cGF0aCBkPSJNNyAyMXYtMS4zIi8+PHBhdGggZD0iTTE3IDIxdi0xLjMiLz48cGF0aCBkPSJNNSAxNWgxNCIvPjxjaXJjbGUgY3g9IjciIGN5PSIxNyIgcj0iMiIvPjxjaXJjbGUgY3g9IjE3IiBjeT0iMTciIHI9IjIiLz48L3N2Zz4=';
-  
-    return (
-      <div style={{ width: 24, height: 24 }}>
-        <img src={carIconDataUri} alt="Car Marker" />
-      </div>
-    );
-  }
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="32"
+      height="32"
+      viewBox="0 0 24 24"
+      fill="hsl(var(--primary))"
+      stroke="hsl(var(--background))"
+      strokeWidth="1"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9L1.4 16.1c-.1.2-.1.4-.1.6V20c0 .6.4 1 1 1h1" />
+      <path d="M7 21v-1.3" />
+      <path d="M17 21v-1.3" />
+      <circle cx="7" cy="17" r="2" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" strokeWidth="0.5" />
+      <circle cx="17" cy="17" r="2" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" strokeWidth="0.5" />
+    </svg>
+  );
+}
 
 export default function NewListingPage() {
     const router = useRouter();
