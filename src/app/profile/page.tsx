@@ -31,7 +31,7 @@ const phoneRegex = new RegExp(/^\+[1-9]\d{1,14}$/);
 
 const profileSchema = z.object({
   displayName: z.string().min(3, { message: 'El nombre debe tener al menos 3 caracteres.' }).max(50),
-  phoneNumber: z.string().optional().refine((val) => !val || phoneRegex.test(val), {
+  phone: z.string().optional().refine((val) => !val || phoneRegex.test(val), {
     message: "Formato inválido. Usa el formato internacional, ej: +584121234567."
   }),
   address: z.string().optional(),
@@ -84,7 +84,7 @@ export default function ProfilePage() {
     resolver: zodResolver(profileSchema),
     defaultValues: {
       displayName: '',
-      phoneNumber: '',
+      phone: '',
       address: '',
     },
   });
@@ -111,7 +111,7 @@ export default function ProfilePage() {
     if (user && data) {
       reset({
         displayName: user.displayName || '',
-        phoneNumber: data?.phoneNumber || user.phoneNumber || '',
+        phone: data?.phone || user.phoneNumber || '',
         address: data?.address || '',
       });
       if (data.logoUrl) setLogoPreview(data.logoUrl);
@@ -119,7 +119,7 @@ export default function ProfilePage() {
     } else if (user) {
       reset({
         displayName: user.displayName || '',
-        phoneNumber: user.phoneNumber || '',
+        phone: user.phoneNumber || '',
       });
     }
   }, [user, profileData, reset]);
@@ -220,7 +220,7 @@ export default function ProfilePage() {
 
     const updatePayload: any = {
       displayName: data.displayName,
-      phoneNumber: data.phoneNumber || null,
+      phone: data.phone || null,
     };
 
     if (isDealer) {
@@ -291,7 +291,7 @@ export default function ProfilePage() {
   const handleSendVerificationCode = async (isResend = false) => {
     if (!user) return;
 
-    const isValid = await trigger('phoneNumber');
+    const isValid = await trigger('phone');
     if (!isValid) {
       toast({
         title: 'Número de teléfono inválido',
@@ -302,7 +302,7 @@ export default function ProfilePage() {
       return;
     }
 
-    const phoneNumber = getValues('phoneNumber');
+    const phoneNumber = getValues('phone');
     if (!phoneNumber) {
       toast({ title: 'Número de teléfono requerido', description: 'Por favor, guarda un número de teléfono en tu perfil primero.', variant: 'destructive' });
       return;
@@ -491,14 +491,14 @@ export default function ProfilePage() {
                   <p className="text-xs text-muted-foreground">El correo no se puede cambiar.</p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="phoneNumber">Número de Teléfono</Label>
-                  <Input id="phoneNumber" type="tel" {...register('phoneNumber')} placeholder="+584121234567" disabled={isPhoneNumberVerified} />
+                  <Label htmlFor="phone">Número de Teléfono</Label>
+                  <Input id="phone" type="tel" {...register('phone')} placeholder="+584121234567" disabled={isPhoneNumberVerified} />
                   <p className="text-xs text-muted-foreground">
                     {isPhoneNumberVerified
                       ? "El número verificado no se puede cambiar."
                       : "Usa el formato internacional (ej: +584121234567)."}
                   </p>
-                  {errors.phoneNumber && <p className="text-sm text-destructive">{errors.phoneNumber.message}</p>}
+                  {errors.phone && <p className="text-sm text-destructive">{errors.phone.message}</p>}
                 </div>
               </CardContent>
             </Card>
