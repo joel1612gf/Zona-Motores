@@ -24,6 +24,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
@@ -543,6 +544,47 @@ export default function ListingDetailPage() {
 
     return <div className="-m-3 p-3">{content}</div>;
   };
+  
+  const ContactButton = () => (
+    <Dialog open={isContactDialogOpen} onOpenChange={setIsContactDialogOpen}>
+      <DialogTrigger asChild>
+        <Button className="w-full" disabled={!displaySeller.phone}>
+          <Phone className="mr-2 h-4 w-4" /> 
+          {displaySeller.phone ? 'Mostrar Número de Teléfono' : 'Teléfono no disponible'}
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Contactar al Vendedor</DialogTitle>
+          <DialogDescription>
+            Estás a punto de contactar a {displaySeller.displayName} por WhatsApp.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="py-4 space-y-4">
+          <div className="bg-muted h-24 flex items-center justify-center rounded-md text-muted-foreground text-sm">
+            (Espacio para anuncio de Google)
+          </div>
+
+          <Button asChild size="lg" className="w-full bg-green-500 hover:bg-green-600 text-white" onClick={handleContactClick} disabled={countdown > 0}>
+            <a href={countdown === 0 ? createWhatsAppLink() : ''} target="_blank" rel="noopener noreferrer">
+              {countdown > 0 ? (
+                `Espera ${countdown} segundos...`
+              ) : (
+                <>
+                  <WhatsAppIcon className="mr-2 h-5 w-5" />
+                  Contactar por WhatsApp
+                </>
+              )}
+            </a>
+          </Button>
+
+          <div className="bg-muted h-24 flex items-center justify-center rounded-md text-muted-foreground text-sm">
+            (Espacio para anuncio de Google)
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 
   return (
     <div className="container mx-auto max-w-6xl py-8">
@@ -645,47 +687,11 @@ export default function ListingDetailPage() {
                         <CardTitleComponent>Información del Vendedor</CardTitleComponent>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                    <SellerInfoBlock />
-                    <Dialog open={isContactDialogOpen} onOpenChange={setIsContactDialogOpen}>
-                        <DialogTrigger asChild>
-                        <Button className="w-full">
-                            <Phone className="mr-2 h-4 w-4" /> Mostrar Número de Teléfono
-                        </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Contactar al Vendedor</DialogTitle>
-                            <DialogDescription>
-                            Estás a punto de contactar a {displaySeller.displayName} por WhatsApp.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="py-4 space-y-4">
-                            <div className="bg-muted h-24 flex items-center justify-center rounded-md text-muted-foreground text-sm">
-                            (Espacio para anuncio de Google)
-                            </div>
-
-                            <Button asChild size="lg" className="w-full bg-green-500 hover:bg-green-600 text-white" onClick={handleContactClick} disabled={countdown > 0}>
-                                <a href={countdown === 0 ? createWhatsAppLink() : undefined} target="_blank" rel="noopener noreferrer">
-                                    {countdown > 0 ? (
-                                        `Espera ${countdown} segundos...`
-                                    ) : (
-                                        <>
-                                            <WhatsAppIcon className="mr-2 h-5 w-5" />
-                                            Contactar por WhatsApp
-                                        </>
-                                    )}
-                                </a>
-                            </Button>
-
-                            <div className="bg-muted h-24 flex items-center justify-center rounded-md text-muted-foreground text-sm">
-                                (Espacio para anuncio de Google)
-                            </div>
-                        </div>
-                        </DialogContent>
-                    </Dialog>
-                    <p className="text-xs text-muted-foreground text-center">
-                        Los vendedores verificados han confirmado su identidad vía WhatsApp.
-                    </p>
+                      <SellerInfoBlock />
+                      <ContactButton />
+                      <p className="text-xs text-muted-foreground text-center">
+                          Los vendedores verificados han confirmado su identidad vía WhatsApp.
+                      </p>
                     </CardContent>
 
                     <div className="border-t">
@@ -755,47 +761,11 @@ export default function ListingDetailPage() {
                         <CardTitleComponent>Información del Vendedor</CardTitleComponent>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                        <SellerInfoBlock />
-                        <Dialog open={isContactDialogOpen} onOpenChange={setIsContactDialogOpen}>
-                            <DialogTrigger asChild>
-                            <Button className="w-full">
-                                <Phone className="mr-2 h-4 w-4" /> Mostrar Número de Teléfono
-                            </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Contactar al Vendedor</DialogTitle>
-                                <DialogDescription>
-                                Estás a punto de contactar a {displaySeller.displayName} por WhatsApp.
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="py-4 space-y-4">
-                                <div className="bg-muted h-24 flex items-center justify-center rounded-md text-muted-foreground text-sm">
-                                (Espacio para anuncio de Google)
-                                </div>
-
-                                <Button asChild size="lg" className="w-full bg-green-500 hover:bg-green-600 text-white" onClick={handleContactClick} disabled={countdown > 0}>
-                                    <a href={countdown === 0 ? createWhatsAppLink() : undefined} target="_blank" rel="noopener noreferrer">
-                                        {countdown > 0 ? (
-                                            `Espera ${countdown} segundos...`
-                                        ) : (
-                                            <>
-                                                <WhatsAppIcon className="mr-2 h-5 w-5" />
-                                                Contactar por WhatsApp
-                                            </>
-                                        )}
-                                    </a>
-                                </Button>
-
-                                <div className="bg-muted h-24 flex items-center justify-center rounded-md text-muted-foreground text-sm">
-                                    (Espacio para anuncio de Google)
-                                </div>
-                            </div>
-                            </DialogContent>
-                        </Dialog>
-                        <p className="text-xs text-muted-foreground text-center">
-                            Los vendedores verificados han confirmado su identidad vía WhatsApp.
-                        </p>
+                          <SellerInfoBlock />
+                          <ContactButton />
+                          <p className="text-xs text-muted-foreground text-center">
+                              Los vendedores verificados han confirmado su identidad vía WhatsApp.
+                          </p>
                         </CardContent>
 
                         <div className="border-t">
