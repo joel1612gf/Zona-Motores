@@ -5,13 +5,13 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useUser } from '@/firebase';
 import { useFavorites } from '@/context/favorites-context';
-import { useVehicles } from '@/context/vehicle-context';
+import { useVehicles, VehicleProvider } from '@/context/vehicle-context';
 import { VehicleCard } from '@/components/vehicle-card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Heart } from 'lucide-react';
 
-export default function MyFavoritesPage() {
+function MyFavoritesPageContent() {
   const { user, isUserLoading: isAuthLoading } = useUser();
   const router = useRouter();
   const { favoriteIds, isFavoritesLoading } = useFavorites();
@@ -70,6 +70,14 @@ export default function MyFavoritesPage() {
       )}
     </div>
   );
+}
+
+export default function MyFavoritesPage() {
+    return (
+        <VehicleProvider>
+            <MyFavoritesPageContent />
+        </VehicleProvider>
+    )
 }
 
 function LoadingSkeleton() {

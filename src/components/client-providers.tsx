@@ -6,7 +6,6 @@ import { APIProvider } from '@vis.gl/react-google-maps';
 import { FirebaseClientProvider } from '@/firebase';
 import { SubscriptionProvider } from '@/context/subscription-context';
 import { MakesProvider } from '@/context/makes-context';
-import { VehicleProvider } from '@/context/vehicle-context';
 import { FavoritesProvider } from '@/context/favorites-context';
 
 export function ClientProviders({ children }: { children: ReactNode }) {
@@ -21,9 +20,7 @@ export function ClientProviders({ children }: { children: ReactNode }) {
         <FirebaseClientProvider>
           <SubscriptionProvider>
             <MakesProvider>
-              <VehicleProvider>
                 <FavoritesProvider>{children}</FavoritesProvider>
-              </VehicleProvider>
             </MakesProvider>
           </SubscriptionProvider>
         </FirebaseClientProvider>

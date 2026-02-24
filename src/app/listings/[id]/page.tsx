@@ -3,7 +3,6 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useRouter, notFound } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useVehicles } from '@/context/vehicle-context';
 import { useUser, useFirestore, useStorage, errorEmitter, FirestorePermissionError, useDoc, useMemoFirebase } from '@/firebase';
 import { useFavorites } from '@/context/favorites-context';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
@@ -12,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle as CardTitleComponent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { doc, updateDoc, deleteDoc, serverTimestamp, increment } from 'firebase/firestore';
+import { collectionGroup, query, where, getDocs, limit, doc, updateDoc, deleteDoc, serverTimestamp, increment } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -60,7 +59,7 @@ import {
 import { formatCurrency, cn } from '@/lib/utils';
 import { Map, AdvancedMarker } from '@vis.gl/react-google-maps';
 import { Skeleton } from '@/components/ui/skeleton';
-import { UserProfile } from '@/lib/types';
+import { UserProfile, Vehicle } from '@/lib/types';
 
 
 function WhatsAppIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -162,13 +161,46 @@ function ContactDialog({
 
 export default function ListingDetailPage() {
   const params = useParams<{ id: string }>();
-  const { vehicles } = useVehicles();
-  const vehicle = vehicles.find(v => v.id === params.id);
   const { user: adminUser } = useUser();
   const firestore = useFirestore();
   const storage = useStorage();
   const router = useRouter();
   const { toast } = useToast();
+
+  const [vehicle, setVehicle] = useState<Vehicle | null>(null);
+  const [isVehicleLoading, setIsVehicleLoading] = useState(true);
+
+  useEffect(() => {
+    const getVehicle = async () => {
+        setIsVehicleLoading(true);
+        if (!params.id || !firestore) {
+            setIsVehicleLoading(false);
+            return;
+        };
+
+        const vehiclesColGroup = collectionGroup(firestore, 'vehicleListings');
+        const q = query(vehiclesColGroup, where('id', '==', params.id), limit(1));
+        
+        try {
+            const querySnapshot = await getDocs(q);
+            if (!querySnapshot.empty) {
+                const docSnap = querySnapshot.docs[0];
+                setVehicle({ id: docSnap.id, ...docSnap.data() } as Vehicle);
+            } else {
+                setVehicle(null);
+            }
+        } catch(e) {
+            console.error("Error fetching vehicle for detail page:", e);
+            setVehicle(null);
+        } finally {
+            setIsVehicleLoading(false);
+        }
+    };
+    
+    if (firestore) {
+        getVehicle();
+    }
+  }, [params.id, firestore]);
   
   const sellerProfileRef = useMemoFirebase(() => {
     if (!firestore || !vehicle) return null;
@@ -234,8 +266,10 @@ export default function ListingDetailPage() {
     }
   }, [isContactDialogOpen]);
 
+  const displaySeller = sellerInfo || vehicle?.seller;
+
   const createWhatsAppLink = () => {
-    if (!vehicle || !displaySeller.phone) return '';
+    if (!vehicle || !displaySeller?.phone) return '';
     
     const sellerName = displaySeller.displayName;
     const vehicleInfo = `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
@@ -297,11 +331,13 @@ export default function ListingDetailPage() {
     setIsLightboxOpen(open);
   };
 
-  if (!vehicle) {
-    notFound();
+  if (isVehicleLoading) {
+    return <LoadingSkeleton />;
   }
 
-  const displaySeller = sellerInfo || vehicle.seller;
+  if (!vehicle || !displaySeller) {
+    notFound();
+  }
 
   const isVehicleFavorite = isFavorite(vehicle.id);
 
@@ -1007,4 +1043,21 @@ export default function ListingDetailPage() {
   );
 }
 
-    
+function LoadingSkeleton() {
+  return (
+    <div className="container mx-auto max-w-6xl py-8">
+      <Skeleton className="h-10 w-48 mb-4" />
+      <div className="grid md:grid-cols-3 gap-8 items-start">
+        <div className="md:col-span-2 space-y-8">
+          <Skeleton className="aspect-video w-full" />
+          <Skeleton className="h-48 w-full hidden md:block" />
+          <Skeleton className="h-48 w-full hidden md:block" />
+        </div>
+        <div className="md:col-span-1 space-y-6">
+          <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-80 w-full" />
+        </div>
+      </div>
+    </div>
+  );
+}

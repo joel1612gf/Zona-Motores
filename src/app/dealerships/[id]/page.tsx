@@ -1,6 +1,6 @@
 'use client';
 import { useParams, notFound } from 'next/navigation';
-import { useVehicles } from '@/context/vehicle-context';
+import { useVehicles, VehicleProvider } from '@/context/vehicle-context';
 import { VehicleCard } from '@/components/vehicle-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { UserProfile } from '@/lib/types';
@@ -13,7 +13,7 @@ import { useDoc } from '@/firebase/firestore/use-doc';
 import { doc } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
 
-export default function DealershipPage() {
+function DealershipPageContent() {
     const params = useParams<{ id: string }>();
     const { vehicles, isLoading: areVehiclesLoading } = useVehicles();
     const firestore = useFirestore();
@@ -84,6 +84,14 @@ export default function DealershipPage() {
             </div>
         </div>
     );
+}
+
+export default function DealershipPage() {
+    return (
+        <VehicleProvider>
+            <DealershipPageContent />
+        </VehicleProvider>
+    )
 }
 
 

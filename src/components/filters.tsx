@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
-import { useVehicles } from '@/context/vehicle-context';
+import { useMakes } from '@/context/makes-context';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
 import { MapLocationFilter } from './map-location-filter';
 
@@ -32,22 +32,38 @@ type FiltersProps = {
 const transmissionTypes = ['all', 'Automática', 'Sincrónica'];
 
 export function Filters({ filters, onFilterChange }: FiltersProps) {
-  const { vehicles } = useVehicles();
+  const { makesByType } = useMakes();
   const [models, setModels] = useState<string[]>([]);
   
-  const uniqueMakes = useMemo(() => ['all', ...Array.from(new Set(vehicles.map(v => v.make)))], [vehicles]);
-  const uniqueBodyTypes = useMemo(() => ['all', ...Array.from(new Set(vehicles.map(v => v.bodyType)))], [vehicles]);
+  const uniqueMakes = useMemo(() => {
+    if (!makesByType) return ['all'];
+    const makes = new Set<string>();
+    Object.values(makesByType).forEach(typeData => {
+      Object.keys(typeData).forEach(make => makes.add(make));
+    });
+    return ['all', ...Array.from(makes).sort()];
+  }, [makesByType]);
+
+  const uniqueBodyTypes = useMemo(() => {
+    if (!makesByType) return ['all'];
+    return ['all', ...Object.keys(makesByType).sort()];
+  }, [makesByType]);
 
   useEffect(() => {
-    if (filters.make && filters.make !== 'all') {
-      const makeModels = [...new Set(vehicles.filter(v => v.make === filters.make).map(v => v.model))];
-      setModels(makeModels);
+    if (filters.make && filters.make !== 'all' && makesByType) {
+      const allModelsForMake = new Set<string>();
+      Object.values(makesByType).forEach(typeData => {
+        if (typeData[filters.make]) {
+          typeData[filters.make].forEach(model => allModelsForMake.add(model));
+        }
+      });
+      setModels(Array.from(allModelsForMake).sort());
     } else {
       setModels([]);
     }
     onFilterChange(prev => ({...prev, model: 'all'}));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.make, vehicles]);
+  }, [filters.make, makesByType]);
 
 
   const handleInputChange = (field: keyof Omit<FilterState, 'location'>, value: string) => {

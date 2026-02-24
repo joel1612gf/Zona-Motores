@@ -1,6 +1,6 @@
 
 'use client';
-import { useVehicles } from '@/context/vehicle-context';
+import { useVehicles, VehicleProvider } from '@/context/vehicle-context';
 import { Vehicle } from '@/lib/types';
 import { DealershipCard } from '@/components/dealership-card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -10,7 +10,8 @@ import { query, collection, where } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
 import { UserProfile } from '@/lib/types';
 
-export default function DealershipsPage() {
+
+function DealershipsPageContent() {
   const { vehicles, isLoading: areVehiclesLoading } = useVehicles();
   const firestore = useFirestore();
 
@@ -54,6 +55,14 @@ export default function DealershipsPage() {
       </div>
     </div>
   );
+}
+
+export default function DealershipsPage() {
+    return (
+        <VehicleProvider>
+            <DealershipsPageContent />
+        </VehicleProvider>
+    )
 }
 
 function LoadingSkeleton() {

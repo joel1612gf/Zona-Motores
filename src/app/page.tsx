@@ -5,7 +5,7 @@ import Image from 'next/image';
 import * as React from 'react';
 import Autoplay from 'embla-carousel-autoplay';
 import { Button } from '@/components/ui/button';
-import { useVehicles } from '@/context/vehicle-context';
+import { useVehicles, VehicleProvider } from '@/context/vehicle-context';
 import { vehicles as initialVehicles } from '@/lib/data';
 import { VehicleCard } from '@/components/vehicle-card';
 import { Search, Store } from 'lucide-react';
@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { SearchWithHistory } from '@/components/search-with-history';
 import { useRouter } from 'next/navigation';
 
-export default function Home() {
+function HomePageContent() {
   const { vehicles, isLoading } = useVehicles();
   const [isClient, setIsClient] = React.useState(false);
   const [showStickySearch, setShowStickySearch] = React.useState(false);
@@ -211,4 +211,12 @@ export default function Home() {
       </section>
     </div>
   );
+}
+
+export default function Home() {
+    return (
+        <VehicleProvider>
+            <HomePageContent />
+        </VehicleProvider>
+    )
 }

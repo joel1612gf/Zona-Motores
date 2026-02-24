@@ -5,7 +5,6 @@ import { Vehicle } from '@/lib/types';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { collectionGroup, query } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
-import { vehicles as initialVehicles } from '@/lib/data';
 
 type VehicleContextType = {
   vehicles: Vehicle[];
@@ -40,25 +39,13 @@ export function VehicleProvider({ children }: { children: ReactNode }) {
       console.error("Error fetching vehicles via collectionGroup:", error);
   }
 
-  // Combine initial data with Firestore data for demonstration purposes
   const vehicles = useMemo(() => {
-    const vehicleMap = new Map<string, Vehicle>();
-
-    // Add initial mock data for demonstration
-    initialVehicles.forEach(mockVehicle => {
-      vehicleMap.set(mockVehicle.id, mockVehicle);
-    });
-
-    // Overwrite with live data from Firestore if it exists, only on the client
+    let liveVehicles: Vehicle[] = [];
     if (isClient && firestoreVehicles) {
-      firestoreVehicles.forEach(firestoreVehicle => {
-        vehicleMap.set(firestoreVehicle.id, firestoreVehicle);
-      });
+      liveVehicles = firestoreVehicles;
     }
     
-    const combinedVehicles = Array.from(vehicleMap.values());
-
-    return combinedVehicles
+    return liveVehicles
       .filter(v => (v.status || 'active') === 'active' && !v.seller.isBlocked)
       .sort((a, b) => { // Sort by creation date, descending
         const dateA = a.createdAt?.toDate() || new Date(0);
