@@ -111,6 +111,7 @@ export default function ProfilePage() {
     if (user && data) {
       reset({
         displayName: user.displayName || '',
+        // Use the phone number from the DB first, otherwise fallback to auth user's phone.
         phoneNumber: data?.phoneNumber || user.phoneNumber || '',
         address: data?.address || '',
       });
@@ -492,8 +493,12 @@ export default function ProfilePage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phoneNumber">Número de Teléfono</Label>
-                  <Input id="phoneNumber" type="tel" {...register('phoneNumber')} placeholder="+584121234567" />
-                  <p className="text-xs text-muted-foreground">Usa el formato internacional (ej: +584121234567).</p>
+                  <Input id="phoneNumber" type="tel" {...register('phoneNumber')} placeholder="+584121234567" disabled={isPhoneNumberVerified} />
+                  <p className="text-xs text-muted-foreground">
+                    {isPhoneNumberVerified
+                      ? "El número verificado no se puede cambiar."
+                      : "Usa el formato internacional (ej: +584121234567)."}
+                  </p>
                   {errors.phoneNumber && <p className="text-sm text-destructive">{errors.phoneNumber.message}</p>}
                 </div>
               </CardContent>
