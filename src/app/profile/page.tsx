@@ -111,7 +111,7 @@ export default function ProfilePage() {
     if (user && data) {
       reset({
         displayName: user.displayName || '',
-        phoneNumber: data?.phoneNumber || '',
+        phoneNumber: data?.phoneNumber || user.phoneNumber || '',
         address: data?.address || '',
       });
       if (data.logoUrl) setLogoPreview(data.logoUrl);
@@ -198,10 +198,10 @@ export default function ProfilePage() {
       };
 
       if (logoFile) {
-        newLogoUrl = await uploadFile(logoFile, `vehicle-images/${user.uid}/dealer_logo`);
+        newLogoUrl = await uploadFile(logoFile, `dealer-assets/${user.uid}/dealer_logo`);
       }
       if (heroFile) {
-        newHeroUrl = await uploadFile(heroFile, `vehicle-images/${user.uid}/dealer_hero`);
+        newHeroUrl = await uploadFile(heroFile, `dealer-assets/${user.uid}/dealer_hero`);
       }
 
       if (data.displayName !== user.displayName) {
