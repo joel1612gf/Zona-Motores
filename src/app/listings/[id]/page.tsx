@@ -383,7 +383,13 @@ export default function ListingDetailPage() {
               const imageDeletePromises = vehicle.images.map(image => {
                   if (image.url.includes('firebasestorage.googleapis.com')) {
                       const imageRef = ref(storage, image.url);
-                      return deleteObject(imageRef);
+                      return deleteObject(imageRef).catch(error => {
+                          if (error.code === 'storage/object-not-found') {
+                              console.warn(`Image not found during admin deletion, skipping: ${image.url}`);
+                              return;
+                          }
+                          throw error;
+                      });
                   }
                   return Promise.resolve();
               });
@@ -402,9 +408,10 @@ export default function ListingDetailPage() {
           toast({
               variant: "destructive",
               title: "Error al eliminar",
-              description: "No se pudo eliminar la publicación. Inténtalo de nuevo.",
+              description: "No se pudo eliminar la publicación por completo. Inténtalo de nuevo.",
           });
-          setIsDeleting(false);
+      } finally {
+        setIsDeleting(false);
       }
   };
 

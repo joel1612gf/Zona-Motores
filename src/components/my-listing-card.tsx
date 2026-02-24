@@ -83,19 +83,23 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
         try {
             const vehicleRef = doc(firestore, 'users', user.uid, 'vehicleListings', vehicle.id);
 
-            try {
+            if (vehicle.images && vehicle.images.length > 0) {
                 const imageDeletePromises = vehicle.images.map(image => {
-                    const imageRef = ref(storage, image.url);
-                    return deleteObject(imageRef);
+                    if (image.url.includes('firebasestorage.googleapis.com')) {
+                        const imageRef = ref(storage, image.url);
+                        return deleteObject(imageRef).catch(error => {
+                            if (error.code === 'storage/object-not-found') {
+                                console.warn(`Image not found during deletion, skipping: ${image.url}`);
+                                return; // Consider it a success if the file is already gone
+                            }
+                            // For other errors, re-throw to fail the Promise.all
+                            throw error;
+                        });
+                    }
+                    return Promise.resolve();
                 });
+                // This will now only fail for critical storage errors other than 'object-not-found'.
                 await Promise.all(imageDeletePromises);
-            } catch (storageError) {
-                console.error("Error deleting one or more images from storage:", storageError);
-                toast({
-                    variant: "destructive",
-                    title: "Error en Storage",
-                    description: "No se pudieron eliminar las imágenes, pero la publicación sí se borró.",
-                });
             }
 
             await deleteDoc(vehicleRef);
@@ -109,8 +113,9 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
             toast({
                 variant: "destructive",
                 title: "Error al eliminar",
-                description: "No se pudo eliminar la publicación. Inténtalo de nuevo.",
+                description: "No se pudo eliminar la publicación por completo. Inténtalo de nuevo.",
             });
+        } finally {
             setIsDeleting(false);
         }
     };

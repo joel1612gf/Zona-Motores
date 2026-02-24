@@ -318,7 +318,19 @@ export default function EditListingPage() {
     try {
       // 1. Delete photos marked for deletion from Storage
       if (photosToDelete.length > 0) {
-        const deletePromises = photosToDelete.map(url => deleteObject(ref(storage, url)));
+        const deletePromises = photosToDelete.map(url => {
+            if (url.includes('firebasestorage.googleapis.com')) {
+                const imageRef = ref(storage, url);
+                return deleteObject(imageRef).catch(error => {
+                    if (error.code === 'storage/object-not-found') {
+                        console.warn(`Image to delete not found, skipping: ${url}`);
+                        return; // Successfully ignored
+                    }
+                    throw error; // Re-throw other errors
+                });
+            }
+            return Promise.resolve();
+        });
         await Promise.all(deletePromises);
       }
       
