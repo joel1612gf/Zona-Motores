@@ -41,6 +41,11 @@ service cloud.firestore {
         // A user can only manage their own favorites
         allow read, write, delete: if isOwner(userId);
       }
+      
+      match /subscription/{subscriptionId} {
+        // A user can only manage their own subscription
+        allow read, write: if isOwner(userId);
+      }
     }
 
     // This rule allows a collection group query on 'vehicleListings'.
