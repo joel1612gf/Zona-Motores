@@ -15,10 +15,10 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      // Any signed-in user can GET a single user profile or LIST all users.
-      // This is required for the dealerships page to function.
-      allow get, list: if isSignedIn();
-      // Only the owner or an admin can make changes.
+      // User profiles are public to read for dealership pages and listing details.
+      // Phone numbers are already public within vehicle listings.
+      allow get, list: if true;
+      // Only the owner or an admin can make changes to their own profile.
       allow write: if isOwner(userId) || isAdmin();
 
       // Vehicle listings are a subcollection of users
