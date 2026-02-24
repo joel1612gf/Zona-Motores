@@ -111,7 +111,6 @@ export default function ProfilePage() {
     if (user && data) {
       reset({
         displayName: user.displayName || '',
-        // Use the phone number from the DB first, otherwise fallback to auth user's phone.
         phoneNumber: data?.phoneNumber || user.phoneNumber || '',
         address: data?.address || '',
       });
