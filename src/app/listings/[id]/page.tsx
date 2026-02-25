@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useUser, useFirestore, useStorage, errorEmitter, FirestorePermissionError, useDoc, useMemoFirebase } from '@/firebase';
 import { useFavorites } from '@/context/favorites-context';
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, type CarouselApi } from '@/components/ui/carousel';
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger, DialogHeader, DialogClose } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -26,13 +26,13 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { 
-  Gauge, 
-  MapPin, 
-  Phone, 
-  ShieldCheck, 
-  User, 
-  Settings2, 
+import {
+  Gauge,
+  MapPin,
+  Phone,
+  ShieldCheck,
+  User,
+  Settings2,
   Palette,
   Snowflake,
   Speaker,
@@ -47,6 +47,7 @@ import {
   Shield,
   ChevronLeft,
   ChevronRight,
+  Home,
   X,
   Pencil as PencilIcon,
   Trash2,
@@ -58,8 +59,10 @@ import {
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Map, AdvancedMarker } from '@vis.gl/react-google-maps';
+import { MapsProvider } from '@/components/maps-provider';
 import { Skeleton } from '@/components/ui/skeleton';
 import { UserProfile, Vehicle } from '@/lib/types';
+import { ADMIN_EMAIL } from '@/lib/constants';
 
 
 function WhatsAppIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -79,23 +82,26 @@ function WhatsAppIcon(props: React.SVGProps<SVGSVGElement>) {
 
 function CarMarker() {
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="32"
-      height="32"
-      viewBox="0 0 24 24"
-      fill="hsl(var(--primary))"
-      stroke="hsl(var(--background))"
-      strokeWidth="1"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9L1.4 16.1c-.1.2-.1.4-.1.6V20c0 .6.4 1 1 1h1" />
-      <path d="M7 21v-1.3" />
-      <path d="M17 21v-1.3" />
-      <circle cx="7" cy="17" r="2" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" strokeWidth="0.5" />
-      <circle cx="17" cy="17" r="2" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" strokeWidth="0.5" />
-    </svg>
+    <div className="flex flex-col items-center" style={{ transform: 'translateY(-50%)' }}>
+      <div className="bg-white rounded-full p-2.5 shadow-lg border-2 border-blue-500">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="26"
+          height="26"
+          viewBox="0 0 64 64"
+          fill="none"
+          stroke="#2563eb"
+          strokeWidth="4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M10 38 h44 a4 4 0 0 0 4-4 v-4 a4 4 0 0 0-2-3.5 L48 22 42 14a6 6 0 0 0-5-2.5 H27a6 6 0 0 0-5 2.5 L16 22 8 26.5a4 4 0 0 0-2 3.5 v4 a4 4 0 0 0 4 4Z" />
+          <circle cx="20" cy="38" r="6" fill="white" />
+          <circle cx="44" cy="38" r="6" fill="white" />
+        </svg>
+      </div>
+      <div className="w-3 h-3 bg-white border-r-2 border-b-2 border-blue-500 rotate-45 -mt-[7px] shadow-lg" />
+    </div>
   );
 }
 
@@ -120,7 +126,7 @@ function ContactDialog({
     <Dialog open={isContactDialogOpen} onOpenChange={setIsContactDialogOpen}>
       <DialogTrigger asChild>
         <Button className="w-full" disabled={!displaySeller.phone}>
-          <Phone className="mr-2 h-4 w-4" /> 
+          <Phone className="mr-2 h-4 w-4" />
           {displaySeller.phone ? 'Mostrar Número de Teléfono' : 'Teléfono no disponible'}
         </Button>
       </DialogTrigger>
@@ -159,7 +165,7 @@ function ContactDialog({
 }
 
 
-export default function ListingDetailPage() {
+function ListingDetailContent() {
   const params = useParams<{ id: string }>();
   const { user: adminUser } = useUser();
   const firestore = useFirestore();
@@ -172,36 +178,36 @@ export default function ListingDetailPage() {
 
   useEffect(() => {
     const getVehicle = async () => {
-        setIsVehicleLoading(true);
-        if (!params.id || !firestore) {
-            setIsVehicleLoading(false);
-            return;
-        };
+      setIsVehicleLoading(true);
+      if (!params.id || !firestore) {
+        setIsVehicleLoading(false);
+        return;
+      };
 
-        const vehiclesColGroup = collectionGroup(firestore, 'vehicleListings');
-        const q = query(vehiclesColGroup, where('id', '==', params.id), limit(1));
-        
-        try {
-            const querySnapshot = await getDocs(q);
-            if (!querySnapshot.empty) {
-                const docSnap = querySnapshot.docs[0];
-                setVehicle({ id: docSnap.id, ...docSnap.data() } as Vehicle);
-            } else {
-                setVehicle(null);
-            }
-        } catch(e) {
-            console.error("Error fetching vehicle for detail page:", e);
-            setVehicle(null);
-        } finally {
-            setIsVehicleLoading(false);
+      const vehiclesColGroup = collectionGroup(firestore, 'vehicleListings');
+      const q = query(vehiclesColGroup, where('id', '==', params.id), limit(1));
+
+      try {
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+          const docSnap = querySnapshot.docs[0];
+          setVehicle({ id: docSnap.id, ...docSnap.data() } as Vehicle);
+        } else {
+          setVehicle(null);
         }
+      } catch (e) {
+        console.error("Error fetching vehicle for detail page:", e);
+        setVehicle(null);
+      } finally {
+        setIsVehicleLoading(false);
+      }
     };
-    
+
     if (firestore) {
-        getVehicle();
+      getVehicle();
     }
   }, [params.id, firestore]);
-  
+
   const sellerProfileRef = useMemoFirebase(() => {
     if (!firestore || !vehicle) return null;
     return doc(firestore, 'users', vehicle.sellerId);
@@ -215,12 +221,15 @@ export default function ListingDetailPage() {
   const [isMapDialogOpen, setIsMapDialogOpen] = useState(false);
   const [countdown, setCountdown] = useState(5);
 
+  const [carouselApi, setCarouselApi] = useState<CarouselApi>();
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+
   const [isDeleting, setIsDeleting] = useState(false);
   const [isTogglingStatus, setIsTogglingStatus] = useState(false);
   const [isBlocking, setIsBlocking] = useState(false);
-  
-  const isAdmin = adminUser?.email === 'zonamotores.ve@gmail.com';
-  
+
+  const isAdmin = adminUser?.email === ADMIN_EMAIL;
+
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
 
   useEffect(() => {
@@ -230,22 +239,22 @@ export default function ListingDetailPage() {
     const hasViewed = sessionStorage.getItem(viewedKey);
 
     if (!hasViewed) {
-        const vehicleRef = doc(firestore, 'users', vehicle.sellerId, 'vehicleListings', vehicle.id);
-        updateDoc(vehicleRef, {
-            viewCount: increment(1)
-        }).then(() => {
-            sessionStorage.setItem(viewedKey, 'true');
-        }).catch(error => {
-            console.error("Error incrementing view count:", error);
-            errorEmitter.emit(
-                'permission-error',
-                new FirestorePermissionError({
-                    path: vehicleRef.path,
-                    operation: 'update',
-                    requestResourceData: { viewCount: 'increment(1)' },
-                }, error)
-            );
-        });
+      const vehicleRef = doc(firestore, 'users', vehicle.sellerId, 'vehicleListings', vehicle.id);
+      updateDoc(vehicleRef, {
+        viewCount: increment(1)
+      }).then(() => {
+        sessionStorage.setItem(viewedKey, 'true');
+      }).catch(error => {
+        console.error("Error incrementing view count:", error);
+        errorEmitter.emit(
+          'permission-error',
+          new FirestorePermissionError({
+            path: vehicleRef.path,
+            operation: 'update',
+            requestResourceData: { viewCount: 'increment(1)' },
+          }, error)
+        );
+      });
     }
   }, [firestore, vehicle]);
 
@@ -266,11 +275,21 @@ export default function ListingDetailPage() {
     }
   }, [isContactDialogOpen]);
 
+  useEffect(() => {
+    if (!carouselApi) return;
+    const onSelect = () => {
+      setSelectedImageIndex(carouselApi.selectedScrollSnap());
+    };
+    onSelect();
+    carouselApi.on('select', onSelect);
+    return () => { carouselApi.off('select', onSelect); };
+  }, [carouselApi]);
+
   const displaySeller = sellerInfo || vehicle?.seller;
 
   const createWhatsAppLink = () => {
     if (!vehicle || !displaySeller?.phone) return '';
-    
+
     const sellerName = displaySeller.displayName;
     const vehicleInfo = `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
     const price = formatCurrency(vehicle.priceUSD);
@@ -291,23 +310,23 @@ export default function ListingDetailPage() {
 
     return `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
   };
-  
+
   const handleContactClick = () => {
     if (!firestore || !vehicle || countdown > 0) return;
 
     const vehicleRef = doc(firestore, 'users', vehicle.sellerId, 'vehicleListings', vehicle.id);
     updateDoc(vehicleRef, {
-        contactRequests: increment(1)
+      contactRequests: increment(1)
     }).catch(error => {
-        console.error("Error incrementing contact requests:", error);
-         errorEmitter.emit(
-            'permission-error',
-            new FirestorePermissionError({
-                path: vehicleRef.path,
-                operation: 'update',
-                requestResourceData: { contactRequests: 'increment(1)' },
-            }, error)
-        );
+      console.error("Error incrementing contact requests:", error);
+      errorEmitter.emit(
+        'permission-error',
+        new FirestorePermissionError({
+          path: vehicleRef.path,
+          operation: 'update',
+          requestResourceData: { contactRequests: 'increment(1)' },
+        }, error)
+      );
     });
   };
 
@@ -342,11 +361,11 @@ export default function ListingDetailPage() {
   const isVehicleFavorite = isFavorite(vehicle.id);
 
   const handleFavoriteToggle = () => {
-      if (isVehicleFavorite) {
-          removeFavorite(vehicle.id);
-      } else {
-          addFavorite(vehicle.id);
-      }
+    if (isVehicleFavorite) {
+      removeFavorite(vehicle.id);
+    } else {
+      addFavorite(vehicle.id);
+    }
   };
 
 
@@ -398,7 +417,7 @@ export default function ListingDetailPage() {
   const handleMouseUpOrLeave = () => {
     setIsPanning(false);
   };
-  
+
   // Touch Handlers
   const getDistance = (touches: React.TouchList) => {
     return Math.sqrt(
@@ -441,92 +460,92 @@ export default function ListingDetailPage() {
   };
 
   const handleToggleStatus = async (newStatus: 'active' | 'paused' | 'sold') => {
-      if (!adminUser) return;
-      setIsTogglingStatus(true);
+    if (!adminUser) return;
+    setIsTogglingStatus(true);
 
-      try {
-          const vehicleRef = doc(firestore, 'users', vehicle.sellerId, 'vehicleListings', vehicle.id);
-          const updatePayload: { status: string; createdAt?: any } = { status: newStatus };
-          
-          if (newStatus === 'active') {
-              updatePayload.createdAt = serverTimestamp();
-          }
-          
-          await updateDoc(vehicleRef, updatePayload);
-          toast({
-              title: `Estado Actualizado`,
-              description: `La publicación ahora está ${newStatus}.`,
-          });
-      } catch (error) {
-          console.error("Error updating status:", error);
-           toast({
-              variant: "destructive",
-              title: "Error al actualizar",
-              description: "No se pudo cambiar el estado de la publicación.",
-          });
-      } finally {
-          setIsTogglingStatus(false);
+    try {
+      const vehicleRef = doc(firestore, 'users', vehicle.sellerId, 'vehicleListings', vehicle.id);
+      const updatePayload: { status: string; createdAt?: any } = { status: newStatus };
+
+      if (newStatus === 'active') {
+        updatePayload.createdAt = serverTimestamp();
       }
+
+      await updateDoc(vehicleRef, updatePayload);
+      toast({
+        title: `Estado Actualizado`,
+        description: `La publicación ahora está ${newStatus}.`,
+      });
+    } catch (error) {
+      console.error("Error updating status:", error);
+      toast({
+        variant: "destructive",
+        title: "Error al actualizar",
+        description: "No se pudo cambiar el estado de la publicación.",
+      });
+    } finally {
+      setIsTogglingStatus(false);
+    }
   };
 
   const handleDelete = async () => {
-      if (!adminUser) return;
-      setIsDeleting(true);
-      try {
-          const vehicleRef = doc(firestore, 'users', vehicle.sellerId, 'vehicleListings', vehicle.id);
-          
-          if (vehicle.images && vehicle.images.length > 0) {
-              const imageDeletePromises = vehicle.images.map(image => {
-                  if (image.url.includes('firebasestorage.googleapis.com')) {
-                      const imageRef = ref(storage, image.url);
-                      return deleteObject(imageRef).catch(error => {
-                          if (error.code === 'storage/object-not-found') {
-                              console.warn(`Image not found during admin deletion, skipping: ${image.url}`);
-                              return;
-                          }
-                          throw error;
-                      });
-                  }
-                  return Promise.resolve();
-              });
-              await Promise.all(imageDeletePromises);
+    if (!adminUser) return;
+    setIsDeleting(true);
+    try {
+      const vehicleRef = doc(firestore, 'users', vehicle.sellerId, 'vehicleListings', vehicle.id);
+
+      if (vehicle.images && vehicle.images.length > 0) {
+        const imageDeletePromises = vehicle.images.map(image => {
+          if (image.url.includes('firebasestorage.googleapis.com')) {
+            const imageRef = ref(storage, image.url);
+            return deleteObject(imageRef).catch(error => {
+              if (error.code === 'storage/object-not-found') {
+                console.warn(`Image not found during admin deletion, skipping: ${image.url}`);
+                return;
+              }
+              throw error;
+            });
           }
-
-          await deleteDoc(vehicleRef);
-
-          toast({
-              title: "Publicación Eliminada",
-              description: `El vehículo ha sido eliminado permanentemente.`,
-          });
-          router.push('/listings');
-      } catch (error) {
-          console.error("Error deleting vehicle:", error);
-          toast({
-              variant: "destructive",
-              title: "Error al eliminar",
-              description: "No se pudo eliminar la publicación por completo. Inténtalo de nuevo.",
-          });
-      } finally {
-        setIsDeleting(false);
+          return Promise.resolve();
+        });
+        await Promise.all(imageDeletePromises);
       }
+
+      await deleteDoc(vehicleRef);
+
+      toast({
+        title: "Publicación Eliminada",
+        description: `El vehículo ha sido eliminado permanentemente.`,
+      });
+      router.push('/listings');
+    } catch (error) {
+      console.error("Error deleting vehicle:", error);
+      toast({
+        variant: "destructive",
+        title: "Error al eliminar",
+        description: "No se pudo eliminar la publicación por completo. Inténtalo de nuevo.",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleToggleBlockSeller = async () => {
-    if(!adminUser) return;
+    if (!adminUser) return;
     setIsBlocking(true);
     const newBlockedState = !displaySeller.isBlocked;
     try {
-        const sellerRef = doc(firestore, 'users', vehicle.sellerId);
-        await updateDoc(sellerRef, { isBlocked: newBlockedState });
-        toast({
-            title: `Vendedor ${newBlockedState ? 'Bloqueado' : 'Desbloqueado'}`,
-            description: `${displaySeller.displayName} ha sido ${newBlockedState ? 'bloqueado' : 'desbloqueado'}.`,
-        });
-    } catch(error) {
-        console.error("Error blocking/unblocking seller:", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar el estado del vendedor.' });
+      const sellerRef = doc(firestore, 'users', vehicle.sellerId);
+      await updateDoc(sellerRef, { isBlocked: newBlockedState });
+      toast({
+        title: `Vendedor ${newBlockedState ? 'Bloqueado' : 'Desbloqueado'}`,
+        description: `${displaySeller.displayName} ha sido ${newBlockedState ? 'bloqueado' : 'desbloqueado'}.`,
+      });
+    } catch (error) {
+      console.error("Error blocking/unblocking seller:", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar el estado del vendedor.' });
     } finally {
-        setIsBlocking(false);
+      setIsBlocking(false);
     }
   };
 
@@ -583,21 +602,21 @@ export default function ListingDetailPage() {
       <CardContent>
         <div className="space-y-4">
           <div className="flex justify-between items-start">
-              <div className="text-3xl font-bold font-headline text-primary">{formatCurrency(vehicle.priceUSD)}</div>
-              <Button variant="outline" size="lg" onClick={handleFavoriteToggle}>
-                  <Heart className={cn(
-                      "mr-2 h-5 w-5 text-destructive transition-all",
-                      isVehicleFavorite ? 'fill-destructive' : 'fill-transparent'
-                  )}/>
-                  {isVehicleFavorite ? 'Guardado' : 'Guardar'}
-              </Button>
+            <div className="text-3xl font-bold font-headline text-primary">{formatCurrency(vehicle.priceUSD)}</div>
+            <Button variant="outline" size="lg" onClick={handleFavoriteToggle}>
+              <Heart className={cn(
+                "mr-2 h-5 w-5 text-destructive transition-all",
+                isVehicleFavorite ? 'fill-destructive' : 'fill-transparent'
+              )} />
+              {isVehicleFavorite ? 'Guardado' : 'Guardar'}
+            </Button>
           </div>
           <Separator />
           <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
             <div className="font-semibold flex items-center gap-1"><Gauge className="h-4 w-4 text-muted-foreground" /> Kilometraje</div><div className="text-muted-foreground">{vehicle.mileage.toLocaleString()} km</div>
             <div className="font-semibold flex items-center gap-1"><Palette className="h-4 w-4 text-muted-foreground" /> Color</div><div className="text-muted-foreground">{vehicle.exteriorColor}</div>
             <div className="font-semibold flex items-center gap-1"><Settings2 className="h-4 w-4 text-muted-foreground" /> Motor</div><div className="text-muted-foreground">{vehicle.engine}</div>
-            <div className="font-semibold flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 5h14v14H5V5z"/><path d="M12 5v14"/><path d="M19 12H5"/><path d="M12 12l5-5"/><path d="m7 12 5 5"/></svg> Transmisión</div><div className="text-muted-foreground">{vehicle.transmission}</div>
+            <div className="font-semibold flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 5h14v14H5V5z" /><path d="M12 5v14" /><path d="M19 12H5" /><path d="M12 12l5-5" /><path d="m7 12 5 5" /></svg> Transmisión</div><div className="text-muted-foreground">{vehicle.transmission}</div>
           </div>
         </div>
       </CardContent>
@@ -606,35 +625,35 @@ export default function ListingDetailPage() {
 
   const SellerInfoBlock = () => {
     const content = (
-        <div className="flex items-center gap-3">
-            {displaySeller.accountType === 'dealer' && displaySeller.logoUrl ? (
-                <Avatar className="h-10 w-10 border-2">
-                    <AvatarImage src={displaySeller.logoUrl} alt={`${displaySeller.displayName} logo`} />
-                    <AvatarFallback>{displaySeller.displayName?.charAt(0)}</AvatarFallback>
-                </Avatar>
-            ) : (
-                <User className="h-8 w-8 text-muted-foreground" />
+      <div className="flex items-center gap-3">
+        {displaySeller.accountType === 'dealer' && displaySeller.logoUrl ? (
+          <Avatar className="h-10 w-10 border-2">
+            <AvatarImage src={displaySeller.logoUrl} alt={`${displaySeller.displayName} logo`} />
+            <AvatarFallback>{displaySeller.displayName?.charAt(0)}</AvatarFallback>
+          </Avatar>
+        ) : (
+          <User className="h-8 w-8 text-muted-foreground" />
+        )}
+        <div>
+          <div className="font-semibold flex items-center gap-2">
+            {displaySeller.displayName}
+            {displaySeller.isVerified && (
+              <Badge variant="secondary" className="border-green-300 bg-green-100 text-green-800 dark:border-green-700 dark:bg-green-900/50 dark:text-green-300">
+                <ShieldCheck className="h-3 w-3 mr-1" />Verificado
+              </Badge>
             )}
-            <div>
-                <div className="font-semibold flex items-center gap-2">
-                    {displaySeller.displayName}
-                    {displaySeller.isVerified && (
-                        <Badge variant="secondary" className="border-green-300 bg-green-100 text-green-800 dark:border-green-700 dark:bg-green-900/50 dark:text-green-300">
-                            <ShieldCheck className="h-3 w-3 mr-1" />Verificado
-                        </Badge>
-                    )}
-                </div>
-                {!displaySeller.isVerified && <Badge variant="destructive">No Verificado</Badge>}
-            </div>
+          </div>
+          {!displaySeller.isVerified && <Badge variant="destructive">No Verificado</Badge>}
         </div>
+      </div>
     );
 
     if (displaySeller.accountType === 'dealer') {
-        return (
-            <Link href={`/dealerships/${displaySeller.uid}`} className="block hover:bg-muted/50 rounded-md -m-3 p-3 transition-colors">
-                {content}
-            </Link>
-        );
+      return (
+        <Link href={`/dealerships/${displaySeller.uid}`} className="block hover:bg-muted/50 rounded-md -m-3 p-3 transition-colors">
+          {content}
+        </Link>
+      );
     }
 
     return <div className="-m-3 p-3">{content}</div>;
@@ -642,19 +661,25 @@ export default function ListingDetailPage() {
 
   return (
     <div className="container mx-auto max-w-6xl py-8">
-      <Button variant="ghost" onClick={() => router.back()} className="mb-4 -ml-4">
-        <ChevronLeft className="mr-1 h-5 w-5" />
-        Volver a los anuncios
-      </Button>
+      <nav className="mb-4 flex items-center gap-1.5 text-sm text-muted-foreground">
+        <Link href="/" className="flex items-center gap-1 hover:text-foreground transition-colors">
+          <Home className="h-3.5 w-3.5" />
+          <span>Inicio</span>
+        </Link>
+        <span>/</span>
+        <Link href="/listings" className="hover:text-foreground transition-colors">Anuncios</Link>
+        <span>/</span>
+        <span className="text-foreground font-medium truncate max-w-[200px] sm:max-w-none">{`${vehicle.year} ${vehicle.make} ${vehicle.model}`}</span>
+      </nav>
       <div className="grid md:grid-cols-3 gap-8 items-start">
         {/* Main Content Column */}
         <div className="md:col-span-2 space-y-8 flex flex-col">
-          <Carousel className="w-full">
+          <Carousel className="w-full" setApi={setCarouselApi}>
             <CarouselContent>
               {vehicle.images.map((image, index) => (
                 <CarouselItem key={index} onClick={() => handleImageClick(index)} className="cursor-pointer">
                   <Card className="overflow-hidden">
-                    <CardContent className="flex aspect-video items-center justify-center p-0">
+                    <CardContent className="flex aspect-video items-center justify-center p-0 relative">
                       <Image
                         src={image.url}
                         alt={image.alt}
@@ -664,6 +689,11 @@ export default function ListingDetailPage() {
                         data-ai-hint={image.hint}
                         priority={index === 0}
                       />
+                      {vehicle.images.length > 1 && (
+                        <Badge variant="secondary" className="absolute bottom-3 right-3 bg-background/80 backdrop-blur-sm shadow-lg text-xs font-medium">
+                          {index + 1} / {vehicle.images.length}
+                        </Badge>
+                      )}
                     </CardContent>
                   </Card>
                 </CarouselItem>
@@ -676,7 +706,32 @@ export default function ListingDetailPage() {
               </>
             )}
           </Carousel>
-          
+
+          {vehicle.images.length > 1 && (
+            <div className="flex gap-2 overflow-x-auto pb-1 -mt-4">
+              {vehicle.images.map((image, index) => (
+                <button
+                  key={index}
+                  onClick={() => carouselApi?.scrollTo(index)}
+                  className={cn(
+                    "relative flex-shrink-0 w-16 h-12 sm:w-20 sm:h-14 rounded-md overflow-hidden border-2 transition-all",
+                    selectedImageIndex === index
+                      ? "border-primary ring-1 ring-primary"
+                      : "border-transparent opacity-60 hover:opacity-100"
+                  )}
+                >
+                  <Image
+                    src={image.url}
+                    alt={image.alt}
+                    fill
+                    className="object-cover"
+                    sizes="80px"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Main Info for Mobile */}
           <div className="space-y-8 md:hidden">
             <MainInfoCard />
@@ -686,10 +741,10 @@ export default function ListingDetailPage() {
               </CardHeader>
               <CardContent className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 gap-y-4 gap-x-2">
                 <div className="flex items-center gap-3">
-                    <FileText className="h-6 w-6 text-primary flex-shrink-0" />
-                    <span className="text-sm">{`Título ${vehicle.ownerCount}-1`}</span>
+                  <FileText className="h-6 w-6 text-primary flex-shrink-0" />
+                  <span className="text-sm">{`Título ${vehicle.ownerCount}-1`}</span>
                 </div>
-                {mainFeatures.map(({icon: Icon, label}) => (
+                {mainFeatures.map(({ icon: Icon, label }) => (
                   <div key={label} className="flex items-center gap-3">
                     <Icon className="h-6 w-6 text-primary flex-shrink-0" />
                     <span className="text-sm">{label}</span>
@@ -713,10 +768,10 @@ export default function ListingDetailPage() {
             </CardHeader>
             <CardContent className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 gap-y-4 gap-x-2">
               <div className="flex items-center gap-3">
-                  <FileText className="h-6 w-6 text-primary flex-shrink-0" />
-                  <span className="text-sm">{`Título ${vehicle.ownerCount}-1`}</span>
+                <FileText className="h-6 w-6 text-primary flex-shrink-0" />
+                <span className="text-sm">{`Título ${vehicle.ownerCount}-1`}</span>
               </div>
-              {mainFeatures.map(({icon: Icon, label}) => (
+              {mainFeatures.map(({ icon: Icon, label }) => (
                 <div key={label} className="flex items-center gap-3">
                   <Icon className="h-6 w-6 text-primary flex-shrink-0" />
                   <span className="text-sm">{label}</span>
@@ -733,248 +788,248 @@ export default function ListingDetailPage() {
               <p className="text-muted-foreground">{vehicle.description}</p>
             </CardContent>
           </Card>
-          
-           {/* Seller info for mobile */}
-           <div className="md:hidden">
-                <Card className="overflow-hidden">
-                    <CardHeader>
-                        <CardTitleComponent>Información del Vendedor</CardTitleComponent>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <SellerInfoBlock />
-                      <ContactDialog
-                        isContactDialogOpen={isContactDialogOpen}
-                        setIsContactDialogOpen={setIsContactDialogOpen}
-                        displaySeller={displaySeller}
-                        handleContactClick={handleContactClick}
-                        countdown={countdown}
-                        createWhatsAppLink={createWhatsAppLink}
-                      />
-                      <p className="text-xs text-muted-foreground text-center">
-                          Los vendedores verificados han confirmado su identidad vía WhatsApp.
-                      </p>
-                    </CardContent>
 
-                    <div className="border-t">
-                    <Dialog open={isMapDialogOpen} onOpenChange={setIsMapDialogOpen}>
-                        <DialogTrigger asChild>
-                            <div className="h-40 w-full cursor-pointer relative group">
-                                <Map
-                                    mapId="listing_detail_map_mobile"
-                                    defaultCenter={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
-                                    defaultZoom={12}
-                                    gestureHandling={'none'}
-                                    zoomControl={false}
-                                    streetViewControl={false}
-                                    mapTypeControl={false}
-                                    fullscreenControl={false}
-                                    clickableIcons={false}
-                                    className="w-full h-full"
-                                >
-                                    <AdvancedMarker position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}>
-                                      <CarMarker />
-                                    </AdvancedMarker>
-                                </Map>
-                                <div className="absolute inset-0 bg-transparent group-hover:bg-black/30 transition-colors flex items-center justify-center" aria-hidden="true">
-                                    <div className="p-2 bg-background/80 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <MapPin className="h-5 w-5 text-foreground" />
-                                    </div>
-                                </div>
-                            </div>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-4xl w-full h-[80vh] p-0">
-                            <DialogHeader className="p-4 absolute top-0 left-0 z-10 bg-gradient-to-b from-background via-background/80 to-transparent w-full">
-                                <DialogTitle>Ubicación del Vehículo</DialogTitle>
-                            </DialogHeader>
-                            <Map
-                                mapId="listing_detail_map_dialog"
-                                defaultCenter={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
-                                defaultZoom={15}
-                                streetViewControl={false}
-                                mapTypeControl={false}
-                                fullscreenControl={false}
-                                className="w-full h-full"
-                            >
-                               <AdvancedMarker position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}>
-                                  <CarMarker />
-                                </AdvancedMarker>
-                            </Map>
-                        </DialogContent>
-                    </Dialog>
+          {/* Seller info for mobile */}
+          <div className="md:hidden">
+            <Card className="overflow-hidden">
+              <CardHeader>
+                <CardTitleComponent>Información del Vendedor</CardTitleComponent>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <SellerInfoBlock />
+                <ContactDialog
+                  isContactDialogOpen={isContactDialogOpen}
+                  setIsContactDialogOpen={setIsContactDialogOpen}
+                  displaySeller={displaySeller}
+                  handleContactClick={handleContactClick}
+                  countdown={countdown}
+                  createWhatsAppLink={createWhatsAppLink}
+                />
+                <p className="text-xs text-muted-foreground text-center">
+                  Los vendedores verificados han confirmado su identidad vía WhatsApp.
+                </p>
+              </CardContent>
+
+              <div className="border-t">
+                <Dialog open={isMapDialogOpen} onOpenChange={setIsMapDialogOpen}>
+                  <DialogTrigger asChild>
+                    <div className="h-40 w-full cursor-pointer relative group">
+                      <Map
+                        mapId="listing_detail_map_mobile"
+                        defaultCenter={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
+                        defaultZoom={12}
+                        gestureHandling={'none'}
+                        zoomControl={false}
+                        streetViewControl={false}
+                        mapTypeControl={false}
+                        fullscreenControl={false}
+                        clickableIcons={false}
+                        className="w-full h-full"
+                      >
+                        <AdvancedMarker position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}>
+                          <CarMarker />
+                        </AdvancedMarker>
+                      </Map>
+                      <div className="absolute inset-0 bg-transparent group-hover:bg-black/30 transition-colors flex items-center justify-center" aria-hidden="true">
+                        <div className="p-2 bg-background/80 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                          <MapPin className="h-5 w-5 text-foreground" />
+                        </div>
+                      </div>
                     </div>
-                    <div className="px-4 py-2 bg-muted/30 border-t">
-                        <p className="text-xs text-muted-foreground text-center">La ubicación proporcionada por el vendedor es aproximada.</p>
-                    </div>
-                </Card>
-           </div>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-4xl w-full h-[80vh] p-0">
+                    <DialogHeader className="p-4 absolute top-0 left-0 z-10 bg-gradient-to-b from-background via-background/80 to-transparent w-full">
+                      <DialogTitle>Ubicación del Vehículo</DialogTitle>
+                    </DialogHeader>
+                    <Map
+                      mapId="listing_detail_map_dialog"
+                      defaultCenter={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
+                      defaultZoom={15}
+                      streetViewControl={false}
+                      mapTypeControl={false}
+                      fullscreenControl={false}
+                      className="w-full h-full"
+                    >
+                      <AdvancedMarker position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}>
+                        <CarMarker />
+                      </AdvancedMarker>
+                    </Map>
+                  </DialogContent>
+                </Dialog>
+              </div>
+              <div className="px-4 py-2 bg-muted/30 border-t">
+                <p className="text-xs text-muted-foreground text-center">La ubicación proporcionada por el vendedor es aproximada.</p>
+              </div>
+            </Card>
+          </div>
         </div>
 
         {/* Sidebar */}
         <div className="md:col-span-1 space-y-6">
-            <div className="md:sticky md:top-24 space-y-6">
-                <div className="hidden md:block">
-                    <MainInfoCard />
-                </div>
-                
-                <div className="hidden md:block">
-                    <Card className="overflow-hidden">
-                        <CardHeader>
-                        <CardTitleComponent>Información del Vendedor</CardTitleComponent>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          <SellerInfoBlock />
-                           <ContactDialog
-                            isContactDialogOpen={isContactDialogOpen}
-                            setIsContactDialogOpen={setIsContactDialogOpen}
-                            displaySeller={displaySeller}
-                            handleContactClick={handleContactClick}
-                            countdown={countdown}
-                            createWhatsAppLink={createWhatsAppLink}
-                          />
-                          <p className="text-xs text-muted-foreground text-center">
-                              Los vendedores verificados han confirmado su identidad vía WhatsApp.
-                          </p>
-                        </CardContent>
-
-                        <div className="border-t">
-                        <Dialog open={isMapDialogOpen} onOpenChange={setIsMapDialogOpen}>
-                            <DialogTrigger asChild>
-                                <div className="h-40 w-full cursor-pointer relative group">
-                                     <Map
-                                        mapId="listing_detail_map_desktop"
-                                        defaultCenter={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
-                                        defaultZoom={12}
-                                        gestureHandling={'none'}
-                                        zoomControl={false}
-                                        streetViewControl={false}
-                                        mapTypeControl={false}
-                                        fullscreenControl={false}
-                                        clickableIcons={false}
-                                        className="w-full h-full"
-                                    >
-                                      <AdvancedMarker position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}>
-                                          <CarMarker />
-                                        </AdvancedMarker>
-                                    </Map>
-                                    <div className="absolute inset-0 bg-transparent group-hover:bg-black/30 transition-colors flex items-center justify-center" aria-hidden="true">
-                                        <div className="p-2 bg-background/80 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <MapPin className="h-5 w-5 text-foreground" />
-                                        </div>
-                                    </div>
-                                </div>
-                            </DialogTrigger>
-                            <DialogContent className="max-w-4xl w-full h-[80vh] p-0">
-                                <DialogHeader className="p-4 absolute top-0 left-0 z-10 bg-gradient-to-b from-background via-background/80 to-transparent w-full">
-                                    <DialogTitle>Ubicación del Vehículo</DialogTitle>
-                                </DialogHeader>
-                                <Map
-                                    mapId="listing_detail_map_dialog_desktop"
-                                    defaultCenter={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
-                                    defaultZoom={15}
-                                    streetViewControl={false}
-                                    mapTypeControl={false}
-                                    fullscreenControl={false}
-                                    className="w-full h-full"
-                                >
-                                    <AdvancedMarker position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}>
-                                      <CarMarker />
-                                    </AdvancedMarker>
-                                </Map>
-                            </DialogContent>
-                        </Dialog>
-                        </div>
-                        <div className="px-4 py-2 bg-muted/30 border-t">
-                            <p className="text-xs text-muted-foreground text-center">La ubicación proporcionada por el vendedor es aproximada.</p>
-                        </div>
-                    </Card>
-                </div>
-                {isAdmin && (
-                    <Card className="border-red-500/50">
-                        <CardHeader>
-                            <CardTitleComponent className="text-red-600 dark:text-red-500">Herramientas de Administrador</CardTitleComponent>
-                        </CardHeader>
-                        <CardContent className="flex flex-col gap-2">
-                            <Button asChild variant="outline">
-                                <Link href={`/listings/${vehicle.id}/edit`}>
-                                    <PencilIcon className="mr-2" /> Editar Anuncio
-                                </Link>
-                            </Button>
-                            
-                            {vehicle.status === 'active' ? (
-                                <Button variant="outline" onClick={() => handleToggleStatus('paused')} disabled={isTogglingStatus}>
-                                    {isTogglingStatus ? <Loader2 className="animate-spin mr-2"/> : <Pause className="mr-2"/>}
-                                    Pausar Anuncio
-                                </Button>
-                            ) : (
-                                <Button variant="outline" onClick={() => handleToggleStatus('active')} disabled={isTogglingStatus}>
-                                    {isTogglingStatus ? <Loader2 className="animate-spin mr-2"/> : <Play className="mr-2"/>}
-                                    Reactivar Anuncio
-                                </Button>
-                            )}
-                            
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button variant="destructive">
-                                        <Trash2 className="mr-2"/> Eliminar Anuncio
-                                    </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>¿Eliminar este anuncio?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                            Esta acción es permanente y no se puede deshacer. Se borrará el anuncio y todas sus imágenes.
-                                        </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                        <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
-                                            {isDeleting && <Loader2 className="animate-spin mr-2"/>}
-                                            Sí, eliminar
-                                        </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
-
-                            <Separator className="my-2"/>
-
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button variant={displaySeller.isBlocked ? 'secondary' : 'destructive'}>
-                                        <ShieldBan className="mr-2"/> {displaySeller.isBlocked ? 'Desbloquear Vendedor' : 'Bloquear Vendedor'}
-                                    </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>¿{displaySeller.isBlocked ? 'Desbloquear' : 'Bloquear'} a {displaySeller.displayName}?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                            {displaySeller.isBlocked 
-                                                ? 'Esto permitirá que el vendedor vuelva a publicar y sus anuncios sean visibles.'
-                                                : 'Al bloquear a este vendedor, se ocultarán todos sus anuncios y no podrá publicar nuevos. ¿Deseas continuar?'}
-                                        </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                        <AlertDialogAction onClick={handleToggleBlockSeller} disabled={isBlocking} className={cn(!displaySeller.isBlocked && 'bg-destructive hover:bg-destructive/90')}>
-                                            {isBlocking && <Loader2 className="animate-spin mr-2"/>}
-                                            {displaySeller.isBlocked ? 'Sí, desbloquear' : 'Sí, bloquear'}
-                                        </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
-                        </CardContent>
-                    </Card>
-                )}
+          <div className="md:sticky md:top-24 space-y-6">
+            <div className="hidden md:block">
+              <MainInfoCard />
             </div>
+
+            <div className="hidden md:block">
+              <Card className="overflow-hidden">
+                <CardHeader>
+                  <CardTitleComponent>Información del Vendedor</CardTitleComponent>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <SellerInfoBlock />
+                  <ContactDialog
+                    isContactDialogOpen={isContactDialogOpen}
+                    setIsContactDialogOpen={setIsContactDialogOpen}
+                    displaySeller={displaySeller}
+                    handleContactClick={handleContactClick}
+                    countdown={countdown}
+                    createWhatsAppLink={createWhatsAppLink}
+                  />
+                  <p className="text-xs text-muted-foreground text-center">
+                    Los vendedores verificados han confirmado su identidad vía WhatsApp.
+                  </p>
+                </CardContent>
+
+                <div className="border-t">
+                  <Dialog open={isMapDialogOpen} onOpenChange={setIsMapDialogOpen}>
+                    <DialogTrigger asChild>
+                      <div className="h-40 w-full cursor-pointer relative group">
+                        <Map
+                          mapId="listing_detail_map_desktop"
+                          defaultCenter={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
+                          defaultZoom={12}
+                          gestureHandling={'none'}
+                          zoomControl={false}
+                          streetViewControl={false}
+                          mapTypeControl={false}
+                          fullscreenControl={false}
+                          clickableIcons={false}
+                          className="w-full h-full"
+                        >
+                          <AdvancedMarker position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}>
+                            <CarMarker />
+                          </AdvancedMarker>
+                        </Map>
+                        <div className="absolute inset-0 bg-transparent group-hover:bg-black/30 transition-colors flex items-center justify-center" aria-hidden="true">
+                          <div className="p-2 bg-background/80 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                            <MapPin className="h-5 w-5 text-foreground" />
+                          </div>
+                        </div>
+                      </div>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-4xl w-full h-[80vh] p-0">
+                      <DialogHeader className="p-4 absolute top-0 left-0 z-10 bg-gradient-to-b from-background via-background/80 to-transparent w-full">
+                        <DialogTitle>Ubicación del Vehículo</DialogTitle>
+                      </DialogHeader>
+                      <Map
+                        mapId="listing_detail_map_dialog_desktop"
+                        defaultCenter={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
+                        defaultZoom={15}
+                        streetViewControl={false}
+                        mapTypeControl={false}
+                        fullscreenControl={false}
+                        className="w-full h-full"
+                      >
+                        <AdvancedMarker position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}>
+                          <CarMarker />
+                        </AdvancedMarker>
+                      </Map>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+                <div className="px-4 py-2 bg-muted/30 border-t">
+                  <p className="text-xs text-muted-foreground text-center">La ubicación proporcionada por el vendedor es aproximada.</p>
+                </div>
+              </Card>
+            </div>
+            {isAdmin && (
+              <Card className="border-red-500/50">
+                <CardHeader>
+                  <CardTitleComponent className="text-red-600 dark:text-red-500">Herramientas de Administrador</CardTitleComponent>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-2">
+                  <Button asChild variant="outline">
+                    <Link href={`/listings/${vehicle.id}/edit`}>
+                      <PencilIcon className="mr-2" /> Editar Anuncio
+                    </Link>
+                  </Button>
+
+                  {vehicle.status === 'active' ? (
+                    <Button variant="outline" onClick={() => handleToggleStatus('paused')} disabled={isTogglingStatus}>
+                      {isTogglingStatus ? <Loader2 className="animate-spin mr-2" /> : <Pause className="mr-2" />}
+                      Pausar Anuncio
+                    </Button>
+                  ) : (
+                    <Button variant="outline" onClick={() => handleToggleStatus('active')} disabled={isTogglingStatus}>
+                      {isTogglingStatus ? <Loader2 className="animate-spin mr-2" /> : <Play className="mr-2" />}
+                      Reactivar Anuncio
+                    </Button>
+                  )}
+
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive">
+                        <Trash2 className="mr-2" /> Eliminar Anuncio
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>¿Eliminar este anuncio?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Esta acción es permanente y no se puede deshacer. Se borrará el anuncio y todas sus imágenes.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                          {isDeleting && <Loader2 className="animate-spin mr-2" />}
+                          Sí, eliminar
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+
+                  <Separator className="my-2" />
+
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant={displaySeller.isBlocked ? 'secondary' : 'destructive'}>
+                        <ShieldBan className="mr-2" /> {displaySeller.isBlocked ? 'Desbloquear Vendedor' : 'Bloquear Vendedor'}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>¿{displaySeller.isBlocked ? 'Desbloquear' : 'Bloquear'} a {displaySeller.displayName}?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {displaySeller.isBlocked
+                            ? 'Esto permitirá que el vendedor vuelva a publicar y sus anuncios sean visibles.'
+                            : 'Al bloquear a este vendedor, se ocultarán todos sus anuncios y no podrá publicar nuevos. ¿Deseas continuar?'}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleToggleBlockSeller} disabled={isBlocking} className={cn(!displaySeller.isBlocked && 'bg-destructive hover:bg-destructive/90')}>
+                          {isBlocking && <Loader2 className="animate-spin mr-2" />}
+                          {displaySeller.isBlocked ? 'Sí, desbloquear' : 'Sí, bloquear'}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
       </div>
-      
+
       <Dialog open={isLightboxOpen} onOpenChange={handleLightboxOpenChange}>
         <DialogContent className="max-w-screen-xl w-full h-[90vh] p-0 border-none bg-black/90 flex items-center justify-center overflow-hidden">
           <DialogTitle className="sr-only">Galería de Imágenes del Vehículo</DialogTitle>
           <DialogDescription className="sr-only">
             Visor de imágenes para {`${vehicle.year} ${vehicle.make} ${vehicle.model}`}. Usa la rueda del ratón o pellizca para hacer zoom. Arrastra para mover la imagen.
           </DialogDescription>
-          
+
           <div
             ref={imageContainerRef}
             className={cn(
@@ -1018,7 +1073,7 @@ export default function ListingDetailPage() {
                 <ChevronLeft className="h-6 w-6" />
                 <span className="sr-only">Anterior</span>
               </Button>
-              
+
               <Button
                 variant="ghost"
                 size="icon"
@@ -1059,5 +1114,13 @@ function LoadingSkeleton() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ListingDetailPage() {
+  return (
+    <MapsProvider>
+      <ListingDetailContent />
+    </MapsProvider>
   );
 }

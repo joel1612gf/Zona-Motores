@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { VehicleCard } from '@/components/vehicle-card';
 import { Filters, type FilterState } from '@/components/filters';
@@ -21,15 +21,15 @@ import {
   AlertDialogTitle as AlertDialogTitleComponent,
 } from "@/components/ui/alert-dialog";
 import { MapLocationFilter } from '@/components/map-location-filter';
-import { 
-  collectionGroup, 
-  query, 
-  where, 
-  orderBy, 
-  limit, 
-  getDocs, 
-  startAfter, 
-  DocumentSnapshot, 
+import {
+  collectionGroup,
+  query,
+  where,
+  orderBy,
+  limit,
+  getDocs,
+  startAfter,
+  DocumentSnapshot,
   DocumentData,
   Query
 } from 'firebase/firestore';
@@ -60,9 +60,9 @@ function ListingsPageContent() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [lastDoc, setLastDoc] = useState<DocumentSnapshot<DocumentData> | null>(null);
+  const lastDocRef = useRef<DocumentSnapshot<DocumentData> | null>(null);
   const [hasMore, setHasMore] = useState(true);
-  
+
   const [layout, setLayout] = useState<'grid' | 'list'>('grid');
   const loaderRef = useRef(null);
   const searchRef = useRef<HTMLDivElement>(null);
@@ -79,15 +79,15 @@ function ListingsPageContent() {
 
     const timer = setTimeout(() => {
       if (!filters.location) {
-         setIsLocationPromptOpen(true);
-         sessionStorage.setItem('locationPromptShown', 'true');
+        setIsLocationPromptOpen(true);
+        sessionStorage.setItem('locationPromptShown', 'true');
       }
     }, 2000);
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  
+
   useEffect(() => {
     const headerHeight = 64; // Corresponds to h-16 in tailwind
 
@@ -101,7 +101,7 @@ function ListingsPageContent() {
       }
     };
 
-    window.addEventListener('scroll', handleScroll);
+    window.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll(); // Run on mount
 
     return () => {
@@ -110,43 +110,43 @@ function ListingsPageContent() {
   }, []);
 
   const applyClientSideFilters = (vehiclesToFilter: Vehicle[]): Vehicle[] => {
-      return vehiclesToFilter.filter(vehicle => {
-          const { searchTerm, minYear, maxYear, location, minPrice, maxPrice } = filters;
+    return vehiclesToFilter.filter(vehicle => {
+      const { searchTerm, minYear, maxYear, location, minPrice, maxPrice } = filters;
 
-          // Client-side search (on the fetched batch)
-          const searchMatch = (() => {
-              const normalizedSearch = searchTerm.trim().toLowerCase();
-              if (normalizedSearch === '') return true;
-              const vehicleText = [
-                  vehicle.make, vehicle.model, vehicle.year.toString(),
-                  vehicle.description, vehicle.bodyType, vehicle.transmission,
-                  vehicle.exteriorColor, vehicle.engine, vehicle.seller.displayName,
-                  vehicle.is4x4 ? '4x4' : '', vehicle.hasAC ? 'aire acondicionado ac' : '',
-                  vehicle.hasSoundSystem ? 'sonido' : '', vehicle.acceptsTradeIn ? 'acepta cambio trueque' : ''
-              ].join(' ').toLowerCase();
-              const searchWords = normalizedSearch.split(' ').filter(w => w.length > 0);
-              return searchWords.every(word => vehicleText.includes(word));
-          })();
+      // Client-side search (on the fetched batch)
+      const searchMatch = (() => {
+        const normalizedSearch = searchTerm.trim().toLowerCase();
+        if (normalizedSearch === '') return true;
+        const vehicleText = [
+          vehicle.make, vehicle.model, vehicle.year.toString(),
+          vehicle.description, vehicle.bodyType, vehicle.transmission,
+          vehicle.exteriorColor, vehicle.engine, vehicle.seller.displayName,
+          vehicle.is4x4 ? '4x4' : '', vehicle.hasAC ? 'aire acondicionado ac' : '',
+          vehicle.hasSoundSystem ? 'sonido' : '', vehicle.acceptsTradeIn ? 'acepta cambio trueque' : ''
+        ].join(' ').toLowerCase();
+        const searchWords = normalizedSearch.split(' ').filter(w => w.length > 0);
+        return searchWords.every(word => vehicleText.includes(word));
+      })();
 
-          // Client-side year filter
-          const minYearNum = minYear ? parseInt(minYear, 10) : 0;
-          const maxYearNum = maxYear ? parseInt(maxYear, 10) : Infinity;
-          const yearMatch = vehicle.year >= minYearNum && vehicle.year <= maxYearNum;
-          
-          // Client-side price filter
-          const minPriceNum = minPrice ? parseInt(minPrice, 10) : 0;
-          const maxPriceNum = maxPrice ? parseInt(maxPrice, 10) : Infinity;
-          const priceMatch = vehicle.priceUSD >= minPriceNum && vehicle.priceUSD <= maxPriceNum;
+      // Client-side year filter
+      const minYearNum = minYear ? parseInt(minYear, 10) : 0;
+      const maxYearNum = maxYear ? parseInt(maxYear, 10) : Infinity;
+      const yearMatch = vehicle.year >= minYearNum && vehicle.year <= maxYearNum;
 
-          // Client-side location filter
-          const locationMatch = (() => {
-              if (!location) return true;
-              const distance = getDistance(location.lat, location.lon, vehicle.location.lat, vehicle.location.lon);
-              return distance <= location.radius;
-          })();
+      // Client-side price filter
+      const minPriceNum = minPrice ? parseInt(minPrice, 10) : 0;
+      const maxPriceNum = maxPrice ? parseInt(maxPrice, 10) : Infinity;
+      const priceMatch = vehicle.priceUSD >= minPriceNum && vehicle.priceUSD <= maxPriceNum;
 
-          return searchMatch && yearMatch && priceMatch && locationMatch;
-      });
+      // Client-side location filter
+      const locationMatch = (() => {
+        if (!location) return true;
+        const distance = getDistance(location.lat, location.lon, vehicle.location.lat, vehicle.location.lon);
+        return distance <= location.radius;
+      })();
+
+      return searchMatch && yearMatch && priceMatch && locationMatch;
+    });
   };
 
   const fetchVehicles = useCallback(async (loadMore = false) => {
@@ -166,13 +166,13 @@ function ListingsPageContent() {
       if (filters.model !== 'all') q = query(q, where('model', '==', filters.model));
       if (filters.bodyType !== 'all') q = query(q, where('bodyType', '==', filters.bodyType));
       if (filters.transmission !== 'all') q = query(q, where('transmission', '==', filters.transmission));
-      
+
       // Ordering: Promoted first (those with a future date), then by creation date.
       q = query(q, orderBy('promotionExpiresAt', 'desc'), orderBy('createdAt', 'desc'));
-      
+
       // Pagination
-      if (loadMore && lastDoc) {
-        q = query(q, startAfter(lastDoc));
+      if (loadMore && lastDocRef.current) {
+        q = query(q, startAfter(lastDocRef.current));
       }
       q = query(q, limit(PAGE_SIZE));
 
@@ -183,7 +183,7 @@ function ListingsPageContent() {
       // We apply remaining filters on the client
       const clientFilteredVehicles = applyClientSideFilters(newVehicles);
 
-      setLastDoc(newLastDoc || null);
+      lastDocRef.current = newLastDoc || null;
       setHasMore(querySnapshot.docs.length === PAGE_SIZE);
 
       if (loadMore) {
@@ -196,14 +196,14 @@ function ListingsPageContent() {
       console.error("Error fetching vehicles:", error);
       // Inform the user about potential index issues.
       if (error instanceof Error && error.message.includes('firestore/failed-precondition')) {
-          console.error("This query requires a Firestore index. Please check the developer console for a link to create it.");
+        console.error("This query requires a Firestore index. Please check the developer console for a link to create it.");
       }
     } finally {
       setIsLoading(false);
       setIsLoadingMore(false);
     }
-  }, [firestore, filters, lastDoc]);
-  
+  }, [firestore, filters]);
+
   const handleLoadMore = useCallback(() => {
     if (hasMore && !isLoadingMore) {
       fetchVehicles(true);
@@ -213,11 +213,11 @@ function ListingsPageContent() {
 
   // Effect to fetch vehicles when filters change
   useEffect(() => {
-      setLastDoc(null); // Reset pagination on filter change
-      fetchVehicles(false);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    lastDocRef.current = null; // Reset pagination on filter change
+    fetchVehicles(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
-  
+
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -263,14 +263,14 @@ function ListingsPageContent() {
   }, [filters]);
 
   const shouldShowAveragePrice = averagePrice && (filters.searchTerm.trim() !== '' || activeFilterCount >= 2);
-  
+
   const handleLocationFilterApply = (location: FilterState['location']) => {
     setFilters(prev => ({ ...prev, location }));
     setIsMapFilterOpen(false);
   };
-  
+
   const handleSearch = (term: string) => {
-    setFilters(prev => ({...prev, searchTerm: term}));
+    setFilters(prev => ({ ...prev, searchTerm: term }));
   };
 
   return (
@@ -327,40 +327,40 @@ function ListingsPageContent() {
           </div>
           <div className="lg:col-span-3">
             <div className="flex justify-between items-center mb-6">
-                <h1 className="flex-1 text-center lg:text-left font-headline text-2xl md:text-3xl font-bold">
-                    Todos los Anuncios
-                </h1>
-                <div className="flex items-center gap-2">
-                    <div className="hidden sm:flex items-center gap-2">
-                        <Button variant={layout === 'grid' ? 'secondary' : 'ghost'} size="icon" onClick={() => setLayout('grid')} aria-label="Vista de cuadrícula">
-                            <Grid className="h-4 w-4" />
-                        </Button>
-                        <Button variant={layout === 'list' ? 'secondary' : 'ghost'} size="icon" onClick={() => setLayout('list')} aria-label="Vista de lista">
-                            <List className="h-4 w-4" />
-                        </Button>
-                    </div>
-                    <div className="lg:hidden">
-                        <Sheet>
-                            <SheetTrigger asChild>
-                            <Button variant="outline">
-                                <Filter className="mr-2 h-4 w-4" />
-                                Filtros
-                            </Button>
-                            </SheetTrigger>
-                            <SheetContent side="left" className="w-[300px] sm:w-[340px]">
-                                <SheetHeader>
-                                    <SheetTitle className="sr-only">Filtros</SheetTitle>
-                                </SheetHeader>
-                                <div className="py-6 h-full overflow-y-auto">
-                                    <Filters filters={filters} onFilterChange={setFilters} />
-                                </div>
-                            </SheetContent>
-                        </Sheet>
-                    </div>
+              <h1 className="flex-1 text-center lg:text-left font-headline text-2xl md:text-3xl font-bold">
+                Todos los Anuncios
+              </h1>
+              <div className="flex items-center gap-2">
+                <div className="hidden sm:flex items-center gap-2">
+                  <Button variant={layout === 'grid' ? 'secondary' : 'ghost'} size="icon" onClick={() => setLayout('grid')} aria-label="Vista de cuadrícula">
+                    <Grid className="h-4 w-4" />
+                  </Button>
+                  <Button variant={layout === 'list' ? 'secondary' : 'ghost'} size="icon" onClick={() => setLayout('list')} aria-label="Vista de lista">
+                    <List className="h-4 w-4" />
+                  </Button>
                 </div>
+                <div className="lg:hidden">
+                  <Sheet>
+                    <SheetTrigger asChild>
+                      <Button variant="outline">
+                        <Filter className="mr-2 h-4 w-4" />
+                        Filtros
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent side="left" className="w-[300px] sm:w-[340px]">
+                      <SheetHeader>
+                        <SheetTitle className="sr-only">Filtros</SheetTitle>
+                      </SheetHeader>
+                      <div className="py-6 h-full overflow-y-auto">
+                        <Filters filters={filters} onFilterChange={setFilters} />
+                      </div>
+                    </SheetContent>
+                  </Sheet>
+                </div>
+              </div>
             </div>
             <div className="mb-4" ref={searchRef}>
-              <SearchWithHistory 
+              <SearchWithHistory
                 initialValue={filters.searchTerm}
                 onSearch={handleSearch}
                 inputClassName="bg-card"
@@ -390,7 +390,7 @@ function ListingsPageContent() {
                   ))}
                 </div>
                 <div ref={loaderRef} className="mt-8 flex justify-center py-4">
-                    {hasMore && isLoadingMore && <Loader2 className="h-8 w-8 animate-spin text-primary" />}
+                  {hasMore && isLoadingMore && <Loader2 className="h-8 w-8 animate-spin text-primary" />}
                 </div>
                 {!isLoading && !hasMore && (
                   <p className="text-center text-muted-foreground mt-8">Has llegado al final de los resultados.</p>
@@ -409,9 +409,10 @@ function ListingsPageContent() {
   );
 }
 
-
 export default function ListingsPage() {
   return (
-    <ListingsPageContent />
+    <Suspense>
+      <ListingsPageContent />
+    </Suspense>
   )
 }

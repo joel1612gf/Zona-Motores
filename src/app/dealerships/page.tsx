@@ -4,11 +4,14 @@ import { useVehicles, VehicleProvider } from '@/context/vehicle-context';
 import { Vehicle } from '@/lib/types';
 import { DealershipCard } from '@/components/dealership-card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 import React from 'react';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { query, collection, where } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
 import { UserProfile } from '@/lib/types';
+import { Building2 } from 'lucide-react';
 
 
 function DealershipsPageContent() {
@@ -26,11 +29,11 @@ function DealershipsPageContent() {
     if (!dealerProfiles || !vehicles) return [];
 
     return dealerProfiles.map(dealerProfile => {
-        const dealerVehicles = vehicles.filter(v => v.sellerId === dealerProfile.uid);
-        return {
-            seller: dealerProfile,
-            vehicles: dealerVehicles,
-        };
+      const dealerVehicles = vehicles.filter(v => v.sellerId === dealerProfile.uid);
+      return {
+        seller: dealerProfile,
+        vehicles: dealerVehicles,
+      };
     }).filter(d => d.vehicles.length > 0);
 
   }, [dealerProfiles, vehicles]);
@@ -48,21 +51,34 @@ function DealershipsPageContent() {
         <h1 className="font-headline text-4xl font-bold">Concesionarios</h1>
       </div>
 
-      <div className="space-y-12">
-        {dealerships.map(dealership => (
-          <DealershipCard key={dealership.seller.uid} dealership={dealership} />
-        ))}
-      </div>
+      {dealerships.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 border-2 border-dashed rounded-lg bg-card">
+          <Building2 className="h-12 w-12 text-muted-foreground mb-4" />
+          <h2 className="font-headline text-2xl font-semibold">Aún no hay concesionarios activos</h2>
+          <p className="mt-2 text-muted-foreground text-center max-w-md">
+            Los concesionarios que publiquen vehículos aparecerán aquí.
+          </p>
+          <Button asChild className="mt-6">
+            <Link href="/listings">Explorar Vehículos</Link>
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-12">
+          {dealerships.map(dealership => (
+            <DealershipCard key={dealership.seller.uid} dealership={dealership} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
 export default function DealershipsPage() {
-    return (
-        <VehicleProvider>
-            <DealershipsPageContent />
-        </VehicleProvider>
-    )
+  return (
+    <VehicleProvider>
+      <DealershipsPageContent />
+    </VehicleProvider>
+  )
 }
 
 function LoadingSkeleton() {

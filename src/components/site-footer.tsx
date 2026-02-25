@@ -18,10 +18,10 @@ export function SiteFooter() {
             </p>
           </div>
           <div className="flex gap-6 items-center flex-wrap justify-center">
-            <Link href="#" className="text-sm font-medium hover:underline">Sobre nosotros</Link>
+            <Link href="/about" className="text-sm font-medium hover:underline">Sobre nosotros</Link>
             <Link href="/pricing" className="text-sm font-medium hover:underline">Planes</Link>
+            <Link href="/terms" className="text-sm font-medium hover:underline">Términos y Condiciones</Link>
             <Link href="#" className="text-sm font-medium hover:underline">Contacto</Link>
-            <Link href="#" className="text-sm font-medium hover:underline">Privacidad</Link>
           </div>
         </div>
         <div className="mt-8 pt-6 border-t border-primary-foreground/20 text-center text-sm text-primary-foreground/80">

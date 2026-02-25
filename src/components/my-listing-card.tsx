@@ -32,6 +32,7 @@ import {
     ExternalLink,
     RefreshCw,
     AlertTriangle,
+    Clock,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { doc, deleteDoc, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
@@ -194,6 +195,16 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
     const isPromotionActive = vehicle.promotionExpiresAt && vehicle.promotionExpiresAt.toDate() > new Date();
     const isLegacy = vehicle.promotionExpiresAt === undefined;
 
+    // Calculate days until auto-pause (7-day window from creation)
+    const daysUntilPause = (() => {
+        if (vehicle.status !== 'active' || !vehicle.createdAt) return null;
+        const createdDate = vehicle.createdAt.toDate();
+        const msPerDay = 1000 * 60 * 60 * 24;
+        const daysSinceCreation = Math.floor((Date.now() - createdDate.getTime()) / msPerDay);
+        const remaining = 7 - daysSinceCreation;
+        return remaining > 0 ? remaining : null;
+    })();
+
 
     return (
         <Card className="flex flex-col md:flex-row items-start gap-4 p-4 transition-all hover:bg-muted/50">
@@ -210,14 +221,34 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
                 <div className="flex items-center gap-4">
                     <h3 className="font-headline text-xl font-bold">{`${vehicle.year} ${vehicle.make} ${vehicle.model}`}</h3>
                     {!isLegacy && <Badge variant="secondary" className={cn(currentStatus.className)}>{currentStatus.text}</Badge>}
-                    {isPromotionActive && (
-                        <Badge variant="secondary" className="border-orange-300 bg-orange-100 text-orange-800 dark:border-orange-700 dark:bg-orange-900/50 dark:text-orange-300">
-                            Promocionado
-                        </Badge>
-                    )}
+                    {isPromotionActive && (() => {
+                        const expiresAt = vehicle.promotionExpiresAt!.toDate();
+                        const msRemaining = expiresAt.getTime() - Date.now();
+                        const totalMinutes = Math.floor(msRemaining / (1000 * 60));
+                        const days = Math.floor(totalMinutes / (60 * 24));
+                        const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+                        const minutes = totalMinutes % 60;
+                        const timeText = days > 0
+                            ? `${days}d restantes`
+                            : `${hours}h ${minutes}min`;
+                        return (
+                            <Badge variant="secondary" className="border-orange-300 bg-orange-100 text-orange-800 dark:border-orange-700 dark:bg-orange-900/50 dark:text-orange-300">
+                                Promocionado · {timeText}
+                            </Badge>
+                        );
+                    })()}
                 </div>
                 <p className="font-headline text-lg font-semibold text-primary mt-1">{formatCurrency(vehicle.priceUSD)}</p>
                 <p className="text-sm text-muted-foreground mt-1">{vehicle.mileage.toLocaleString()} km &middot; {vehicle.location.city}</p>
+                {daysUntilPause !== null && (
+                    <p className={cn(
+                        "text-xs mt-1 flex items-center gap-1",
+                        daysUntilPause <= 3 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"
+                    )}>
+                        <Clock className="h-3 w-3" />
+                        Se pausará en {daysUntilPause} {daysUntilPause === 1 ? 'día' : 'días'}
+                    </p>
+                )}
 
                 {isLegacy ? (
                     <Alert className="mt-4 border-amber-500 bg-amber-50 text-amber-900 dark:bg-amber-900/20 dark:text-amber-200 dark:border-amber-500/50">

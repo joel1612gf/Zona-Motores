@@ -2,7 +2,6 @@
 
 import { ReactNode } from 'react';
 import { ThemeProvider } from '@/components/theme-provider';
-import { APIProvider } from '@vis.gl/react-google-maps';
 import { FirebaseClientProvider } from '@/firebase';
 import { SubscriptionProvider } from '@/context/subscription-context';
 import { MakesProvider } from '@/context/makes-context';
@@ -16,15 +15,13 @@ export function ClientProviders({ children }: { children: ReactNode }) {
       enableSystem
       disableTransitionOnChange
     >
-      <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!}>
-        <FirebaseClientProvider>
-          <SubscriptionProvider>
-            <MakesProvider>
-                <FavoritesProvider>{children}</FavoritesProvider>
-            </MakesProvider>
-          </SubscriptionProvider>
-        </FirebaseClientProvider>
-      </APIProvider>
+      <FirebaseClientProvider>
+        <SubscriptionProvider>
+          <MakesProvider>
+            <FavoritesProvider>{children}</FavoritesProvider>
+          </MakesProvider>
+        </SubscriptionProvider>
+      </FirebaseClientProvider>
     </ThemeProvider>
   );
 }

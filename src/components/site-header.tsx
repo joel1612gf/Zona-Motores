@@ -3,12 +3,17 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
-import { AuthButton } from '@/components/auth-button';
-import { Car, PlusCircle, Menu } from 'lucide-react';
+import { Car, PlusCircle, Menu, Bell } from 'lucide-react';
 import { useUser } from '@/firebase';
-import { ThemeToggle } from './theme-toggle';
 import { Sheet, SheetContent, SheetTrigger, SheetClose, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+
+const AuthButton = dynamic(() => import('@/components/auth-button').then(mod => ({ default: mod.AuthButton })), {
+  ssr: false,
+  loading: () => <div className="h-9 w-[120px] animate-pulse bg-secondary/50 rounded-md" />,
+});
+
 
 export function SiteHeader() {
   const { user } = useUser();
@@ -78,7 +83,7 @@ export function SiteHeader() {
             </SheetContent>
           </Sheet>
           <div className="flex-1 text-center">
-             <Link href="/" className="inline-flex items-center space-x-2" tabIndex={-1}>
+            <Link href="/" className="inline-flex items-center space-x-2" tabIndex={-1}>
               <Car className="h-6 w-6" />
               <span className="font-headline text-xl font-bold">
                 Zona Motores
@@ -89,11 +94,14 @@ export function SiteHeader() {
 
         <div className="flex flex-1 items-center justify-end space-x-1 sm:space-x-2">
           <Button variant="secondary" size="sm" className="h-9 px-2 sm:px-3" onClick={handleNewListingClick}>
-              <PlusCircle className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Publicar</span>
+            <PlusCircle className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Publicar</span>
           </Button>
           <AuthButton open={loginOpen} onOpenChange={setLoginOpen} />
-          <ThemeToggle />
+          <Button variant="secondary" size="icon" className="relative">
+            <Bell className="h-[1.2rem] w-[1.2rem]" />
+            <span className="sr-only">Notificaciones</span>
+          </Button>
         </div>
       </div>
     </header>

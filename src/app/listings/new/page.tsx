@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Bike, Car, Truck, UploadCloud, X, Loader2, ShieldAlert, Phone, ExternalLink, AlertTriangle, MapPin, LocateFixed } from 'lucide-react';
+import { Bike, Car, Truck, UploadCloud, X, Loader2, ShieldAlert, Phone, ExternalLink, AlertTriangle, MapPin, LocateFixed, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -27,7 +27,8 @@ import { Progress } from '@/components/ui/progress';
 import imageCompression from 'browser-image-compression';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { summarizeVehicleListing } from '@/ai/flows/summarize-vehicle-listing';
+
+import { ADMIN_EMAIL } from '@/lib/constants';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -37,9 +38,11 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
+    AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { formatCurrency } from '@/lib/utils';
 import { Map, AdvancedMarker } from '@vis.gl/react-google-maps';
+import { MapsProvider } from '@/components/maps-provider';
 
 
 type VehicleType = 'Moto' | 'Carro' | 'Camioneta';
@@ -56,33 +59,35 @@ const vehicleTypeOptions: {
     ];
 
 // LISTING_LIMIT is now dynamic, see useSubscription()
-const ADMIN_EMAIL = 'zonamotores.ve@gmail.com';
 
 const defaultCenter = { lat: 6.4238, lng: -66.5897 }; // Center of Venezuela
 
 function CarMarker() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="32"
-      height="32"
-      viewBox="0 0 24 24"
-      fill="hsl(var(--primary))"
-      stroke="hsl(var(--background))"
-      strokeWidth="1"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9L1.4 16.1c-.1.2-.1.4-.1.6V20c0 .6.4 1 1 1h1" />
-      <path d="M7 21v-1.3" />
-      <path d="M17 21v-1.3" />
-      <circle cx="7" cy="17" r="2" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" strokeWidth="0.5" />
-      <circle cx="17" cy="17" r="2" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" strokeWidth="0.5" />
-    </svg>
-  );
+    return (
+        <div className="flex flex-col items-center" style={{ transform: 'translateY(-50%)' }}>
+            <div className="bg-white rounded-full p-2.5 shadow-lg border-2 border-blue-500">
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="26"
+                    height="26"
+                    viewBox="0 0 64 64"
+                    fill="none"
+                    stroke="#2563eb"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                >
+                    <path d="M10 38 h44 a4 4 0 0 0 4-4 v-4 a4 4 0 0 0-2-3.5 L48 22 42 14a6 6 0 0 0-5-2.5 H27a6 6 0 0 0-5 2.5 L16 22 8 26.5a4 4 0 0 0-2 3.5 v4 a4 4 0 0 0 4 4Z" />
+                    <circle cx="20" cy="38" r="6" fill="white" />
+                    <circle cx="44" cy="38" r="6" fill="white" />
+                </svg>
+            </div>
+            <div className="w-3 h-3 bg-white border-r-2 border-b-2 border-blue-500 rotate-45 -mt-[7px] shadow-lg" />
+        </div>
+    );
 }
 
-export default function NewListingPage() {
+function NewListingContent() {
     const router = useRouter();
     const { toast } = useToast();
     const { user, isUserLoading } = useUser();
@@ -131,7 +136,7 @@ export default function NewListingPage() {
     const [mainPhotoIndex, setMainPhotoIndex] = useState<number | null>(null);
     const [isPublishing, setIsPublishing] = useState(false);
     const [uploadProgress, setUploadProgress] = useState<number | null>(null);
-    const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
+
 
     const [location, setLocation] = useState<{ lat: number; lon: number; city: string; state: string; } | null>(null);
     const [markerPosition, setMarkerPosition] = useState<{ lat: number; lng: number } | null>(null);
@@ -321,42 +326,7 @@ export default function NewListingPage() {
         }
     };
 
-    const handleGenerateDescription = async () => {
-        if (!selectedType) return;
-        setIsGeneratingDescription(true);
-        try {
-            const { summary } = await summarizeVehicleListing({
-                make: selectedBrand,
-                model: selectedModel,
-                year: parseInt(selectedYear, 10),
-                mileage: parseInt(details.mileage, 10) || 0,
-                bodyType: selectedType,
-                exteriorColor: details.exteriorColor,
-                description: details.moreDetails,
-                features: [
-                    details.is4x4 ? '4x4' : '',
-                    details.isArmored ? `Blindado nivel ${details.armorLevel}` : '',
-                    details.hasAC ? 'Aire Acondicionado' : '',
-                    details.hasSoundSystem ? 'Sistema de sonido' : '',
-                    details.acceptsTradeIn ? 'Acepta cambios' : '',
-                ].filter(Boolean),
-            });
-            handleDetailChange('moreDetails', summary);
-            toast({
-                title: "Descripción Generada",
-                description: "La descripción ha sido generada por IA y añadida al formulario."
-            });
-        } catch (e) {
-            console.error("Error generating description", e);
-            toast({
-                title: "Error",
-                description: "No se pudo generar la descripción.",
-                variant: "destructive"
-            });
-        } finally {
-            setIsGeneratingDescription(false);
-        }
-    };
+
 
     const validatePriceAgainstMarket = (price: number): boolean => {
         if (!selectedBrand || !selectedModel || !selectedYear || !allVehicles) return true;
@@ -955,13 +925,7 @@ export default function NewListingPage() {
                         <Input id="tireLife" type="number" min="0" max="100" step="5" value={details.tireLife} onChange={(e) => handleDetailChange('tireLife', e.target.value)} placeholder="Ej: 75" />
                     </div>
                     <div className="md:col-span-2 space-y-2">
-                        <div className="flex items-center justify-between mb-2">
-                            <Label htmlFor="moreDetails">Descripción / Más detalles</Label>
-                            <Button variant="outline" size="sm" onClick={handleGenerateDescription} disabled={isGeneratingDescription}>
-                                {isGeneratingDescription ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ExternalLink className="mr-2 h-4 w-4" />}
-                                Generar descripción con IA
-                            </Button>
-                        </div>
+                        <Label htmlFor="moreDetails">Descripción / Más detalles</Label>
                         <Textarea id="moreDetails" placeholder="Añade cualquier otra información relevante como extras, detalles de pintura, etc." value={details.moreDetails} onChange={(e) => handleDetailChange('moreDetails', e.target.value)} />
                     </div>
                 </div>
@@ -1183,8 +1147,53 @@ export default function NewListingPage() {
         );
     }
 
+    const steps: { key: Step; label: string }[] = [
+        { key: 'selection', label: 'Vehículo' },
+        { key: 'details', label: 'Detalles' },
+        { key: 'location', label: 'Ubicación' },
+        { key: 'photos', label: 'Fotos' },
+    ];
+    const currentStepIndex = steps.findIndex(s => s.key === step);
+
     return (
         <div className="container max-w-5xl mx-auto py-12">
+            {/* Stepper */}
+            <div className="mb-10">
+                <div className="flex items-center justify-center">
+                    {steps.map((s, i) => {
+                        const isCompleted = i < currentStepIndex;
+                        const isCurrent = i === currentStepIndex;
+                        return (
+                            <div key={s.key} className="flex items-center">
+                                <div className="flex flex-col items-center">
+                                    <div className={cn(
+                                        "flex items-center justify-center h-9 w-9 rounded-full border-2 text-sm font-semibold transition-all",
+                                        isCompleted && "bg-primary border-primary text-primary-foreground",
+                                        isCurrent && "border-primary bg-primary/10 text-primary",
+                                        !isCompleted && !isCurrent && "border-border bg-muted text-muted-foreground"
+                                    )}>
+                                        {isCompleted ? <Check className="h-5 w-5" /> : i + 1}
+                                    </div>
+                                    <span className={cn(
+                                        "mt-1.5 text-xs font-medium hidden sm:block",
+                                        isCurrent ? "text-primary" : isCompleted ? "text-foreground" : "text-muted-foreground"
+                                    )}>{s.label}</span>
+                                </div>
+                                {i < steps.length - 1 && (
+                                    <div className={cn(
+                                        "h-0.5 w-8 sm:w-16 mx-1 sm:mx-2 transition-colors",
+                                        i < currentStepIndex ? "bg-primary" : "bg-border"
+                                    )} />
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+                <p className="text-center text-sm text-muted-foreground mt-3 sm:hidden">
+                    Paso {currentStepIndex + 1} de {steps.length} — {steps[currentStepIndex].label}
+                </p>
+            </div>
+
             {step === 'selection' && renderSelectionStep()}
             {step === 'details' && renderDetailsStep()}
             {step === 'location' && renderLocationStep()}
@@ -1193,4 +1202,10 @@ export default function NewListingPage() {
     );
 }
 
-    
+export default function NewListingPage() {
+    return (
+        <MapsProvider>
+            <NewListingContent />
+        </MapsProvider>
+    );
+}

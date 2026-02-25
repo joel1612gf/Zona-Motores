@@ -1,6 +1,6 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
-import { Search, History } from 'lucide-react';
+import { Search, History, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverAnchor } from '@/components/ui/popover';
@@ -29,6 +29,7 @@ export function SearchWithHistory({
     const [searchTerm, setSearchTerm] = useState(initialValue);
     const { history, addSearchTerm, clearSearchHistory } = useSearchHistory();
     const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+    const [isSearching, setIsSearching] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -36,7 +37,7 @@ export function SearchWithHistory({
         if (initialValue !== searchTerm) {
             setSearchTerm(initialValue);
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [initialValue]);
 
     useEffect(() => {
@@ -48,11 +49,14 @@ export function SearchWithHistory({
     const handleSearch = (term: string) => {
         const trimmedTerm = term.trim();
         if (!trimmedTerm) return;
+        setIsSearching(true);
         if (user) {
             addSearchTerm(trimmedTerm);
         }
         onSearch(trimmedTerm);
         setIsPopoverOpen(false);
+        // Reset after brief visual feedback
+        setTimeout(() => setIsSearching(false), 1500);
     };
 
     const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -69,7 +73,7 @@ export function SearchWithHistory({
     return (
         <Popover open={isPopoverOpen && history.length > 0} onOpenChange={setIsPopoverOpen}>
             <PopoverAnchor asChild>
-                 <form
+                <form
                     onSubmit={handleSubmit}
                     className={cn(
                         "relative w-full bg-card shadow-lg",
@@ -92,7 +96,8 @@ export function SearchWithHistory({
                         onFocus={() => setIsPopoverOpen(true)}
                         autoComplete="off"
                     />
-                    <Button type="submit" size="lg" variant="secondary" className={cn("absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full h-9 shadow-md", buttonClassName)}>
+                    <Button type="submit" size="lg" variant="secondary" disabled={isSearching} className={cn("absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full h-9 shadow-md", buttonClassName)}>
+                        {isSearching ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
                         Buscar
                     </Button>
                 </form>
@@ -116,7 +121,7 @@ export function SearchWithHistory({
                                     className="w-full text-left flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-accent"
                                     onClick={() => handleHistoryClick(item)}
                                 >
-                                    <History className="h-4 w-4 text-muted-foreground"/>
+                                    <History className="h-4 w-4 text-muted-foreground" />
                                     <span>{item}</span>
                                 </button>
                             ))}

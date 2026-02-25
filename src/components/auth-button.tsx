@@ -16,7 +16,7 @@ import {
   getAdditionalUserInfo,
 } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
-import { LogIn, LogOut, User as UserIcon, Loader2, List, Store, Heart, BarChart, Crown } from 'lucide-react';
+import { LogIn, LogOut, User as UserIcon, Loader2, List, Store, Heart, BarChart, Crown, Palette, Sun, Moon, Monitor } from 'lucide-react';
 
 import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -35,11 +35,36 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuPortal,
 } from '@/components/ui/dropdown-menu';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { UserProfile } from '@/lib/types';
+import { useTheme } from 'next-themes';
+
+function ThemeOptions() {
+  const { setTheme } = useTheme();
+  return (
+    <>
+      <DropdownMenuItem onClick={() => setTheme('system')}>
+        <Monitor className="mr-2 h-4 w-4" />
+        Por defecto
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={() => setTheme('light')}>
+        <Sun className="mr-2 h-4 w-4" />
+        Claro
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={() => setTheme('dark')}>
+        <Moon className="mr-2 h-4 w-4" />
+        Oscuro
+      </DropdownMenuItem>
+    </>
+  );
+}
 
 interface AuthButtonProps {
   open: boolean;
@@ -271,6 +296,18 @@ export function AuthButton({ open, onOpenChange }: AuthButtonProps) {
               <span>Estadísticas</span>
             </Link>
           </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>
+              <Palette className="mr-2 h-4 w-4" />
+              <span>Aspecto</span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuPortal>
+              <DropdownMenuSubContent>
+                <ThemeOptions />
+              </DropdownMenuSubContent>
+            </DropdownMenuPortal>
+          </DropdownMenuSub>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleSignOut}>
             <LogOut className="mr-2 h-4 w-4" />

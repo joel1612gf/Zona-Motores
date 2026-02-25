@@ -176,7 +176,7 @@ export default function PricingPage() {
                 <CardDescription className="text-sm">
                   {planKey === 'basico' && 'Empieza sin costo'}
                   {planKey === 'pro' && 'Para vendedores activos'}
-                  {planKey === 'ultra' && 'Para concesionarios y profesionales'}
+                  {planKey === 'ultra' && 'Para concesionarios y revendedores'}
                 </CardDescription>
               </CardHeader>
 
@@ -241,7 +241,6 @@ export default function PricingPage() {
         <h2 className="font-headline text-2xl font-bold mb-3">¿Tienes preguntas?</h2>
         <p className="text-muted-foreground mb-2">
           Todos los planes incluyen acceso al marketplace, publicación de vehículos y contacto con compradores.
-          Los planes pagos se activan al instante con un código de acceso.
         </p>
         <p className="text-sm text-muted-foreground">
           Puedes cambiar o cancelar tu plan en cualquier momento desde tu perfil.

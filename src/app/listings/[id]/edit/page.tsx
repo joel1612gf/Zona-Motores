@@ -23,7 +23,8 @@ import type { Vehicle } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { summarizeVehicleListing } from '@/ai/flows/summarize-vehicle-listing';
+
+import { ADMIN_EMAIL } from '@/lib/constants';
 
 type PhotoState = {
   file?: File;
@@ -31,7 +32,7 @@ type PhotoState = {
   existingUrl?: string;
 };
 
-const ADMIN_EMAIL = 'zonamotores.ve@gmail.com';
+
 
 export default function EditListingPage() {
   const router = useRouter();
@@ -48,42 +49,42 @@ export default function EditListingPage() {
 
   useEffect(() => {
     const getVehicle = async () => {
-        setIsVehicleLoading(true);
-        if (!params.id || !firestore) {
-            setIsVehicleLoading(false);
-            return;
-        };
+      setIsVehicleLoading(true);
+      if (!params.id || !firestore) {
+        setIsVehicleLoading(false);
+        return;
+      };
 
-        const vehiclesColGroup = collectionGroup(firestore, 'vehicleListings');
-        const q = query(vehiclesColGroup, where('id', '==', params.id));
-        
-        try {
-            const querySnapshot = await getDocs(q);
-            if (!querySnapshot.empty) {
-                const docSnap = querySnapshot.docs[0];
-                const vehicle = { id: docSnap.id, ...docSnap.data() } as Vehicle;
-                
-                // Permission Check
-                if (!isAdmin && user && vehicle.sellerId !== user.uid) {
-                    toast({ title: "No autorizado", description: "No tienes permiso para editar esta publicación.", variant: "destructive" });
-                    router.push('/');
-                    return;
-                }
-                setVehicleData(vehicle);
-            } else {
-                setVehicleData(null);
-            }
-        } catch(e) {
-            console.error("Error fetching vehicle for edit:", e);
-            setVehicleData(null);
-        } finally {
-            setIsVehicleLoading(false);
+      const vehiclesColGroup = collectionGroup(firestore, 'vehicleListings');
+      const q = query(vehiclesColGroup, where('id', '==', params.id));
+
+      try {
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+          const docSnap = querySnapshot.docs[0];
+          const vehicle = { id: docSnap.id, ...docSnap.data() } as Vehicle;
+
+          // Permission Check
+          if (!isAdmin && user && vehicle.sellerId !== user.uid) {
+            toast({ title: "No autorizado", description: "No tienes permiso para editar esta publicación.", variant: "destructive" });
+            router.push('/');
+            return;
+          }
+          setVehicleData(vehicle);
+        } else {
+          setVehicleData(null);
         }
+      } catch (e) {
+        console.error("Error fetching vehicle for edit:", e);
+        setVehicleData(null);
+      } finally {
+        setIsVehicleLoading(false);
+      }
     };
-    
+
     // Trigger fetch when user/admin status is confirmed
     if (!isUserLoading) {
-        getVehicle();
+      getVehicle();
     }
 
   }, [params.id, firestore, isUserLoading, user, isAdmin, router, toast]);
@@ -93,7 +94,7 @@ export default function EditListingPage() {
   const [mainPhotoIndex, setMainPhotoIndex] = useState<number | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
-  const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
+
 
   const [details, setDetails] = useState({
     year: '',
@@ -180,27 +181,27 @@ export default function EditListingPage() {
 
     let year = parseInt(value, 10);
     if (isNaN(year)) {
-        handleDetailChange('year', '');
-        toast({ title: "Año inválido", description: "Por favor, introduce un número válido.", variant: "destructive" });
-        return;
+      handleDetailChange('year', '');
+      toast({ title: "Año inválido", description: "Por favor, introduce un número válido.", variant: "destructive" });
+      return;
     }
 
     if (year >= 0 && year < 100) {
-        if (year > (new Date().getFullYear() % 100) + 1) {
-            year += 1900;
-        } else {
-            year += 2000;
-        }
+      if (year > (new Date().getFullYear() % 100) + 1) {
+        year += 1900;
+      } else {
+        year += 2000;
+      }
     }
-    
+
     const finalYearString = year.toString();
     handleDetailChange('year', finalYearString);
 
     const minYear = 1950;
     const maxYear = new Date().getFullYear() + 1;
-    
+
     if (year < minYear || year > maxYear) {
-        toast({ title: "Año inválido", description: `El año debe estar entre ${minYear} y ${maxYear}.`, variant: "destructive" });
+      toast({ title: "Año inválido", description: `El año debe estar entre ${minYear} y ${maxYear}.`, variant: "destructive" });
     }
   };
 
@@ -212,7 +213,7 @@ export default function EditListingPage() {
       toast({ title: "Límite de fotos alcanzado", description: "Puedes subir un máximo de 12 fotos.", variant: "destructive" });
       return;
     }
-    
+
     const compressionToast = toast({ title: 'Comprimiendo imágenes...', description: 'Por favor, espera un momento.' });
 
     const newPhotosPromises = Array.from(files).map(async (file) => {
@@ -227,7 +228,7 @@ export default function EditListingPage() {
     });
 
     const newPhotos = (await Promise.all(newPhotosPromises)).filter((p): p is PhotoState => p !== null);
-    
+
     compressionToast.dismiss();
 
     if (newPhotos.length > 0) {
@@ -246,50 +247,15 @@ export default function EditListingPage() {
     }
 
     setPhotos(prev => prev.filter((_, i) => i !== index));
-    
+
     if (mainPhotoIndex === index) {
       setMainPhotoIndex(photos.length > 1 ? 0 : null);
     } else if (mainPhotoIndex && mainPhotoIndex > index) {
       setMainPhotoIndex(mainPhotoIndex - 1);
     }
   };
-  
-  const handleGenerateDescription = async () => {
-    if (!vehicleData) return;
-    setIsGeneratingDescription(true);
-    try {
-        const { summary } = await summarizeVehicleListing({
-            make: vehicleData.make,
-            model: vehicleData.model,
-            year: parseInt(details.year, 10),
-            mileage: parseInt(details.mileage, 10) || 0,
-            bodyType: vehicleData.bodyType,
-            exteriorColor: details.exteriorColor,
-            description: details.moreDetails,
-            features: [
-                details.is4x4 ? '4x4' : '',
-                details.isArmored ? `Blindado nivel ${details.armorLevel}` : '',
-                details.hasAC ? 'Aire Acondicionado' : '',
-                details.hasSoundSystem ? 'Sistema de sonido' : '',
-                details.acceptsTradeIn ? 'Acepta cambios' : '',
-            ].filter(Boolean),
-        });
-        handleDetailChange('moreDetails', summary);
-        toast({
-            title: "Descripción Generada",
-            description: "La descripción ha sido generada por IA y añadida al formulario."
-        });
-    } catch (e) {
-        console.error("Error generating description", e);
-        toast({
-            title: "Error",
-            description: "No se pudo generar la descripción.",
-            variant: "destructive"
-        });
-    } finally {
-        setIsGeneratingDescription(false);
-    }
-  };
+
+
 
   const handleUpdate = async () => {
     if (!user || !vehicleData) return;
@@ -319,31 +285,31 @@ export default function EditListingPage() {
       // 1. Delete photos marked for deletion from Storage
       if (photosToDelete.length > 0) {
         const deletePromises = photosToDelete.map(url => {
-            if (url.includes('firebasestorage.googleapis.com')) {
-                const imageRef = ref(storage, url);
-                return deleteObject(imageRef).catch(error => {
-                    if (error.code === 'storage/object-not-found') {
-                        console.warn(`Image to delete not found, skipping: ${url}`);
-                        return; // Successfully ignored
-                    }
-                    throw error; // Re-throw other errors
-                });
-            }
-            return Promise.resolve();
+          if (url.includes('firebasestorage.googleapis.com')) {
+            const imageRef = ref(storage, url);
+            return deleteObject(imageRef).catch(error => {
+              if (error.code === 'storage/object-not-found') {
+                console.warn(`Image to delete not found, skipping: ${url}`);
+                return; // Successfully ignored
+              }
+              throw error; // Re-throw other errors
+            });
+          }
+          return Promise.resolve();
         });
         await Promise.all(deletePromises);
       }
-      
+
       // 2. Upload new images and collect all image info
       const finalImages: { url: string; alt: string; hint: string }[] = [];
       const newPhotoUploads: { photo: PhotoState; index: number }[] = [];
-      
+
       photos.forEach((photo, index) => {
-        if(photo.file) {
+        if (photo.file) {
           newPhotoUploads.push({ photo, index });
         }
       });
-      
+
       let uploadedCount = 0;
       const totalNewUploads = newPhotoUploads.length;
 
@@ -360,8 +326,8 @@ export default function EditListingPage() {
                 // Calculate progress based on which photo is currently uploading
                 const currentUploadIndex = newPhotoUploads.findIndex(p => p.index === originalIndex);
                 if (currentUploadIndex !== -1) {
-                   const overallProgress = ((currentUploadIndex * 100) + progress) / totalNewUploads;
-                   setUploadProgress(overallProgress);
+                  const overallProgress = ((currentUploadIndex * 100) + progress) / totalNewUploads;
+                  setUploadProgress(overallProgress);
                 }
               },
               (error) => reject(error),
@@ -382,9 +348,9 @@ export default function EditListingPage() {
         }
         return Promise.resolve(null);
       });
-      
+
       let allImageInfos = (await Promise.all(uploadAndCollectPromises)).filter((info): info is { url: string; alt: string; hint: string } => info !== null);
-      
+
       // 3. Reorder to put the main photo first
       if (mainPhotoIndex !== null && mainPhotoIndex > 0 && allImageInfos.length > mainPhotoIndex) {
         const mainImage = allImageInfos.splice(mainPhotoIndex, 1)[0];
@@ -414,30 +380,30 @@ export default function EditListingPage() {
         images: allImageInfos,
         updatedAt: serverTimestamp(),
       };
-      
+
       if (isAdmin) {
         updatedVehicleData.seller = {
-            ...vehicleData.seller,
-            displayName: details.sellerName,
-            phone: details.sellerPhone,
+          ...vehicleData.seller,
+          displayName: details.sellerName,
+          phone: details.sellerPhone,
         };
         if (details.marketplaceUrl) {
-            updatedVehicleData.marketplaceUrl = details.marketplaceUrl;
+          updatedVehicleData.marketplaceUrl = details.marketplaceUrl;
         }
       }
-      
+
       updatedVehicleData.operationalDetails = details.isOperational ? null : details.operationalDetails;
       updatedVehicleData.armorLevel = details.isArmored ? parseInt(details.armorLevel, 10) : null;
       updatedVehicleData.tradeInDetails = details.acceptsTradeIn ? details.tradeInDetails : null;
       updatedVehicleData.tradeInForHigherValue = details.acceptsTradeIn ? details.tradeInForHigherValue : null;
       updatedVehicleData.tradeInForLowerValue = details.acceptsTradeIn ? details.tradeInForLowerValue : null;
-      
+
       await updateDoc(finalVehicleRef, updatedVehicleData);
 
       toast({ title: "¡Publicación Actualizada!", description: `Tu ${vehicleData.make} ${vehicleData.model} se actualizó con éxito.` });
       router.push('/profile/listings');
 
-    } catch(e) {
+    } catch (e) {
       console.error("Error al actualizar el anuncio: ", e);
       toast({ variant: "destructive", title: "Error al actualizar", description: "No se pudo guardar la publicación." });
     } finally {
@@ -451,230 +417,224 @@ export default function EditListingPage() {
       <div className="container max-w-5xl mx-auto py-12">
         <Skeleton className="h-8 w-48 mb-4" />
         <h2 className="text-2xl font-bold font-headline mb-4 text-center">
-            <Skeleton className="h-8 w-1/2 mx-auto" />
+          <Skeleton className="h-8 w-1/2 mx-auto" />
         </h2>
         <Card className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                {[...Array(10)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
-            </div>
-             <div className="flex justify-end mt-8">
-                <Skeleton className="h-12 w-32" />
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+            {[...Array(10)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+          </div>
+          <div className="flex justify-end mt-8">
+            <Skeleton className="h-12 w-32" />
+          </div>
         </Card>
       </div>
     );
   }
-  
+
   if (!vehicleData) {
     return notFound();
   }
 
   return (
     <div className="container max-w-5xl mx-auto py-12">
-        <Button variant="ghost" onClick={() => router.back()} className="mb-4 pl-0">
-            &larr; Volver
-        </Button>
-        <h2 className="text-2xl font-bold font-headline mb-4 text-center">
-            Editando: {vehicleData.year} {vehicleData.make} {vehicleData.model}
-        </h2>
-        <Card className="p-4 mb-6 bg-muted/50 border-dashed">
-            <p className="text-sm text-center text-muted-foreground">La <strong>marca</strong> y el <strong>modelo</strong> no se pueden cambiar para mantener la consistencia del anuncio.</p>
-        </Card>
-        
-        <div className="space-y-8">
-          {/* Details Form */}
-          <Card className="p-6">
-              {isAdmin && (
-                  <>
-                      <CardHeader className="p-0 pb-6 -mt-2">
-                          <CardTitle>Información del Vendedor (Admin)</CardTitle>
-                          <CardDescription>Estás editando una publicación en nombre de otra persona.</CardDescription>
-                      </CardHeader>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start mb-6">
-                          <div className="space-y-2">
-                              <Label htmlFor="sellerName">Nombre del Vendedor</Label>
-                              <Input id="sellerName" value={details.sellerName} onChange={(e) => handleDetailChange('sellerName', e.target.value)} placeholder="Ej: Carlos Rodriguez" />
-                          </div>
-                          <div className="space-y-2">
-                              <Label htmlFor="sellerPhone">Teléfono del Vendedor</Label>
-                              <Input id="sellerPhone" type="tel" value={details.sellerPhone} onChange={(e) => handleDetailChange('sellerPhone', e.target.value)} placeholder="+58412..." />
-                          </div>
-                          <div className="md:col-span-2 space-y-2">
-                            <Label htmlFor="marketplaceUrl">URL de Marketplace (Opcional)</Label>
-                            <Input id="marketplaceUrl" value={details.marketplaceUrl} onChange={(e) => handleDetailChange('marketplaceUrl', e.target.value)} placeholder="https://www.facebook.com/marketplace/item/..." />
-                        </div>
-                      </div>
-                      <Separator className="mb-6" />
-                  </>
-              )}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                  <div className="space-y-2">
-                      <Label htmlFor="year">Año</Label>
-                      <Input
-                        id="year"
-                        type="number"
-                        min="1950"
-                        max={new Date().getFullYear() + 1}
-                        value={details.year}
-                        onChange={handleYearChange}
-                        onBlur={handleYearBlur}
-                        placeholder="Ej: 2021"
-                      />
-                  </div>
-                  <div className="space-y-2">
-                      <Label htmlFor="price">Precio (USD)</Label>
-                      <Input id="price" type="number" min="0" value={details.price} onChange={(e) => handleDetailChange('price', e.target.value)} placeholder="Ej: 22000" />
-                  </div>
-                   <div className="space-y-2">
-                      <Label htmlFor="mileage">Kilometraje</Label>
-                      <Input id="mileage" type="number" min="0" value={details.mileage} onChange={(e) => handleDetailChange('mileage', e.target.value)} placeholder="Ej: 55000" />
-                  </div>
-                   <div className="space-y-2">
-                      <Label htmlFor="engine">Motor</Label>
-                      <Input id="engine" value={details.engine} onChange={(e) => handleDetailChange('engine', e.target.value)} placeholder="Ej: 1.8L 4 Cilindros" />
-                  </div>
-                  <div className="space-y-2">
-                      <Label htmlFor="exteriorColor">Color Exterior</Label>
-                      <Input id="exteriorColor" value={details.exteriorColor} onChange={(e) => handleDetailChange('exteriorColor', e.target.value)} placeholder="Ej: Blanco Perlado" />
-                  </div>
-                  <div className="rounded-lg border p-4">
-                      <Label className="mb-3 block">Transmisión</Label>
-                      <RadioGroup value={details.transmission} onValueChange={(v) => handleDetailChange('transmission', v)} className="flex gap-4">
-                          <RadioGroupItem value="Automática" id="t_auto" /><Label htmlFor="t_auto">Automática</Label>
-                          <RadioGroupItem value="Sincrónica" id="t_sync" /><Label htmlFor="t_sync">Sincrónica</Label>
-                      </RadioGroup>
-                  </div>
-                  <div className="flex items-center justify-between rounded-lg border p-4">
-                      <Label htmlFor="hadMajorCrash">¿Tuvo un choque fuerte?</Label>
-                      <Switch id="hadMajorCrash" checked={details.hadMajorCrash} onCheckedChange={(c) => handleDetailChange('hadMajorCrash', c)} />
-                  </div>
-                  <div className="flex items-center justify-between rounded-lg border p-4">
-                      <Label htmlFor="hasAC">¿Tiene aire acondicionado?</Label>
-                      <Switch id="hasAC" checked={details.hasAC} onCheckedChange={(c) => handleDetailChange('hasAC', c)} />
-                  </div>
-                  <div className="flex items-center justify-between rounded-lg border p-4">
-                      <Label htmlFor="isOperational">¿El vehículo rueda?</Label>
-                      <Switch id="isOperational" checked={details.isOperational} onCheckedChange={(c) => handleDetailChange('isOperational', c)} />
-                  </div>
-                  {!details.isOperational && (
-                      <div className="md:col-span-2 space-y-2"><Label htmlFor="operationalDetails">Explica por qué no rueda</Label><Textarea id="operationalDetails" value={details.operationalDetails} onChange={(e) => handleDetailChange('operationalDetails', e.target.value)}/></div>
-                  )}
-                  <div className="flex items-center justify-between rounded-lg border p-4">
-                      <Label htmlFor="isSignatory">¿Eres el firmante?</Label>
-                      <Switch id="isSignatory" checked={details.isSignatory} onCheckedChange={(c) => handleDetailChange('isSignatory', c)} />
-                  </div>
-                  {vehicleData.bodyType === 'Carro' && (
-                      <div className="rounded-lg border p-4">
-                          <Label className="mb-3 block">Número de puertas</Label>
-                          <RadioGroup value={details.doorCount} onValueChange={(v) => handleDetailChange('doorCount', v)} className="flex gap-4">
-                              <RadioGroupItem value="2" id="d2" /><Label htmlFor="d2">2</Label>
-                              <RadioGroupItem value="4" id="d4" /><Label htmlFor="d4">4</Label>
-                          </RadioGroup>
-                      </div>
-                  )}
-                  <div className="flex items-center justify-between rounded-lg border p-4">
-                    <Label htmlFor="is4x4">¿Es 4x4?</Label>
-                    <Switch id="is4x4" checked={details.is4x4} onCheckedChange={(c) => handleDetailChange('is4x4', c)} />
-                  </div>
-                  <div className="flex items-center justify-between rounded-lg border p-4">
-                      <Label htmlFor="hasSoundSystem">¿Tiene sistema de sonido?</Label>
-                      <Switch id="hasSoundSystem" checked={details.hasSoundSystem} onCheckedChange={(c) => handleDetailChange('hasSoundSystem', c)} />
-                  </div>
-                  <div className="md:col-span-2 space-y-4 rounded-lg border p-4">
-                      <div className="flex items-center justify-between">
-                          <Label htmlFor="isArmored" className="pr-4">¿El vehículo es blindado?</Label>
-                          <Switch id="isArmored" checked={details.isArmored} onCheckedChange={(c) => handleDetailChange('isArmored', c)} />
-                      </div>
-                      {details.isArmored && (
-                          <div className="space-y-2 pt-4 border-t animate-in fade-in-50 duration-300">
-                              <Label htmlFor="armorLevel">Nivel de Blindaje</Label>
-                              <Select onValueChange={(v) => handleDetailChange('armorLevel', v)} value={details.armorLevel}>
-                                  <SelectTrigger id="armorLevel">
-                                      <SelectValue placeholder="Selecciona el nivel" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                      <SelectItem value="1">Nivel 1</SelectItem>
-                                      <SelectItem value="2">Nivel 2</SelectItem>
-                                      <SelectItem value="3">Nivel 3</SelectItem>
-                                      <SelectItem value="4">Nivel 4</SelectItem>
-                                      <SelectItem value="5">Nivel 5</SelectItem>
-                                      <SelectItem value="6">Nivel 6</SelectItem>
-                                      <SelectItem value="7">Nivel 7</SelectItem>
-                                  </SelectContent>
-                              </Select>
-                          </div>
-                      )}
-                  </div>
-                   <div className="md:col-span-2 space-y-4 rounded-lg border p-4">
-                      <div className="flex items-center justify-between"><Label htmlFor="acceptsTradeIn">¿Aceptas cambios?</Label><Switch id="acceptsTradeIn" checked={details.acceptsTradeIn} onCheckedChange={(c) => handleDetailChange('acceptsTradeIn', c)} /></div>
-                      {details.acceptsTradeIn && (
-                          <div className="space-y-4 pt-4 border-t">
-                              <div className="flex items-center justify-between rounded-lg border p-4"><Label htmlFor="tradeInForLowerValue">¿Recibes menor valor?</Label><Switch id="tradeInForLowerValue" checked={details.tradeInForLowerValue} onCheckedChange={(c) => handleDetailChange('tradeInForLowerValue', c)} /></div>
-                              <div className="flex items-center justify-between rounded-lg border p-4"><Label htmlFor="tradeInForHigherValue">¿Das como parte de pago?</Label><Switch id="tradeInForHigherValue" checked={details.tradeInForHigherValue} onCheckedChange={(c) => handleDetailChange('tradeInForHigherValue', c)} /></div>
-                              <div className="space-y-2"><Label htmlFor="tradeInDetails">Modelos que aceptarías</Label><Textarea id="tradeInDetails" value={details.tradeInDetails} onChange={(e) => handleDetailChange('tradeInDetails', e.target.value)}/></div>
-                          </div>
-                      )}
-                  </div>
-                  <div className="space-y-2">
-                      <Label htmlFor="ownerCount">Título (dueños)</Label>
-                      <Input id="ownerCount" type="number" min="1" value={details.ownerCount} onChange={(e) => handleDetailChange('ownerCount', e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                      <Label htmlFor="tireLife">Vida de cauchos (%)</Label>
-                      <Input id="tireLife" type="number" min="0" max="100" step="5" value={details.tireLife} onChange={(e) => handleDetailChange('tireLife', e.target.value)} />
-                  </div>
-                   <div className="md:col-span-2 space-y-2">
-                    <div className="flex items-center justify-between mb-2">
-                      <Label htmlFor="moreDetails">Descripción / Más detalles</Label>
-                      <Button variant="outline" size="sm" onClick={handleGenerateDescription} disabled={isGeneratingDescription}>
-                          {isGeneratingDescription ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ExternalLink className="mr-2 h-4 w-4" />}
-                          Generar descripción con IA
-                      </Button>
-                    </div>
-                    <Textarea id="moreDetails" value={details.moreDetails} onChange={(e) => handleDetailChange('moreDetails', e.target.value)} />
-                  </div>
+      <Button variant="ghost" onClick={() => router.back()} className="mb-4 pl-0">
+        &larr; Volver
+      </Button>
+      <h2 className="text-2xl font-bold font-headline mb-4 text-center">
+        Editando: {vehicleData.year} {vehicleData.make} {vehicleData.model}
+      </h2>
+      <Card className="p-4 mb-6 bg-muted/50 border-dashed">
+        <p className="text-sm text-center text-muted-foreground">La <strong>marca</strong> y el <strong>modelo</strong> no se pueden cambiar para mantener la consistencia del anuncio.</p>
+      </Card>
+
+      <div className="space-y-8">
+        {/* Details Form */}
+        <Card className="p-6">
+          {isAdmin && (
+            <>
+              <CardHeader className="p-0 pb-6 -mt-2">
+                <CardTitle>Información del Vendedor (Admin)</CardTitle>
+                <CardDescription>Estás editando una publicación en nombre de otra persona.</CardDescription>
+              </CardHeader>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start mb-6">
+                <div className="space-y-2">
+                  <Label htmlFor="sellerName">Nombre del Vendedor</Label>
+                  <Input id="sellerName" value={details.sellerName} onChange={(e) => handleDetailChange('sellerName', e.target.value)} placeholder="Ej: Carlos Rodriguez" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="sellerPhone">Teléfono del Vendedor</Label>
+                  <Input id="sellerPhone" type="tel" value={details.sellerPhone} onChange={(e) => handleDetailChange('sellerPhone', e.target.value)} placeholder="+58412..." />
+                </div>
+                <div className="md:col-span-2 space-y-2">
+                  <Label htmlFor="marketplaceUrl">URL de Marketplace (Opcional)</Label>
+                  <Input id="marketplaceUrl" value={details.marketplaceUrl} onChange={(e) => handleDetailChange('marketplaceUrl', e.target.value)} placeholder="https://www.facebook.com/marketplace/item/..." />
+                </div>
               </div>
-          </Card>
-
-          {/* Photos Management */}
-          <Card className="p-6">
-              <h3 className="text-xl font-bold font-headline mb-4">Fotos</h3>
-              <p className="text-center text-muted-foreground mb-6">Sube entre 4 y 12 fotos. Selecciona una como la foto principal.</p>
-
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
-                  {photos.map((photo, index) => (
-                      <div key={photo.previewUrl} className="relative aspect-square group" onClick={() => setMainPhotoIndex(index)}>
-                          <Image src={photo.previewUrl} alt={`Foto ${index + 1}`} fill className="object-cover rounded-md cursor-pointer" />
-                          <button onClick={(e) => { e.stopPropagation(); removePhoto(index); }} className="absolute top-1 right-1 z-10 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100"><X className="h-4 w-4" /></button>
-                          {mainPhotoIndex === index && (
-                              <><div className="absolute inset-0 rounded-md ring-4 ring-primary" /><div className="absolute bottom-0 w-full bg-primary text-primary-foreground text-center text-xs py-1 rounded-b-md">Principal</div></>
-                          )}
-                      </div>
-                  ))}
-                  {photos.length < 12 && (
-                      <Label htmlFor="photo-upload" className="aspect-square flex flex-col items-center justify-center border-2 border-dashed rounded-md cursor-pointer hover:bg-muted">
-                          <UploadCloud className="h-10 w-10 text-muted-foreground" />
-                          <span className="mt-2 text-sm text-muted-foreground">Subir fotos</span>
-                          <input id="photo-upload" type="file" multiple accept="image/*" className="hidden" onChange={handlePhotoSelect} />
-                      </Label>
-                  )}
+              <Separator className="mb-6" />
+            </>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+            <div className="space-y-2">
+              <Label htmlFor="year">Año</Label>
+              <Input
+                id="year"
+                type="number"
+                min="1950"
+                max={new Date().getFullYear() + 1}
+                value={details.year}
+                onChange={handleYearChange}
+                onBlur={handleYearBlur}
+                placeholder="Ej: 2021"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="price">Precio (USD)</Label>
+              <Input id="price" type="number" min="0" value={details.price} onChange={(e) => handleDetailChange('price', e.target.value)} placeholder="Ej: 22000" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="mileage">Kilometraje</Label>
+              <Input id="mileage" type="number" min="0" value={details.mileage} onChange={(e) => handleDetailChange('mileage', e.target.value)} placeholder="Ej: 55000" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="engine">Motor</Label>
+              <Input id="engine" value={details.engine} onChange={(e) => handleDetailChange('engine', e.target.value)} placeholder="Ej: 1.8L 4 Cilindros" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="exteriorColor">Color Exterior</Label>
+              <Input id="exteriorColor" value={details.exteriorColor} onChange={(e) => handleDetailChange('exteriorColor', e.target.value)} placeholder="Ej: Blanco Perlado" />
+            </div>
+            <div className="rounded-lg border p-4">
+              <Label className="mb-3 block">Transmisión</Label>
+              <RadioGroup value={details.transmission} onValueChange={(v) => handleDetailChange('transmission', v)} className="flex gap-4">
+                <RadioGroupItem value="Automática" id="t_auto" /><Label htmlFor="t_auto">Automática</Label>
+                <RadioGroupItem value="Sincrónica" id="t_sync" /><Label htmlFor="t_sync">Sincrónica</Label>
+              </RadioGroup>
+            </div>
+            <div className="flex items-center justify-between rounded-lg border p-4">
+              <Label htmlFor="hadMajorCrash">¿Tuvo un choque fuerte?</Label>
+              <Switch id="hadMajorCrash" checked={details.hadMajorCrash} onCheckedChange={(c) => handleDetailChange('hadMajorCrash', c)} />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border p-4">
+              <Label htmlFor="hasAC">¿Tiene aire acondicionado?</Label>
+              <Switch id="hasAC" checked={details.hasAC} onCheckedChange={(c) => handleDetailChange('hasAC', c)} />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border p-4">
+              <Label htmlFor="isOperational">¿El vehículo rueda?</Label>
+              <Switch id="isOperational" checked={details.isOperational} onCheckedChange={(c) => handleDetailChange('isOperational', c)} />
+            </div>
+            {!details.isOperational && (
+              <div className="md:col-span-2 space-y-2"><Label htmlFor="operationalDetails">Explica por qué no rueda</Label><Textarea id="operationalDetails" value={details.operationalDetails} onChange={(e) => handleDetailChange('operationalDetails', e.target.value)} /></div>
+            )}
+            <div className="flex items-center justify-between rounded-lg border p-4">
+              <Label htmlFor="isSignatory">¿Eres el firmante?</Label>
+              <Switch id="isSignatory" checked={details.isSignatory} onCheckedChange={(c) => handleDetailChange('isSignatory', c)} />
+            </div>
+            {vehicleData.bodyType === 'Carro' && (
+              <div className="rounded-lg border p-4">
+                <Label className="mb-3 block">Número de puertas</Label>
+                <RadioGroup value={details.doorCount} onValueChange={(v) => handleDetailChange('doorCount', v)} className="flex gap-4">
+                  <RadioGroupItem value="2" id="d2" /><Label htmlFor="d2">2</Label>
+                  <RadioGroupItem value="4" id="d4" /><Label htmlFor="d4">4</Label>
+                </RadioGroup>
               </div>
-          </Card>
-
-          <div className="flex justify-end mt-8 items-center gap-4">
-              {isUpdating && uploadProgress !== null && (
-                  <div className="w-full max-w-xs text-right">
-                      <Progress value={uploadProgress} className="h-2" />
-                      <p className="text-sm text-muted-foreground mt-1">Subiendo... {uploadProgress.toFixed(0)}%</p>
-                  </div>
+            )}
+            <div className="flex items-center justify-between rounded-lg border p-4">
+              <Label htmlFor="is4x4">¿Es 4x4?</Label>
+              <Switch id="is4x4" checked={details.is4x4} onCheckedChange={(c) => handleDetailChange('is4x4', c)} />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border p-4">
+              <Label htmlFor="hasSoundSystem">¿Tiene sistema de sonido?</Label>
+              <Switch id="hasSoundSystem" checked={details.hasSoundSystem} onCheckedChange={(c) => handleDetailChange('hasSoundSystem', c)} />
+            </div>
+            <div className="md:col-span-2 space-y-4 rounded-lg border p-4">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="isArmored" className="pr-4">¿El vehículo es blindado?</Label>
+                <Switch id="isArmored" checked={details.isArmored} onCheckedChange={(c) => handleDetailChange('isArmored', c)} />
+              </div>
+              {details.isArmored && (
+                <div className="space-y-2 pt-4 border-t animate-in fade-in-50 duration-300">
+                  <Label htmlFor="armorLevel">Nivel de Blindaje</Label>
+                  <Select onValueChange={(v) => handleDetailChange('armorLevel', v)} value={details.armorLevel}>
+                    <SelectTrigger id="armorLevel">
+                      <SelectValue placeholder="Selecciona el nivel" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">Nivel 1</SelectItem>
+                      <SelectItem value="2">Nivel 2</SelectItem>
+                      <SelectItem value="3">Nivel 3</SelectItem>
+                      <SelectItem value="4">Nivel 4</SelectItem>
+                      <SelectItem value="5">Nivel 5</SelectItem>
+                      <SelectItem value="6">Nivel 6</SelectItem>
+                      <SelectItem value="7">Nivel 7</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               )}
-              <Button onClick={() => router.push('/profile/listings')} variant="outline" size="lg">Cancelar</Button>
-              <Button onClick={handleUpdate} size="lg" disabled={photos.length < 4 || isUpdating}>
-                  {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  {isUpdating ? 'Guardando...' : 'Guardar Cambios'}
-              </Button>
+            </div>
+            <div className="md:col-span-2 space-y-4 rounded-lg border p-4">
+              <div className="flex items-center justify-between"><Label htmlFor="acceptsTradeIn">¿Aceptas cambios?</Label><Switch id="acceptsTradeIn" checked={details.acceptsTradeIn} onCheckedChange={(c) => handleDetailChange('acceptsTradeIn', c)} /></div>
+              {details.acceptsTradeIn && (
+                <div className="space-y-4 pt-4 border-t">
+                  <div className="flex items-center justify-between rounded-lg border p-4"><Label htmlFor="tradeInForLowerValue">¿Recibes menor valor?</Label><Switch id="tradeInForLowerValue" checked={details.tradeInForLowerValue} onCheckedChange={(c) => handleDetailChange('tradeInForLowerValue', c)} /></div>
+                  <div className="flex items-center justify-between rounded-lg border p-4"><Label htmlFor="tradeInForHigherValue">¿Das como parte de pago?</Label><Switch id="tradeInForHigherValue" checked={details.tradeInForHigherValue} onCheckedChange={(c) => handleDetailChange('tradeInForHigherValue', c)} /></div>
+                  <div className="space-y-2"><Label htmlFor="tradeInDetails">Modelos que aceptarías</Label><Textarea id="tradeInDetails" value={details.tradeInDetails} onChange={(e) => handleDetailChange('tradeInDetails', e.target.value)} /></div>
+                </div>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ownerCount">Título (dueños)</Label>
+              <Input id="ownerCount" type="number" min="1" value={details.ownerCount} onChange={(e) => handleDetailChange('ownerCount', e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="tireLife">Vida de cauchos (%)</Label>
+              <Input id="tireLife" type="number" min="0" max="100" step="5" value={details.tireLife} onChange={(e) => handleDetailChange('tireLife', e.target.value)} />
+            </div>
+            <div className="md:col-span-2 space-y-2">
+              <Label htmlFor="moreDetails">Descripción / Más detalles</Label>
+              <Textarea id="moreDetails" value={details.moreDetails} onChange={(e) => handleDetailChange('moreDetails', e.target.value)} />
+            </div>
           </div>
+        </Card>
+
+        {/* Photos Management */}
+        <Card className="p-6">
+          <h3 className="text-xl font-bold font-headline mb-4">Fotos</h3>
+          <p className="text-center text-muted-foreground mb-6">Sube entre 4 y 12 fotos. Selecciona una como la foto principal.</p>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
+            {photos.map((photo, index) => (
+              <div key={photo.previewUrl} className="relative aspect-square group" onClick={() => setMainPhotoIndex(index)}>
+                <Image src={photo.previewUrl} alt={`Foto ${index + 1}`} fill className="object-cover rounded-md cursor-pointer" />
+                <button onClick={(e) => { e.stopPropagation(); removePhoto(index); }} className="absolute top-1 right-1 z-10 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100"><X className="h-4 w-4" /></button>
+                {mainPhotoIndex === index && (
+                  <><div className="absolute inset-0 rounded-md ring-4 ring-primary" /><div className="absolute bottom-0 w-full bg-primary text-primary-foreground text-center text-xs py-1 rounded-b-md">Principal</div></>
+                )}
+              </div>
+            ))}
+            {photos.length < 12 && (
+              <Label htmlFor="photo-upload" className="aspect-square flex flex-col items-center justify-center border-2 border-dashed rounded-md cursor-pointer hover:bg-muted">
+                <UploadCloud className="h-10 w-10 text-muted-foreground" />
+                <span className="mt-2 text-sm text-muted-foreground">Subir fotos</span>
+                <input id="photo-upload" type="file" multiple accept="image/*" className="hidden" onChange={handlePhotoSelect} />
+              </Label>
+            )}
+          </div>
+        </Card>
+
+        <div className="flex justify-end mt-8 items-center gap-4">
+          {isUpdating && uploadProgress !== null && (
+            <div className="w-full max-w-xs text-right">
+              <Progress value={uploadProgress} className="h-2" />
+              <p className="text-sm text-muted-foreground mt-1">Subiendo... {uploadProgress.toFixed(0)}%</p>
+            </div>
+          )}
+          <Button onClick={() => router.push('/profile/listings')} variant="outline" size="lg">Cancelar</Button>
+          <Button onClick={handleUpdate} size="lg" disabled={photos.length < 4 || isUpdating}>
+            {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            {isUpdating ? 'Guardando...' : 'Guardar Cambios'}
+          </Button>
         </div>
+      </div>
     </div>
   );
 }
