@@ -5,9 +5,10 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
-import { Car, PlusCircle, Menu, Bell } from 'lucide-react';
+import { Car, PlusCircle, Menu } from 'lucide-react';
 import { useUser } from '@/firebase';
 import { Sheet, SheetContent, SheetTrigger, SheetClose, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { NotificationBell } from '@/components/notification-bell';
 
 const AuthButton = dynamic(() => import('@/components/auth-button').then(mod => ({ default: mod.AuthButton })), {
   ssr: false,
@@ -98,10 +99,7 @@ export function SiteHeader() {
             <span className="hidden sm:inline">Publicar</span>
           </Button>
           <AuthButton open={loginOpen} onOpenChange={setLoginOpen} />
-          <Button variant="secondary" size="icon" className="relative">
-            <Bell className="h-[1.2rem] w-[1.2rem]" />
-            <span className="sr-only">Notificaciones</span>
-          </Button>
+          <NotificationBell />
         </div>
       </div>
     </header>

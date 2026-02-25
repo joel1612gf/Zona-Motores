@@ -15,7 +15,7 @@ import { formatCurrency } from '@/lib/utils';
 import { SearchWithHistory } from '@/components/search-with-history';
 import { useRouter } from 'next/navigation';
 import { MapsProvider } from '@/components/maps-provider';
-import { Map, AdvancedMarker, InfoWindow, useMap } from '@vis.gl/react-google-maps';
+import { Map, AdvancedMarker, InfoWindow, useMap, Pin } from '@vis.gl/react-google-maps';
 import type { Vehicle } from '@/lib/types';
 
 const VENEZUELA_CENTER = { lat: 7.5, lng: -66.0 };
@@ -66,7 +66,9 @@ function VehicleMapSection({ vehicles }: { vehicles: Vehicle[] }) {
                   key={vehicle.id}
                   position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
                   onClick={() => setSelectedVehicle(vehicle)}
-                />
+                >
+                  <Pin background="#2563eb" borderColor="#1d4ed8" glyphColor="white" />
+                </AdvancedMarker>
               ))}
 
               {selectedVehicle && (

@@ -6,6 +6,7 @@ import { FirebaseClientProvider } from '@/firebase';
 import { SubscriptionProvider } from '@/context/subscription-context';
 import { MakesProvider } from '@/context/makes-context';
 import { FavoritesProvider } from '@/context/favorites-context';
+import { NotificationProvider } from '@/context/notification-context';
 
 export function ClientProviders({ children }: { children: ReactNode }) {
   return (
@@ -17,11 +18,14 @@ export function ClientProviders({ children }: { children: ReactNode }) {
     >
       <FirebaseClientProvider>
         <SubscriptionProvider>
-          <MakesProvider>
-            <FavoritesProvider>{children}</FavoritesProvider>
-          </MakesProvider>
+          <NotificationProvider>
+            <MakesProvider>
+              <FavoritesProvider>{children}</FavoritesProvider>
+            </MakesProvider>
+          </NotificationProvider>
         </SubscriptionProvider>
       </FirebaseClientProvider>
     </ThemeProvider>
   );
 }
+

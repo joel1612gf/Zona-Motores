@@ -58,7 +58,7 @@ import {
   Heart,
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
-import { Map, AdvancedMarker } from '@vis.gl/react-google-maps';
+import { Map, AdvancedMarker, Pin } from '@vis.gl/react-google-maps';
 import { MapsProvider } from '@/components/maps-provider';
 import { Skeleton } from '@/components/ui/skeleton';
 import { UserProfile, Vehicle } from '@/lib/types';
@@ -82,26 +82,7 @@ function WhatsAppIcon(props: React.SVGProps<SVGSVGElement>) {
 
 function CarMarker() {
   return (
-    <div className="flex flex-col items-center" style={{ transform: 'translateY(-50%)' }}>
-      <div className="bg-white rounded-full p-2.5 shadow-lg border-2 border-blue-500">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="26"
-          height="26"
-          viewBox="0 0 64 64"
-          fill="none"
-          stroke="#2563eb"
-          strokeWidth="4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M10 38 h44 a4 4 0 0 0 4-4 v-4 a4 4 0 0 0-2-3.5 L48 22 42 14a6 6 0 0 0-5-2.5 H27a6 6 0 0 0-5 2.5 L16 22 8 26.5a4 4 0 0 0-2 3.5 v4 a4 4 0 0 0 4 4Z" />
-          <circle cx="20" cy="38" r="6" fill="white" />
-          <circle cx="44" cy="38" r="6" fill="white" />
-        </svg>
-      </div>
-      <div className="w-3 h-3 bg-white border-r-2 border-b-2 border-blue-500 rotate-45 -mt-[7px] shadow-lg" />
-    </div>
+    <Pin background="#2563eb" borderColor="#1d4ed8" glyphColor="white" />
   );
 }
 

@@ -36,10 +36,10 @@ export type Vehicle = {
   armorLevel?: number;
   ownerCount: number;
   tireLife: number;
-  
+
   hasAC: boolean;
   hasSoundSystem: boolean;
-  
+
   hadMajorCrash: boolean;
   isOperational: boolean;
   operationalDetails?: string;
@@ -88,6 +88,27 @@ export type PlanLimits = {
   hasAdvancedStats: boolean;
   hasDealerProfile: boolean;
   extraPromotionDiscount: number; // percentage, e.g. 50
+};
+
+export type NotificationType =
+  | 'listing_expiring_soon'
+  | 'listing_paused'
+  | 'listing_deleted'
+  | 'listing_promoted'
+  | 'welcome';
+
+export type Notification = {
+  id: string;
+  userId: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  read: boolean;
+  createdAt: Timestamp;
+  actionLabel?: string;
+  actionUrl?: string;
+  vehicleId?: string;
+  vehicleName?: string;
 };
 
 export const PLAN_CONFIG: Record<PlanTier, { name: string; price: number; limits: PlanLimits }> = {
