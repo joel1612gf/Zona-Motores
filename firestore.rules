@@ -46,6 +46,11 @@ service cloud.firestore {
         // A user can only manage their own subscription
         allow read, write: if isOwner(userId);
       }
+
+      match /notifications/{notificationId} {
+        // A user can only read and manage their own notifications
+        allow read, write: if isOwner(userId);
+      }
     }
 
     // This rule allows a collection group query on 'vehicleListings'.
