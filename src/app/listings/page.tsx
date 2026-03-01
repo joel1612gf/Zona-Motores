@@ -305,7 +305,7 @@ function ListingsPageContent() {
       <div
         className={cn(
           'fixed top-16 left-0 right-0 z-40 bg-primary py-3 shadow-md transition-transform duration-300',
-          showStickySearch ? 'translate-y-0' : '-translate-y-full'
+          showStickySearch ? 'translate-y-0 pointer-events-auto' : '-translate-y-full pointer-events-none overflow-hidden'
         )}
       >
         <div className="container px-4 md:px-6">

@@ -46,29 +46,39 @@ function DealershipsPageContent() {
   }
 
   return (
-    <div className="container mx-auto max-w-6xl py-12">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="font-headline text-4xl font-bold">Concesionarios</h1>
+    <div className="min-h-screen">
+      {/* Mobile Hero Section */}
+      <div className="md:hidden bg-gradient-to-b from-primary to-primary/80 text-primary-foreground py-10 px-4 text-center">
+        <Building2 className="h-12 w-12 mx-auto mb-4 opacity-80" />
+        <h1 className="font-headline text-3xl font-bold mb-2">Concesionarios</h1>
+        <p className="text-primary-foreground/80 text-sm max-w-xs mx-auto">
+          Encuentra los mejores concesionarios y explora sus catálogos de vehículos
+        </p>
       </div>
+      <div className="container mx-auto max-w-6xl py-6 md:py-12 px-4 md:px-6">
+        <div className="hidden md:flex justify-between items-center mb-8">
+          <h1 className="font-headline text-4xl font-bold">Concesionarios</h1>
+        </div>
 
-      {dealerships.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 border-2 border-dashed rounded-lg bg-card">
-          <Building2 className="h-12 w-12 text-muted-foreground mb-4" />
-          <h2 className="font-headline text-2xl font-semibold">Aún no hay concesionarios activos</h2>
-          <p className="mt-2 text-muted-foreground text-center max-w-md">
-            Los concesionarios que publiquen vehículos aparecerán aquí.
-          </p>
-          <Button asChild className="mt-6">
-            <Link href="/listings">Explorar Vehículos</Link>
-          </Button>
-        </div>
-      ) : (
-        <div className="space-y-12">
-          {dealerships.map(dealership => (
-            <DealershipCard key={dealership.seller.uid} dealership={dealership} />
-          ))}
-        </div>
-      )}
+        {dealerships.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 border-2 border-dashed rounded-lg bg-card">
+            <Building2 className="h-12 w-12 text-muted-foreground mb-4" />
+            <h2 className="font-headline text-2xl font-semibold">Aún no hay concesionarios activos</h2>
+            <p className="mt-2 text-muted-foreground text-center max-w-md">
+              Los concesionarios que publiquen vehículos aparecerán aquí.
+            </p>
+            <Button asChild className="mt-6">
+              <Link href="/listings">Explorar Vehículos</Link>
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-8 md:space-y-12">
+            {dealerships.map(dealership => (
+              <DealershipCard key={dealership.seller.uid} dealership={dealership} />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

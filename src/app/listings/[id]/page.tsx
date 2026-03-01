@@ -311,22 +311,39 @@ function ListingDetailContent() {
     });
   };
 
-  // State and refs for zoom/pan
-  const [transform, setTransform] = useState({ scale: 1, x: 0, y: 0 });
-  const [isPanning, setIsPanning] = useState(false);
+  // Ref-based zoom/pan for smooth, GPU-accelerated transforms (no React re-renders)
+  const transformRef = useRef({ scale: 1, x: 0, y: 0 });
+  const isPanningRef = useRef(false);
   const panStart = useRef({ x: 0, y: 0 });
   const imageContainerRef = useRef<HTMLDivElement>(null);
-  const initialTouchState = useRef({ distance: 0, scale: 1 });
+  const lightboxImageRef = useRef<HTMLImageElement>(null);
+  const initialTouchState = useRef({ distance: 0, scale: 1, midX: 0, midY: 0, startX: 0, startY: 0 });
+  const lastTapRef = useRef(0);
+  const swipeRef = useRef({ startX: 0, startY: 0, swiping: false });
+  const [isZoomed, setIsZoomed] = useState(false);
 
-  // Reset zoom when lightbox closes or image changes
+  const applyTransform = useCallback((animate = false) => {
+    const el = lightboxImageRef.current;
+    if (!el) return;
+    const { scale, x, y } = transformRef.current;
+    el.style.transition = animate ? 'transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 'none';
+    el.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale})`;
+  }, []);
+
+  const resetZoom = useCallback((animate = false) => {
+    transformRef.current = { scale: 1, x: 0, y: 0 };
+    applyTransform(animate);
+    setIsZoomed(false);
+  }, [applyTransform]);
+
   useEffect(() => {
-    setTransform({ scale: 1, x: 0, y: 0 });
-  }, [isLightboxOpen, currentImageIndex]);
+    resetZoom(false);
+  }, [isLightboxOpen, currentImageIndex, resetZoom]);
 
   const handleLightboxOpenChange = (open: boolean) => {
     if (!open) {
-      setTransform({ scale: 1, x: 0, y: 0 });
-      setIsPanning(false);
+      resetZoom(false);
+      isPanningRef.current = false;
     }
     setIsLightboxOpen(open);
   };
@@ -365,57 +382,100 @@ function ListingDetailContent() {
     setCurrentImageIndex(prev => (prev === vehicle.images.length - 1 ? 0 : prev + 1));
   };
 
-  // Zoom/Pan Handlers
+  // Zoom/Pan Handlers — ref-based, no re-renders
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    const scaleAmount = -e.deltaY * 0.002;
-    setTransform(prev => {
-      const newScale = Math.max(1, Math.min(prev.scale + scaleAmount, 5));
-      if (newScale === 1) {
-        return { scale: 1, x: 0, y: 0 };
+    const t = transformRef.current;
+    const scaleAmount = -e.deltaY * 0.003;
+    const newScale = Math.max(1, Math.min(t.scale + scaleAmount * t.scale, 5));
+    if (newScale === 1) {
+      transformRef.current = { scale: 1, x: 0, y: 0 };
+      applyTransform(true);
+      setIsZoomed(false);
+    } else {
+      const container = imageContainerRef.current;
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        const cx = e.clientX - rect.left - rect.width / 2;
+        const cy = e.clientY - rect.top - rect.height / 2;
+        const factor = newScale / t.scale;
+        transformRef.current = { scale: newScale, x: cx - factor * (cx - t.x), y: cy - factor * (cy - t.y) };
+      } else {
+        transformRef.current = { ...t, scale: newScale };
       }
-      // TODO: Implement zoom towards cursor for better UX
-      return { ...prev, scale: newScale };
-    });
+      applyTransform(false);
+      setIsZoomed(true);
+    }
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button !== 0 || transform.scale <= 1) return;
+    if (e.button !== 0 || transformRef.current.scale <= 1) return;
     e.preventDefault();
-    setIsPanning(true);
-    panStart.current = { x: e.clientX - transform.x, y: e.clientY - transform.y };
+    isPanningRef.current = true;
+    panStart.current = { x: e.clientX - transformRef.current.x, y: e.clientY - transformRef.current.y };
+    if (imageContainerRef.current) imageContainerRef.current.style.cursor = 'grabbing';
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isPanning) return;
+    if (!isPanningRef.current) return;
     e.preventDefault();
-    const newX = e.clientX - panStart.current.x;
-    const newY = e.clientY - panStart.current.y;
-    setTransform(prev => ({ ...prev, x: newX, y: newY }));
+    transformRef.current.x = e.clientX - panStart.current.x;
+    transformRef.current.y = e.clientY - panStart.current.y;
+    applyTransform(false);
   };
 
   const handleMouseUpOrLeave = () => {
-    setIsPanning(false);
+    isPanningRef.current = false;
+    if (imageContainerRef.current && transformRef.current.scale > 1) imageContainerRef.current.style.cursor = 'grab';
   };
 
-  // Touch Handlers
-  const getDistance = (touches: React.TouchList) => {
-    return Math.sqrt(
-      Math.pow(touches[0].clientX - touches[1].clientX, 2) +
-      Math.pow(touches[0].clientY - touches[1].clientY, 2)
-    );
-  };
+  const getDistance = (touches: React.TouchList) => Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+  const getMidpoint = (touches: React.TouchList) => ({ x: (touches[0].clientX + touches[1].clientX) / 2, y: (touches[0].clientY + touches[1].clientY) / 2 });
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 2) {
       e.preventDefault();
-      setIsPanning(false);
-      initialTouchState.current = { distance: getDistance(e.touches), scale: transform.scale };
-    } else if (e.touches.length === 1 && transform.scale > 1) {
-      e.preventDefault();
-      setIsPanning(true);
-      panStart.current = { x: e.touches[0].clientX - transform.x, y: e.touches[0].clientY - transform.y };
+      isPanningRef.current = false;
+      swipeRef.current.swiping = false;
+      const mid = getMidpoint(e.touches);
+      initialTouchState.current = {
+        distance: getDistance(e.touches),
+        scale: transformRef.current.scale,
+        midX: mid.x,
+        midY: mid.y,
+        startX: transformRef.current.x,
+        startY: transformRef.current.y,
+      };
+    } else if (e.touches.length === 1) {
+      const now = Date.now();
+      if (now - lastTapRef.current < 300) {
+        e.preventDefault();
+        if (transformRef.current.scale > 1) {
+          resetZoom(true);
+        } else {
+          const container = imageContainerRef.current;
+          if (container) {
+            const rect = container.getBoundingClientRect();
+            const cx = e.touches[0].clientX - rect.left - rect.width / 2;
+            const cy = e.touches[0].clientY - rect.top - rect.height / 2;
+            transformRef.current = { scale: 2.5, x: cx - 2.5 * cx, y: cy - 2.5 * cy };
+            applyTransform(true);
+            setIsZoomed(true);
+          }
+        }
+        lastTapRef.current = 0;
+        return;
+      }
+      lastTapRef.current = now;
+      if (transformRef.current.scale > 1) {
+        e.preventDefault();
+        isPanningRef.current = true;
+        panStart.current = { x: e.touches[0].clientX - transformRef.current.x, y: e.touches[0].clientY - transformRef.current.y };
+      } else {
+        // Start tracking swipe for image navigation
+        swipeRef.current = { startX: e.touches[0].clientX, startY: e.touches[0].clientY, swiping: true };
+      }
     }
   };
 
@@ -423,21 +483,58 @@ function ListingDetailContent() {
     if (e.touches.length === 2) {
       e.preventDefault();
       const newDistance = getDistance(e.touches);
-      const newScale = Math.max(1, (newDistance / initialTouchState.current.distance) * initialTouchState.current.scale);
-      setTransform(prev => ({ ...prev, scale: newScale, x: 0, y: 0 }));
-    } else if (e.touches.length === 1 && isPanning) {
+      const newScale = Math.max(1, Math.min((newDistance / initialTouchState.current.distance) * initialTouchState.current.scale, 5));
+      const container = imageContainerRef.current;
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        const mid = getMidpoint(e.touches);
+        const cx = mid.x - rect.left - rect.width / 2;
+        const cy = mid.y - rect.top - rect.height / 2;
+        const initCx = initialTouchState.current.midX - rect.left - rect.width / 2;
+        const initCy = initialTouchState.current.midY - rect.top - rect.height / 2;
+        const factor = newScale / initialTouchState.current.scale;
+        const { startX, startY } = initialTouchState.current;
+        transformRef.current = {
+          scale: newScale,
+          x: cx - factor * (initCx - startX),
+          y: cy - factor * (initCy - startY),
+        };
+      } else {
+        transformRef.current.scale = newScale;
+      }
+      applyTransform(false);
+      setIsZoomed(newScale > 1);
+    } else if (e.touches.length === 1 && isPanningRef.current) {
       e.preventDefault();
-      const newX = e.touches[0].clientX - panStart.current.x;
-      const newY = e.touches[0].clientY - panStart.current.y;
-      setTransform(prev => ({ ...prev, x: newX, y: newY }));
+      transformRef.current.x = e.touches[0].clientX - panStart.current.x;
+      transformRef.current.y = e.touches[0].clientY - panStart.current.y;
+      applyTransform(false);
+    } else if (e.touches.length === 1 && swipeRef.current.swiping) {
+      // Track swipe but don't prevent default yet
+      const deltaX = e.touches[0].clientX - swipeRef.current.startX;
+      const deltaY = e.touches[0].clientY - swipeRef.current.startY;
+      // If vertical movement dominates, cancel swipe
+      if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > 20) {
+        swipeRef.current.swiping = false;
+      }
     }
   };
 
-  const handleTouchEnd = () => {
-    setIsPanning(false);
-    if (transform.scale <= 1) {
-      setTransform({ scale: 1, x: 0, y: 0 });
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    // Swipe to change image when not zoomed
+    if (swipeRef.current.swiping && transformRef.current.scale <= 1 && e.changedTouches.length > 0) {
+      const deltaX = e.changedTouches[0].clientX - swipeRef.current.startX;
+      if (Math.abs(deltaX) > 50 && vehicle.images.length > 1) {
+        if (deltaX < 0) {
+          setCurrentImageIndex(prev => (prev === vehicle.images.length - 1 ? 0 : prev + 1));
+        } else {
+          setCurrentImageIndex(prev => (prev === 0 ? vehicle.images.length - 1 : prev - 1));
+        }
+      }
+      swipeRef.current.swiping = false;
     }
+    isPanningRef.current = false;
+    if (transformRef.current.scale <= 1.05) resetZoom(true);
   };
 
   const handleToggleStatus = async (newStatus: 'active' | 'paused' | 'sold') => {
@@ -641,8 +738,8 @@ function ListingDetailContent() {
   };
 
   return (
-    <div className="container mx-auto max-w-6xl py-8">
-      <nav className="mb-4 flex items-center gap-1.5 text-sm text-muted-foreground">
+    <div className="container mx-auto max-w-6xl py-4 md:py-8 px-4 md:px-6 overflow-hidden">
+      <nav className="mb-4 flex items-center gap-1.5 text-sm text-muted-foreground overflow-hidden">
         <Link href="/" className="flex items-center gap-1 hover:text-foreground transition-colors">
           <Home className="h-3.5 w-3.5" />
           <span>Inicio</span>
@@ -652,9 +749,9 @@ function ListingDetailContent() {
         <span>/</span>
         <span className="text-foreground font-medium truncate max-w-[200px] sm:max-w-none">{`${vehicle.year} ${vehicle.make} ${vehicle.model}`}</span>
       </nav>
-      <div className="grid md:grid-cols-3 gap-8 items-start">
+      <div className="grid md:grid-cols-3 gap-8 items-start min-w-0">
         {/* Main Content Column */}
-        <div className="md:col-span-2 space-y-8 flex flex-col">
+        <div className="md:col-span-2 space-y-8 flex flex-col min-w-0">
           <Carousel className="w-full" setApi={setCarouselApi}>
             <CarouselContent>
               {vehicle.images.map((image, index) => (
@@ -682,8 +779,8 @@ function ListingDetailContent() {
             </CarouselContent>
             {vehicle.images.length > 1 && (
               <>
-                <CarouselPrevious className="ml-16" />
-                <CarouselNext className="mr-16" />
+                <CarouselPrevious className="ml-2 md:ml-16" />
+                <CarouselNext className="mr-2 md:mr-16" />
               </>
             )}
           </Carousel>
@@ -1014,9 +1111,10 @@ function ListingDetailContent() {
           <div
             ref={imageContainerRef}
             className={cn(
-              "relative w-full h-full",
-              transform.scale > 1 ? (isPanning ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-auto'
+              "relative w-full h-full select-none",
+              isZoomed ? 'cursor-grab' : 'cursor-auto'
             )}
+            style={{ touchAction: 'none' }}
             onWheel={handleWheel}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
@@ -1027,15 +1125,16 @@ function ListingDetailContent() {
             onTouchEnd={handleTouchEnd}
           >
             <Image
+              ref={lightboxImageRef}
               key={currentImageIndex}
               src={vehicle.images[currentImageIndex].url}
               alt={vehicle.images[currentImageIndex].alt}
               fill
               className="object-contain"
               style={{
-                transform: `scale(${transform.scale}) translate(${transform.x}px, ${transform.y}px)`,
+                willChange: 'transform',
+                transformOrigin: 'center center',
                 cursor: 'inherit',
-                transition: isPanning ? 'none' : 'transform 0.1s ease-out',
               }}
               data-ai-hint={vehicle.images[currentImageIndex].hint}
               sizes="(max-width: 1280px) 90vw, 80vw"
@@ -1043,7 +1142,7 @@ function ListingDetailContent() {
             />
           </div>
 
-          {vehicle.images.length > 1 && transform.scale === 1 && (
+          {vehicle.images.length > 1 && !isZoomed && (
             <>
               <Button
                 variant="ghost"

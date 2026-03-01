@@ -5,6 +5,7 @@ import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { getAnalytics, isSupported, Analytics } from 'firebase/analytics';
 
 // IMPORTANT: DO NOT MODIFY THIS FUNCTION
 export function initializeFirebase() {
@@ -34,6 +35,18 @@ export function initializeFirebase() {
 }
 
 export function getSdks(firebaseApp: FirebaseApp) {
+  // Initialize Analytics only in the browser (not SSR)
+  let analytics: Analytics | null = null;
+  if (typeof window !== 'undefined') {
+    isSupported().then((supported) => {
+      if (supported) {
+        analytics = getAnalytics(firebaseApp);
+      }
+    }).catch(() => {
+      // Analytics not supported in this environment
+    });
+  }
+
   return {
     firebaseApp,
     auth: getAuth(firebaseApp),
