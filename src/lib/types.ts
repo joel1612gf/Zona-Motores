@@ -3,8 +3,10 @@ import type { Timestamp } from 'firebase/firestore';
 export type UserProfile = {
   uid: string;
   displayName: string;
+  email?: string;
   isVerified: boolean;
   phone?: string;
+  cedula?: string;
   accountType?: 'personal' | 'dealer';
   logoUrl?: string;
   heroUrl?: string;

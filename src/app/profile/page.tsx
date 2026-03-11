@@ -6,7 +6,7 @@ import { useForm, type SubmitHandler } from 'react-hook-form';
 import Image from 'next/image';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { doc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, query, collection, where, getDocs } from 'firebase/firestore';
 import { updateProfile, sendEmailVerification, RecaptchaVerifier, linkWithPhoneNumber, type ConfirmationResult } from 'firebase/auth';
 import { ref, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import imageCompression from 'browser-image-compression';
@@ -20,12 +20,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, MailCheck, MailWarning, ShieldCheck, Phone, FileText, UploadCloud, Crown, Zap, Shield, ArrowUpRight } from 'lucide-react';
+import { Loader2, MailCheck, MailWarning, ShieldCheck, Phone, FileText, UploadCloud, Crown, Zap, Shield, ArrowUpRight, Store } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { useSubscription } from '@/context/subscription-context';
 import { PLAN_CONFIG } from '@/lib/types';
 import Link from 'next/link';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const phoneRegex = new RegExp(/^\+[1-9]\d{1,14}$/);
 
@@ -71,6 +72,15 @@ export default function ProfilePage() {
   const [heroPreview, setHeroPreview] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [isFixing, setIsFixing] = useState(false);
+
+  // Cédula for existing accounts
+  const [cedulaPrefix, setCedulaPrefix] = useState('V');
+  const [cedulaNumber, setCedulaNumber] = useState('');
+  const [isSavingCedula, setIsSavingCedula] = useState(false);
+
+  // Dealer activation
+  const [isDealerDialogOpen, setIsDealerDialogOpen] = useState(false);
+  const [isActivatingDealer, setIsActivatingDealer] = useState(false);
 
 
   const profileRef = useMemoFirebase(() => {
@@ -167,14 +177,17 @@ export default function ProfilePage() {
   const onSaveChanges: SubmitHandler<ProfileFormValues> = async (data) => {
     if (!user || !profileRef || isSubmitting || isProfileLoading || isFormLoading) return;
 
-    setUploadProgress(0);
-
     let newLogoUrl: string | null = (profileData as any)?.logoUrl || null;
     let newHeroUrl: string | null = (profileData as any)?.heroUrl || null;
 
     try {
       const totalUploads = (logoFile ? 1 : 0) + (heroFile ? 1 : 0);
       let uploadsCompleted = 0;
+
+      // Only show progress bar if there are files to upload
+      if (totalUploads > 0) {
+        setUploadProgress(0);
+      }
 
       const uploadFile = async (file: File, path: string): Promise<string> => {
         const fileRef = ref(storage, path);
@@ -187,7 +200,10 @@ export default function ProfilePage() {
               const overallProgress = ((uploadsCompleted * 100) + progress) / totalUploads;
               setUploadProgress(overallProgress);
             },
-            (error) => reject(error),
+            (error) => {
+              console.error('Upload state_changed error:', error.code, error.message);
+              reject(error);
+            },
             async () => {
               uploadsCompleted++;
               const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
@@ -207,11 +223,11 @@ export default function ProfilePage() {
       if (data.displayName !== user.displayName) {
         await updateProfile(user, { displayName: data.displayName });
       }
-    } catch (uploadError) {
+    } catch (uploadError: any) {
       console.error("Error uploading images:", uploadError);
       toast({
         title: 'Error de Subida',
-        description: 'No se pudieron subir las imágenes. Inténtalo de nuevo.',
+        description: `No se pudieron subir las imágenes: ${uploadError?.message || 'Error desconocido'}. Inténtalo de nuevo.`,
         variant: 'destructive',
       });
       setUploadProgress(null);
@@ -397,7 +413,7 @@ export default function ProfilePage() {
       .then(() => {
         toast({
           title: "¡Cuenta Corregida!",
-          description: "Tu cuenta ha sido actualizada a Concesionario. Por favor, recarga la página para ver los cambios."
+          description: "Tu cuenta ha sido actualizada a Concesionario."
         });
       })
       .catch((error) => {
@@ -411,6 +427,83 @@ export default function ProfilePage() {
         setIsFixing(false);
       });
   };
+
+  const handleSaveCedula = async () => {
+    if (!user || !profileRef || !cedulaNumber || cedulaNumber.length < 5) {
+      toast({ title: 'Cédula inválida', description: 'La cédula debe tener al menos 5 dígitos.', variant: 'destructive' });
+      return;
+    }
+    setIsSavingCedula(true);
+    const cedula = `${cedulaPrefix}${cedulaNumber}`;
+
+    try {
+      // Check if cedula is already in use
+      const cedulaQuery = query(collection(firestore, 'users'), where('cedula', '==', cedula));
+      const cedulaSnapshot = await getDocs(cedulaQuery);
+      if (cedulaSnapshot.size > 0) {
+        toast({
+          title: 'Cédula ya registrada',
+          description: 'Esta cédula ya está en uso. Si crees que es un error, contáctanos por WhatsApp al 04221756187.',
+          variant: 'destructive',
+          duration: 10000,
+        });
+        setIsSavingCedula(false);
+        return;
+      }
+
+      await setDoc(profileRef, { cedula }, { merge: true });
+      toast({ title: '¡Cédula guardada!', description: `Tu cédula ${cedula} ha sido registrada.` });
+    } catch (error: any) {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({
+        path: profileRef.path,
+        operation: 'update',
+        requestResourceData: { cedula },
+      }, error));
+    } finally {
+      setIsSavingCedula(false);
+    }
+  };
+
+  const handleActivateDealer = async () => {
+    if (!user || !profileRef) return;
+    if (plan !== 'ultra') {
+      toast({
+        title: 'Plan Ultra requerido',
+        description: 'Necesitas el Plan Ultra para activar el perfil de concesionario.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setIsDealerDialogOpen(true);
+  };
+
+  const handleConfirmDealerActivation = async () => {
+    if (!user || !profileRef) return;
+    setIsActivatingDealer(true);
+
+    const payload: any = { accountType: 'dealer' };
+    const address = getValues('address');
+    if (address) payload.address = address;
+
+    setDoc(profileRef, payload, { merge: true })
+      .then(() => {
+        toast({ title: '¡Perfil de Concesionario Activado!', description: 'Ahora tienes acceso a las herramientas de concesionario. Puedes subir tu logo y portada desde tu perfil.' });
+        setIsDealerDialogOpen(false);
+      })
+      .catch((error) => {
+        console.error('Error activating dealer:', error);
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: profileRef.path,
+          operation: 'update',
+          requestResourceData: payload,
+        }, error));
+      })
+      .finally(() => {
+        setIsActivatingDealer(false);
+      });
+  };
+
+  const hasCedula = !!(profileData as any)?.cedula;
 
   if (isAuthLoading || isProfileLoading) {
     return (
@@ -452,21 +545,52 @@ export default function ProfilePage() {
 
   return (
     <div className="container max-w-4xl mx-auto py-12">
-      {user.email === 'zonamotores.concesionario@gmail.com' && !isDealer && (
+      {/* Cédula alert for existing accounts */}
+      {!hasCedula && (
         <Card className="mb-8 border-yellow-500 bg-yellow-50/50 dark:bg-yellow-900/20">
           <CardHeader>
-            <CardTitle className="text-yellow-800 dark:text-yellow-300">Corrección de Cuenta de Concesionario</CardTitle>
+            <CardTitle className="text-yellow-800 dark:text-yellow-300">Perfil desactualizado</CardTitle>
             <CardDescription className="text-yellow-700 dark:text-yellow-400">
-              Detectamos que tu cuenta fue afectada por un error anterior que la marcó incorrectamente como "Personal".
-              Haz clic aquí para corregirla y restaurar tu acceso de concesionario.
+              Añade tu cédula de identidad para completar tu perfil. Este dato no se podrá cambiar después.
             </CardDescription>
           </CardHeader>
-          <CardFooter>
-            <Button onClick={handleFixAccountType} disabled={isFixing} variant="outline" className="bg-yellow-50 hover:bg-yellow-100 dark:bg-yellow-900/50 dark:hover:bg-yellow-900/80 border-yellow-500/50">
-              {isFixing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Convertir mi cuenta a Concesionario
-            </Button>
-          </CardFooter>
+          <CardContent>
+            <div className="flex gap-2 items-end">
+              <div className="space-y-1">
+                <Label className="text-xs">Tipo</Label>
+                <Select value={cedulaPrefix} onValueChange={setCedulaPrefix}>
+                  <SelectTrigger className="w-[70px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="V">V</SelectItem>
+                    <SelectItem value="E">E</SelectItem>
+                    <SelectItem value="J">J</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex-1 space-y-1">
+                <Label className="text-xs">Número de cédula</Label>
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="12345678"
+                  value={cedulaNumber}
+                  onChange={(e) => setCedulaNumber(e.target.value.replace(/\D/g, ''))}
+                  maxLength={8}
+                />
+              </div>
+              <Button
+                onClick={handleSaveCedula}
+                disabled={isSavingCedula || cedulaNumber.length < 5}
+                variant="outline"
+                className="bg-yellow-50 hover:bg-yellow-100 dark:bg-yellow-900/50 dark:hover:bg-yellow-900/80 border-yellow-500/50"
+              >
+                {isSavingCedula ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Guardar
+              </Button>
+            </div>
+          </CardContent>
         </Card>
       )}
 
@@ -500,6 +624,13 @@ export default function ProfilePage() {
                   </p>
                   {errors.phone && <p className="text-sm text-destructive">{errors.phone.message}</p>}
                 </div>
+                {hasCedula && (
+                  <div className="space-y-2">
+                    <Label>Cédula de Identidad</Label>
+                    <Input value={(profileData as any)?.cedula || ''} disabled />
+                    <p className="text-xs text-muted-foreground">La cédula no se puede cambiar.</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -598,10 +729,14 @@ export default function ProfilePage() {
               </div>
               <div className='flex items-center justify-between'>
                 <div className='flex items-center gap-2'>
-                  <FileText className="text-muted-foreground" />
+                  <FileText className={hasCedula ? 'text-green-500' : 'text-orange-500'} />
                   <span>Cédula</span>
                 </div>
-                <Button variant="outline" size="sm" disabled>Próximamente</Button>
+                {hasCedula ? (
+                  <Badge variant="secondary" className="border-green-300 bg-green-100 text-green-800 dark:border-green-700 dark:bg-green-900/50 dark:text-green-300">{(profileData as any)?.cedula}</Badge>
+                ) : (
+                  <Badge variant="secondary" className="border-orange-300 bg-orange-100 text-orange-800 dark:border-orange-700 dark:bg-orange-900/50 dark:text-orange-300">Pendiente</Badge>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -614,8 +749,8 @@ export default function ProfilePage() {
                 <Badge
                   variant="secondary"
                   className={`${plan === 'ultra' ? 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/50 dark:text-amber-300 dark:border-amber-700' :
-                      plan === 'pro' ? 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/50 dark:text-blue-300 dark:border-blue-700' :
-                        ''
+                    plan === 'pro' ? 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/50 dark:text-blue-300 dark:border-blue-700' :
+                      ''
                     }`}
                 >
                   {plan === 'ultra' ? <Crown className="h-3 w-3 mr-1" /> : plan === 'pro' ? <Zap className="h-3 w-3 mr-1" /> : <Shield className="h-3 w-3 mr-1" />}
@@ -665,6 +800,37 @@ export default function ProfilePage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Dealer activation */}
+          {!isDealer && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Concesionario</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Activa tu perfil de concesionario para acceder a herramientas especiales y más publicaciones.
+                </p>
+                {plan === 'ultra' ? (
+                  <Button className="w-full" size="sm" onClick={handleActivateDealer}>
+                    <Store className="h-4 w-4 mr-2" />
+                    Activar perfil de concesionario
+                  </Button>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground text-center">
+                      Requiere el Plan Ultra
+                    </p>
+                    <Button asChild className="w-full" size="sm" variant="outline">
+                      <Link href="/pricing">
+                        Ver planes <ArrowUpRight className="h-3.5 w-3.5 ml-1" />
+                      </Link>
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
       <Dialog open={isVerificationDialogOpen} onOpenChange={(open) => { if (!open) handleDialogClose(); setIsVerificationDialogOpen(open); }}>
@@ -714,6 +880,28 @@ export default function ProfilePage() {
               <Button variant="outline" onClick={handleDialogClose}>Cancelar</Button>
             </DialogClose>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dealer activation dialog */}
+      <Dialog open={isDealerDialogOpen} onOpenChange={setIsDealerDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Activar Perfil de Concesionario</DialogTitle>
+            <DialogDescription>
+              Al activar tu perfil de concesionario, podrás personalizar tu página con logo, portada y más. Ingresa tu dirección para comenzar.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="dealer-address">Dirección del Concesionario</Label>
+              <Input id="dealer-address" {...register('address')} placeholder="Ej: Av. Principal, Edif. XYZ, Local 1" />
+            </div>
+            <Button onClick={handleConfirmDealerActivation} disabled={isActivatingDealer} className="w-full">
+              {isActivatingDealer && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Activar Concesionario
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
