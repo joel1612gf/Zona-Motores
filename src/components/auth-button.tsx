@@ -226,6 +226,7 @@ export function AuthButton({ open, onOpenChange }: AuthButtonProps) {
   }, [resetCountdown]);
 
   // Reset forms when mode changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- reset() refs are stable from react-hook-form
   useEffect(() => {
     signInForm.reset();
     signUpStep1Form.reset();

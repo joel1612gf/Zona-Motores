@@ -154,15 +154,19 @@ export default function ProfilePage() {
 
     try {
       const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
-      const compressedFile = await imageCompression(file, options);
+      const compressedBlob = await imageCompression(file, options);
+      // Ensure the compressed result is a proper File with name and type preserved
+      const safeType = compressedBlob.type || file.type || 'image/jpeg';
+      const safeName = (compressedBlob as File).name || file.name || `${type}-${Date.now()}.jpg`;
+      const properFile = new File([compressedBlob], safeName, { type: safeType });
 
-      const previewUrl = URL.createObjectURL(compressedFile);
+      const previewUrl = URL.createObjectURL(properFile);
 
       if (type === 'logo') {
-        setLogoFile(compressedFile);
+        setLogoFile(properFile);
         setLogoPreview(previewUrl);
       } else {
-        setHeroFile(compressedFile);
+        setHeroFile(properFile);
         setHeroPreview(previewUrl);
       }
       toast({ title: 'Imagen lista', description: 'La imagen ha sido comprimida y está lista para subirse.' });

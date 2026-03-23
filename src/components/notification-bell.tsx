@@ -108,7 +108,7 @@ export function NotificationBell() {
                                     <div
                                         key={notif.id}
                                         className={cn(
-                                            "relative flex gap-3 px-4 py-3 transition-colors hover:bg-muted/50 border-b last:border-b-0",
+                                            "group relative flex gap-3 px-4 py-3 transition-colors hover:bg-muted/50 border-b last:border-b-0",
                                             !notif.read && "bg-primary/5"
                                         )}
                                         onClick={() => handleNotificationClick(notif.id, notif.read)}

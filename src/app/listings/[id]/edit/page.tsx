@@ -218,8 +218,12 @@ export default function EditListingPage() {
 
     const newPhotosPromises = Array.from(files).map(async (file) => {
       try {
-        const compressedFile = await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true });
-        return { file: compressedFile, previewUrl: URL.createObjectURL(compressedFile) };
+        const compressedBlob = await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true });
+        // Ensure the compressed result is a proper File with name and type preserved
+        const safeType = compressedBlob.type || file.type || 'image/jpeg';
+        const safeName = (compressedBlob as File).name || file.name || `image-${Date.now()}.jpg`;
+        const properFile = new File([compressedBlob], safeName, { type: safeType });
+        return { file: properFile, previewUrl: URL.createObjectURL(properFile) };
       } catch (error) {
         console.error('Error al comprimir la imagen:', error);
         toast({ title: 'Error de compresión', description: `No se pudo comprimir la imagen ${file.name}.`, variant: 'destructive' });

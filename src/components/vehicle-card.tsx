@@ -31,6 +31,7 @@ export function VehicleCard({ vehicle, isFeatured = false }: { vehicle: Vehicle;
   };
 
   const isPromoted = vehicle.promotionExpiresAt && vehicle.promotionExpiresAt.toDate() > new Date();
+  const mainImage = vehicle.images?.[0];
 
   return (
     <Card className={cn(
@@ -40,12 +41,12 @@ export function VehicleCard({ vehicle, isFeatured = false }: { vehicle: Vehicle;
       <Link href={`/listings/${vehicle.id}`} className="focus:outline-none block h-full flex flex-col">
         <div className="relative">
           <Image
-            src={vehicle.images[0].url}
-            alt={vehicle.images[0].alt}
+            src={mainImage?.url || '/placeholder-vehicle.svg'}
+            alt={mainImage?.alt || `${vehicle.year} ${vehicle.make} ${vehicle.model}`}
             width={600}
             height={400}
             className="aspect-video w-full object-cover transition-transform group-hover:scale-105"
-            data-ai-hint={vehicle.images[0].hint}
+            data-ai-hint={mainImage?.hint}
             sizes="(max-width: 640px) 80vw, (max-width: 1024px) 50vw, 33vw"
             priority={isFeatured}
             loading={isFeatured ? 'eager' : 'lazy'}

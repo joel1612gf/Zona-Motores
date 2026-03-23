@@ -409,9 +409,28 @@ function ListingsPageContent() {
   );
 }
 
+function ListingsPageFallback() {
+  return (
+    <div className="container mx-auto py-8 px-2 sm:px-6 lg:px-8">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
+        <div className="lg:col-span-1 hidden lg:block">
+          <Skeleton className="h-[400px] w-full" />
+        </div>
+        <div className="lg:col-span-3">
+          <Skeleton className="h-10 w-64 mb-6" />
+          <Skeleton className="h-10 w-full mb-4" />
+          <div className="grid grid-cols-2 xl:grid-cols-3 gap-2 sm:gap-6">
+            {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-[300px] sm:h-[380px] w-full" />)}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ListingsPage() {
   return (
-    <Suspense>
+    <Suspense fallback={<ListingsPageFallback />}>
       <ListingsPageContent />
     </Suspense>
   )

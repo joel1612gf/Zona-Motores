@@ -111,7 +111,7 @@ function VehicleMapSection({ vehicles }: { vehicles: Vehicle[] }) {
           <div className="absolute top-4 left-4 z-10">
             <Badge variant="secondary" className="bg-background/90 backdrop-blur-sm shadow-md text-sm px-3 py-1.5">
               <MapPin className="h-3.5 w-3.5 mr-1.5 text-primary" />
-              {vehiclesWithLocation.length} vehículos disponibles
+              {vehiclesWithLocation.length} {vehiclesWithLocation.length === 1 ? 'vehículo disponible' : 'vehículos disponibles'}
             </Badge>
           </div>
         </div>
@@ -320,10 +320,10 @@ function HomePageContent() {
                     </div>
                   </CarouselItem>
                 ))
-                : latestVehicles.map((vehicle) => (
+                : latestVehicles.map((vehicle, index) => (
                   <CarouselItem key={vehicle.id} className="pl-2 md:pl-4 basis-3/4 sm:basis-1/2 lg:basis-1/3 xl:basis-1/4 carousel-item-peek">
                     <div className="p-1 h-full">
-                      <VehicleCard vehicle={vehicle} />
+                      <VehicleCard vehicle={vehicle} isFeatured={index < 3} />
                     </div>
                   </CarouselItem>
                 ))

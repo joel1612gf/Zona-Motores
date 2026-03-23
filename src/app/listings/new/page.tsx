@@ -258,10 +258,14 @@ function NewListingContent() {
                     maxWidthOrHeight: 1920,
                     useWebWorker: true,
                 };
-                const compressedFile = await imageCompression(file, options);
+                const compressedBlob = await imageCompression(file, options);
+                // Ensure the compressed result is a proper File with name and type preserved
+                const safeType = compressedBlob.type || file.type || 'image/jpeg';
+                const safeName = (compressedBlob as File).name || file.name || `image-${Date.now()}.jpg`;
+                const properFile = new File([compressedBlob], safeName, { type: safeType });
                 return {
-                    file: compressedFile,
-                    previewUrl: URL.createObjectURL(compressedFile)
+                    file: properFile,
+                    previewUrl: URL.createObjectURL(properFile)
                 };
             } catch (error) {
                 console.error('Error al comprimir la imagen:', error);
@@ -464,46 +468,63 @@ function NewListingContent() {
                 photosToUpload.unshift(mainPhoto);
             }
 
+
             const uploadedImages: { url: string; alt: string; hint: string }[] = [];
+            const totalPhotos = photosToUpload.length;
 
-            for (let i = 0; i < photosToUpload.length; i++) {
+            for (let i = 0; i < totalPhotos; i++) {
                 const photo = photosToUpload[i];
-                const fileName = `${Date.now()}-${i}-${photo.file.name}`;
+                // Ensure the file is a proper File object with valid name and type
+                const safeType = photo.file.type || 'image/jpeg';
+                const safeName = photo.file.name || `image-${Date.now()}-${i}.jpg`;
+                const fileToUpload = (photo.file instanceof File && photo.file.name && photo.file.type)
+                    ? photo.file
+                    : new File([photo.file], safeName, { type: safeType });
+
+                const fileName = `${Date.now()}-${i}-${safeName}`;
                 const imageRef = ref(storage, `vehicle-images/${user.uid}/${fileName}`);
+                const metadata = { contentType: safeType };
 
-                const metadata = {
-                    contentType: photo.file.type,
-                };
+                console.log(`[Upload] Starting upload ${i + 1}/${totalPhotos}: ${safeName} (${(fileToUpload.size / 1024).toFixed(1)}KB, type: ${safeType})`);
 
-                const uploadTask = uploadBytesResumable(imageRef, photo.file, metadata);
+                // Set initial progress for this photo
+                setUploadProgress(((i) / totalPhotos) * 100);
 
                 await new Promise<void>((resolve, reject) => {
+                    const uploadTask = uploadBytesResumable(imageRef, fileToUpload, metadata);
+
                     uploadTask.on('state_changed',
                         (snapshot) => {
-                            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                            const totalProgress = ((i * 100) + progress) / photos.length;
+                            const progress = snapshot.totalBytes > 0 ? (snapshot.bytesTransferred / snapshot.totalBytes) * 100 : 0;
+                            const totalProgress = ((i * 100) + progress) / totalPhotos;
                             setUploadProgress(totalProgress);
+                            console.log(`[Upload] Photo ${i + 1}: ${progress.toFixed(0)}% (${snapshot.bytesTransferred}/${snapshot.totalBytes} bytes)`);
                         },
                         (error) => {
-                            console.error("Fallo en la subida de imagen:", error);
+                            console.error(`[Upload] Failed photo ${i + 1}:`, error);
                             reject(error);
                         },
                         async () => {
                             try {
+                                console.log(`[Upload] Photo ${i + 1} uploaded, getting download URL...`);
                                 const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                                console.log(`[Upload] Photo ${i + 1} complete: ${downloadURL.substring(0, 80)}...`);
                                 uploadedImages.push({
                                     url: downloadURL,
-                                    alt: `Foto ${i + 1} de ${selectedBrand} ${selectedModel}`,
+                                    alt: `Foto de ${selectedBrand} ${selectedModel}`,
                                     hint: 'car photo'
                                 });
                                 resolve();
                             } catch (error) {
+                                console.error(`[Upload] Failed to get URL for photo ${i + 1}:`, error);
                                 reject(error);
                             }
                         }
                     );
                 });
             }
+
+            setUploadProgress(100);
 
             if (uploadedImages.length !== photos.length) {
                 throw new Error("No todas las imágenes se subieron correctamente.");
@@ -1034,12 +1055,7 @@ function NewListingContent() {
             </div>
 
             <div className="flex justify-end mt-8 items-center gap-4">
-                {isPublishing && uploadProgress !== null && (
-                    <div className="w-full max-w-xs text-right">
-                        <Progress value={uploadProgress} className="h-2" />
-                        <p className="text-sm text-muted-foreground mt-1">Subiendo fotos... {uploadProgress.toFixed(0)}%</p>
-                    </div>
-                )}
+                {/* Progress bar moved into dialog */}
                 <AlertDialog>
                     <AlertDialogTrigger asChild>
                         <Button size="lg" disabled={photos.length < 4 || isPublishing}>
@@ -1054,13 +1070,29 @@ function NewListingContent() {
                             </AlertDialogTitle>
                             <AlertDialogDescription className="pt-2">
                                 Al publicar, confirmas que el precio y las características del vehículo son reales.
-                                Cualquier información falsa o engañosa, especialmente en el precio, resultará en la <strong>suspensión permanente de tu cuenta</strong>.
+                                Cualquier información falsa o engañosa, resultará en la <strong>suspensión de tu cuenta</strong>.
                                 Esta es una comunidad basada en la confianza.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
+                        
+                        {isPublishing && uploadProgress !== null && (
+                            <div className="py-4">
+                                <Progress value={uploadProgress} className="h-2 mb-2" />
+                                <p className="text-sm text-center text-muted-foreground animate-pulse">
+                                    Subiendo y publicando... {Math.min(100, uploadProgress).toFixed(0)}%
+                                </p>
+                            </div>
+                        )}
+
                         <AlertDialogFooter>
-                            <AlertDialogCancel>Volver a Editar</AlertDialogCancel>
-                            <AlertDialogAction onClick={handlePublish} disabled={isPublishing}>
+                            <AlertDialogCancel disabled={isPublishing}>Volver a Editar</AlertDialogCancel>
+                            <AlertDialogAction 
+                                onClick={(e) => {
+                                    e.preventDefault(); // Prevents dialog from closing automatically
+                                    handlePublish();
+                                }} 
+                                disabled={isPublishing}
+                            >
                                 {isPublishing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 {isPublishing ? 'Publicando...' : 'Confirmar y Publicar'}
                             </AlertDialogAction>
