@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Bike, Car, Truck, UploadCloud, X, Loader2, ShieldAlert, Phone, ExternalLink, AlertTriangle, MapPin, LocateFixed, Check } from 'lucide-react';
+import { Bike, Car, Truck, UploadCloud, X, Loader2, ShieldAlert, Phone, ExternalLink, AlertTriangle, MapPin, LocateFixed, Check, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -46,7 +46,7 @@ import { MapsProvider } from '@/components/maps-provider';
 
 
 type VehicleType = 'Moto' | 'Carro' | 'Camioneta';
-type Step = 'selection' | 'details' | 'location' | 'photos';
+type Step = 'selection' | 'details' | 'location' | 'consignment' | 'photos';
 
 const vehicleTypeOptions: {
     id: VehicleType;
@@ -107,6 +107,9 @@ function NewListingContent() {
     const { makesByType, isLoading: areMakesLoading } = useMakes();
 
     const [step, setStep] = useState<Step>('selection');
+
+    const [acceptsConsignment, setAcceptsConsignment] = useState(false);
+    const [consignmentRadiusKm, setConsignmentRadiusKm] = useState(10);
 
     const [selectedType, setSelectedType] = useState<VehicleType | null>(null);
     const [selectedBrand, setSelectedBrand] = useState<string>('');
@@ -469,12 +472,21 @@ function NewListingContent() {
             }
 
 
-            const uploadedImages: { url: string; alt: string; hint: string }[] = [];
             const totalPhotos = photosToUpload.length;
 
-            for (let i = 0; i < totalPhotos; i++) {
-                const photo = photosToUpload[i];
-                // Ensure the file is a proper File object with valid name and type
+            // Diagnostic: log which storage bucket is being used
+            console.log(`[Upload] Storage bucket: ${storage.app.options.storageBucket}`);
+            console.log(`[Upload] Total photos to upload: ${totalPhotos}`);
+
+            // Track progress for each photo individually
+            const progressPerPhoto = new Array(totalPhotos).fill(0);
+            const updateTotalProgress = () => {
+                const total = progressPerPhoto.reduce((sum, p) => sum + p, 0) / totalPhotos;
+                setUploadProgress(total);
+            };
+
+            // Upload all photos in parallel
+            const uploadPromises = photosToUpload.map((photo, i) => {
                 const safeType = photo.file.type || 'image/jpeg';
                 const safeName = photo.file.name || `image-${Date.now()}-${i}.jpg`;
                 const fileToUpload = (photo.file instanceof File && photo.file.name && photo.file.type)
@@ -487,34 +499,43 @@ function NewListingContent() {
 
                 console.log(`[Upload] Starting upload ${i + 1}/${totalPhotos}: ${safeName} (${(fileToUpload.size / 1024).toFixed(1)}KB, type: ${safeType})`);
 
-                // Set initial progress for this photo
-                setUploadProgress(((i) / totalPhotos) * 100);
-
-                await new Promise<void>((resolve, reject) => {
+                return new Promise<{ url: string; alt: string; hint: string; index: number }>((resolve, reject) => {
                     const uploadTask = uploadBytesResumable(imageRef, fileToUpload, metadata);
+
+                    // Timeout: if no progress after 30s, likely a CORS issue
+                    let lastBytesTransferred = 0;
+                    const stallTimeout = setTimeout(() => {
+                        if (lastBytesTransferred === 0) {
+                            console.error(`[Upload] STALL DETECTED: Photo ${i + 1} has not transferred any bytes in 30s. This is likely a CORS configuration issue.`);
+                            uploadTask.cancel();
+                            reject(new Error('CORS_STALL'));
+                        }
+                    }, 30000);
 
                     uploadTask.on('state_changed',
                         (snapshot) => {
+                            lastBytesTransferred = snapshot.bytesTransferred;
                             const progress = snapshot.totalBytes > 0 ? (snapshot.bytesTransferred / snapshot.totalBytes) * 100 : 0;
-                            const totalProgress = ((i * 100) + progress) / totalPhotos;
-                            setUploadProgress(totalProgress);
-                            console.log(`[Upload] Photo ${i + 1}: ${progress.toFixed(0)}% (${snapshot.bytesTransferred}/${snapshot.totalBytes} bytes)`);
+                            progressPerPhoto[i] = progress;
+                            updateTotalProgress();
                         },
                         (error) => {
+                            clearTimeout(stallTimeout);
                             console.error(`[Upload] Failed photo ${i + 1}:`, error);
                             reject(error);
                         },
                         async () => {
+                            clearTimeout(stallTimeout);
                             try {
                                 console.log(`[Upload] Photo ${i + 1} uploaded, getting download URL...`);
                                 const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
                                 console.log(`[Upload] Photo ${i + 1} complete: ${downloadURL.substring(0, 80)}...`);
-                                uploadedImages.push({
+                                resolve({
                                     url: downloadURL,
                                     alt: `Foto de ${selectedBrand} ${selectedModel}`,
-                                    hint: 'car photo'
+                                    hint: 'car photo',
+                                    index: i
                                 });
-                                resolve();
                             } catch (error) {
                                 console.error(`[Upload] Failed to get URL for photo ${i + 1}:`, error);
                                 reject(error);
@@ -522,7 +543,13 @@ function NewListingContent() {
                         }
                     );
                 });
-            }
+            });
+
+            // Wait for all uploads to complete, then sort by original order
+            const results = await Promise.all(uploadPromises);
+            const uploadedImages = results
+                .sort((a, b) => a.index - b.index)
+                .map(({ url, alt, hint }) => ({ url, alt, hint }));
 
             setUploadProgress(100);
 
@@ -554,6 +581,8 @@ function NewListingContent() {
                 description: details.moreDetails,
                 images: uploadedImages,
                 sellerId: user.uid,
+                acceptsConsignment: acceptsConsignment,
+                consignmentRadiusKm: acceptsConsignment ? consignmentRadiusKm : 0,
                 seller: {
                     uid: user.uid,
                     displayName: isAdmin ? details.sellerName : (user.displayName || 'Vendedor Anónimo'),
@@ -594,12 +623,16 @@ function NewListingContent() {
 
             router.push('/');
 
-        } catch (e) {
+        } catch (e: any) {
             console.error("Error al publicar el anuncio: ", e);
+            const isCorsError = e?.message === 'CORS_STALL' || e?.code === 'storage/canceled';
             toast({
                 variant: "destructive",
-                title: "Error al publicar",
-                description: "No se pudo guardar el vehículo. Revisa tu conexión y los permisos de almacenamiento.",
+                title: isCorsError ? "Error de configuración del servidor" : "Error al publicar",
+                description: isCorsError
+                    ? "La subida de imágenes fue bloqueada por el servidor (CORS). Contacta al administrador para configurar los permisos del bucket de almacenamiento."
+                    : "No se pudo guardar el vehículo. Revisa tu conexión y los permisos de almacenamiento.",
+                duration: 10000,
             });
         } finally {
             setIsPublishing(false);
@@ -996,7 +1029,83 @@ function NewListingContent() {
             </Card>
 
             <div className="flex justify-end mt-8">
-                <Button onClick={() => setStep('photos')} size="lg" disabled={!location || isGeocoding}>
+                <Button onClick={() => setStep('consignment')} size="lg" disabled={!location || isGeocoding}>
+                    Siguiente
+                </Button>
+            </div>
+        </div>
+    );
+
+    const renderConsignmentStep = () => (
+        <div className="animate-in fade-in-50 duration-500">
+            <Button variant="ghost" onClick={() => setStep('location')} className="mb-4 pl-0">
+                &larr; Volver a ubicación
+            </Button>
+            <h2 className="text-2xl font-bold font-headline mb-2 text-center">
+                ¿Quieres que concesionarios cerca de ti ofrezcan tu vehículo?
+            </h2>
+            <p className="text-center text-muted-foreground mb-8 text-sm max-w-2xl mx-auto">
+                Si aceptas, venderás tu carro mucho más rápido con ayuda de profesionales.<br/>Los concesionarios de la zona podrán contactarte para ofrecer sus servicios de consignación.
+            </p>
+
+            <Card className="p-6 max-w-2xl mx-auto mb-8 border-primary/20 shadow-md">
+                <div className="flex items-center justify-between mb-6">
+                    <div>
+                        <Label htmlFor="consignment-toggle" className="text-lg font-semibold cursor-pointer">Aceptar ofertas de concesionarios</Label>
+                        <p className="text-sm text-muted-foreground mt-1">Tu número de contacto será visible para concesionarios verificados.</p>
+                    </div>
+                    <Switch 
+                        id="consignment-toggle" 
+                        checked={acceptsConsignment} 
+                        onCheckedChange={setAcceptsConsignment} 
+                        className="scale-125 data-[state=checked]:bg-green-500"
+                    />
+                </div>
+
+                {acceptsConsignment && (
+                    <div className="space-y-6 animate-in fade-in-50 duration-300 border-t pt-6">
+                        <div>
+                            <Label className="text-base font-medium mb-3 block">
+                                ¿En qué radio máximo (km) estás dispuesto a llevar tu vehículo?
+                            </Label>
+                            <div className="flex items-center gap-4">
+                                <Input 
+                                    type="number" 
+                                    min="1" 
+                                    max="500" 
+                                    value={consignmentRadiusKm} 
+                                    onChange={(e) => setConsignmentRadiusKm(Number(e.target.value) || 1)}
+                                    className="w-24 text-center font-bold text-lg"
+                                />
+                                <span className="text-sm font-medium text-muted-foreground">kilómetros a la redonda</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground flex items-center gap-2 mt-3">
+                                <Info className="h-4 w-4 shrink-0" />
+                                Solo los concesionarios dentro de este radio podrán hacerte ofertas.
+                            </p>
+                        </div>
+                        
+                        <div className="rounded-lg overflow-hidden border h-[250px] relative pointer-events-none opacity-80">
+                           <div className="absolute inset-0 z-10 bg-primary/10 flex items-center justify-center">
+                               {/* Representación visual abstracta del radio */}
+                               <div className="h-[200px] w-[200px] rounded-full border-2 border-primary/40 bg-primary/20 animate-pulse" />
+                           </div>
+                           <Map
+                                mapId="consignment_map"
+                                defaultCenter={location ? {lat: location.lat, lng: location.lon} : defaultCenter}
+                                defaultZoom={consignmentRadiusKm > 50 ? 8 : 10}
+                                disableDefaultUI={true}
+                                gestureHandling="none"
+                            >
+                                {location && <AdvancedMarker position={{lat: location.lat, lng: location.lon}}><CarMarker /></AdvancedMarker>}
+                            </Map>
+                        </div>
+                    </div>
+                )}
+            </Card>
+
+            <div className="flex justify-end mt-8">
+                <Button onClick={() => setStep('photos')} size="lg">
                     Siguiente
                 </Button>
             </div>
@@ -1164,6 +1273,7 @@ function NewListingContent() {
         { key: 'selection', label: 'Vehículo' },
         { key: 'details', label: 'Detalles' },
         { key: 'location', label: 'Ubicación' },
+        { key: 'consignment', label: 'Ofertas' },
         { key: 'photos', label: 'Fotos' },
     ];
     const currentStepIndex = steps.findIndex(s => s.key === step);
@@ -1210,6 +1320,7 @@ function NewListingContent() {
             {step === 'selection' && renderSelectionStep()}
             {step === 'details' && renderDetailsStep()}
             {step === 'location' && renderLocationStep()}
+            {step === 'consignment' && renderConsignmentStep()}
             {step === 'photos' && renderPhotosStep()}
         </div>
     );

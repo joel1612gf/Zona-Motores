@@ -3,9 +3,8 @@ import { Inter, Oswald } from 'next/font/google';
 import './globals.css';
 import { cn } from '@/lib/utils';
 import { Toaster } from '@/components/ui/toaster';
-import { SiteHeader } from '@/components/site-header';
-import { SiteFooter } from '@/components/site-footer';
 import { ClientProviders } from '@/components/client-providers';
+import { LayoutShell } from '@/components/layout-shell';
 
 const fontBody = Inter({
   subsets: ['latin'],
@@ -53,14 +52,11 @@ export default function RootLayout({
       </head>
       <body className={cn('min-h-screen bg-background font-body antialiased')}>
         <ClientProviders>
-          <div className="relative flex min-h-dvh flex-col">
-            <SiteHeader />
-            <main className="flex-1 overflow-x-hidden">{children}</main>
-            <SiteFooter />
-          </div>
+          <LayoutShell>{children}</LayoutShell>
           <Toaster />
         </ClientProviders>
       </body>
     </html>
   );
 }
+

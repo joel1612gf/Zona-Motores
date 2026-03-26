@@ -62,6 +62,9 @@ export type Vehicle = {
     lat: number;
     lon: number;
   };
+
+  acceptsConsignment?: boolean;
+  consignmentRadiusKm?: number;
   createdAt: Timestamp;
   status?: 'active' | 'paused' | 'sold';
   viewCount?: number;
