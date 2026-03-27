@@ -1222,6 +1222,27 @@ function NewListingContent() {
         );
     }
 
+    const isDealer = (profileData as any)?.accountType === 'dealer';
+    if (isDealer && !isAdmin) {
+        return (
+            <div className="container max-w-3xl mx-auto py-12">
+                <Card className="p-8 text-center flex flex-col items-center">
+                    <ShieldAlert className="h-12 w-12 text-destructive mb-4" />
+                    <h1 className="font-headline text-3xl font-bold">Acceso Restringido</h1>
+                    <p className="mt-4 text-lg text-muted-foreground">
+                        Las cuentas de concesionario deben gestionar su inventario exclusivamente desde el entorno Business.
+                    </p>
+                    <p className="mt-2 text-muted-foreground">
+                        No es posible crear publicaciones manuales a través de esta vía. Todos tus vehículos se sincronizan automáticamente con tu inventario SaaS.
+                    </p>
+                    <Button asChild className="mt-8" size="lg">
+                        <Link href="/">Volver al Inicio</Link>
+                    </Button>
+                </Card>
+            </div>
+        );
+    }
+
     const isVerified = (profileData as any)?.isVerified || false;
     if (!isVerified && !isAdmin) {
         return (

@@ -4,7 +4,8 @@ import { useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useFirestore, useUser, useMemoFirebase, useCollection } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { collection, query, orderBy, doc, collectionGroup, where } from 'firebase/firestore';
+import { useDoc } from '@/firebase/firestore/use-doc';
 import type { Vehicle } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -29,13 +30,31 @@ export default function StatsPage() {
   const firestore = useFirestore();
   const { limits, planName } = useSubscription();
 
+  const profileRef = useMemoFirebase(() => {
+    if (!user) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [firestore, user]);
+
+  const { data: profileData } = useDoc(profileRef);
+  const isDealer = (profileData as any)?.accountType === 'dealer';
+  const businessId = (profileData as any)?.businessId;
+
   const myListingsQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
+
+    if (profileData && isDealer && businessId) {
+      return query(
+        collectionGroup(firestore, 'vehicleListings'),
+        where('seller.businessId', '==', businessId),
+        orderBy('createdAt', 'desc')
+      );
+    }
+
     return query(
       collection(firestore, 'users', user.uid, 'vehicleListings'),
       orderBy('createdAt', 'desc')
     );
-  }, [user, firestore]);
+  }, [user, firestore, profileData, isDealer, businessId]);
 
   const { data: listings, isLoading: areListingsLoading } = useCollection<Vehicle>(myListingsQuery);
 
@@ -118,12 +137,16 @@ export default function StatsPage() {
         <div className="text-center py-16 border-2 border-dashed rounded-lg bg-card">
           <BarChart className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
           <h2 className="text-2xl font-semibold font-headline">Aún no tienes datos</h2>
-          <p className="text-muted-foreground mt-2 mb-6">Publica un vehículo para empezar a ver tus estadísticas.</p>
-          <Button asChild>
-            <Link href="/listings/new">
-              Publicar un Vehículo
-            </Link>
-          </Button>
+          <p className="text-muted-foreground mt-2 mb-6">
+            {isDealer ? 'Las estadísticas de tus vehículos aparecerán aquí una vez que reciban visualizaciones o contactos.' : 'Publica un vehículo para empezar a ver tus estadísticas.'}
+          </p>
+          {!isDealer && (
+            <Button asChild>
+              <Link href="/listings/new">
+                Publicar un Vehículo
+              </Link>
+            </Button>
+          )}
         </div>
       </div>
     )

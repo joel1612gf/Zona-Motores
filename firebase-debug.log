@@ -1,0 +1,77 @@
+[debug] [2026-03-27T03:51:25.338Z] ----------------------------------------------------------------------
+[debug] [2026-03-27T03:51:25.344Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\joel1\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\bin\firebase.js deploy --only firestore:rules
+[debug] [2026-03-27T03:51:25.344Z] CLI Version:   15.11.0
+[debug] [2026-03-27T03:51:25.344Z] Platform:      win32
+[debug] [2026-03-27T03:51:25.344Z] Node Version:  v22.17.1
+[debug] [2026-03-27T03:51:25.345Z] Time:          Thu Mar 26 2026 23:51:25 GMT-0400 (hora de Venezuela)
+[debug] [2026-03-27T03:51:25.345Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-03-27T03:51:31.416Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-03-27T03:51:31.425Z] > authorizing via signed-in user (joel110gf@gmail.com)
+[debug] [2026-03-27T03:51:31.425Z] [iam] checking project studio-2511212328-1383b for permissions ["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]
+[debug] [2026-03-27T03:51:31.427Z] Checked if tokens are valid: true, expires at: 1774586662546
+[debug] [2026-03-27T03:51:31.427Z] Checked if tokens are valid: true, expires at: 1774586662546
+[debug] [2026-03-27T03:51:31.428Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/studio-2511212328-1383b:testIamPermissions [none]
+[debug] [2026-03-27T03:51:31.428Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/studio-2511212328-1383b:testIamPermissions  x-goog-user-project=studio-2511212328-1383b
+[debug] [2026-03-27T03:51:31.428Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/studio-2511212328-1383b:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]}
+[debug] [2026-03-27T03:51:31.827Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/studio-2511212328-1383b:testIamPermissions 200
+[debug] [2026-03-27T03:51:31.827Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/studio-2511212328-1383b:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]}
+[info] 
+[info] === Deploying to 'studio-2511212328-1383b'...
+[info] 
+[info] i  deploying firestore 
+[info] i  firestore: ensuring required API firestore.googleapis.com is enabled... 
+[info] i  firestore: ensuring required API firestore.googleapis.com is enabled... 
+[debug] [2026-03-27T03:51:31.894Z] Checked if tokens are valid: true, expires at: 1774586662546
+[debug] [2026-03-27T03:51:31.894Z] Checked if tokens are valid: true, expires at: 1774586662546
+[debug] [2026-03-27T03:51:31.895Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/studio-2511212328-1383b/databases/(default) [none]
+[debug] [2026-03-27T03:51:32.418Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/studio-2511212328-1383b/databases/(default) 200
+[debug] [2026-03-27T03:51:32.418Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/studio-2511212328-1383b/databases/(default) {"name":"projects/studio-2511212328-1383b/databases/(default)","uid":"8864e8af-ff21-41c4-bf38-6303428ad697","createTime":"2026-01-23T03:22:14.792243Z","updateTime":"2026-01-23T03:22:14.792243Z","locationId":"us-central1","type":"FIRESTORE_NATIVE","concurrencyMode":"PESSIMISTIC","versionRetentionPeriod":"604800s","earliestVersionTime":"2026-03-20T03:52:00Z","appEngineIntegrationMode":"DISABLED","pointInTimeRecoveryEnablement":"POINT_IN_TIME_RECOVERY_ENABLED","deleteProtectionState":"DELETE_PROTECTION_DISABLED","databaseEdition":"STANDARD","freeTier":true,"realtimeUpdatesMode":"REALTIME_UPDATES_MODE_ENABLED","etag":"IMbLydWWv5MDMNLEqaWBl5MD"}
+[info] i  firestore: reading indexes from firestore.indexes.json... 
+[info] i  cloud.firestore: checking firestore.rules for compilation errors... 
+[debug] [2026-03-27T03:51:32.486Z] Checked if tokens are valid: true, expires at: 1774586662546
+[debug] [2026-03-27T03:51:32.486Z] Checked if tokens are valid: true, expires at: 1774586662546
+[debug] [2026-03-27T03:51:32.486Z] >>> [apiv2][query] POST https://firebaserules.googleapis.com/v1/projects/studio-2511212328-1383b:test [none]
+[debug] [2026-03-27T03:51:32.486Z] >>> [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/studio-2511212328-1383b:test [omitted]
+[debug] [2026-03-27T03:51:32.869Z] <<< [apiv2][status] POST https://firebaserules.googleapis.com/v1/projects/studio-2511212328-1383b:test 200
+[debug] [2026-03-27T03:51:32.870Z] <<< [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/studio-2511212328-1383b:test {"issues":[{"sourcePosition":{"fileName":"firestore.rules","line":5,"column":14,"currentOffset":103,"endOffset":112},"description":"Unused function: isSignedIn.","severity":"WARNING"},{"sourcePosition":{"fileName":"firestore.rules","line":6,"column":14,"currentOffset":131,"endOffset":137},"description":"Invalid variable name: request.","severity":"WARNING"}]}
+[warn] !  [W] 5:14 - Unused function: isSignedIn. 
+[warn] !  [W] 6:14 - Invalid variable name: request. 
+[info] +  cloud.firestore: rules file firestore.rules compiled successfully 
+[debug] [2026-03-27T03:51:32.881Z] Checked if tokens are valid: true, expires at: 1774586662546
+[debug] [2026-03-27T03:51:32.881Z] Checked if tokens are valid: true, expires at: 1774586662546
+[debug] [2026-03-27T03:51:32.881Z] >>> [apiv2][query] GET https://firebaserules.googleapis.com/v1/projects/studio-2511212328-1383b/releases pageSize=10&pageToken=
+[debug] [2026-03-27T03:51:33.099Z] <<< [apiv2][status] GET https://firebaserules.googleapis.com/v1/projects/studio-2511212328-1383b/releases 200
+[debug] [2026-03-27T03:51:33.099Z] <<< [apiv2][body] GET https://firebaserules.googleapis.com/v1/projects/studio-2511212328-1383b/releases {"releases":[{"name":"projects/studio-2511212328-1383b/releases/cloud.firestore","rulesetName":"projects/studio-2511212328-1383b/rulesets/eace0de4-6910-40c1-b198-b25376a5e79c","createTime":"2026-01-23T03:22:23.565327Z","updateTime":"2026-03-25T21:48:18.187679Z"},{"name":"projects/studio-2511212328-1383b/releases/firebase.storage/studio-2511212328-1383b.firebasestorage.app","rulesetName":"projects/studio-2511212328-1383b/rulesets/ec37125a-a5c2-49f3-9eba-d43f1b550d15","createTime":"2026-01-25T00:38:28.171263Z","updateTime":"2026-03-26T05:09:35.652063Z"}]}
+[debug] [2026-03-27T03:51:33.113Z] Checked if tokens are valid: true, expires at: 1774586662546
+[debug] [2026-03-27T03:51:33.113Z] Checked if tokens are valid: true, expires at: 1774586662546
+[debug] [2026-03-27T03:51:33.113Z] >>> [apiv2][query] GET https://firebaserules.googleapis.com/v1/projects/studio-2511212328-1383b/rulesets/eace0de4-6910-40c1-b198-b25376a5e79c [none]
+[debug] [2026-03-27T03:51:33.301Z] <<< [apiv2][status] GET https://firebaserules.googleapis.com/v1/projects/studio-2511212328-1383b/rulesets/eace0de4-6910-40c1-b198-b25376a5e79c 200
+[debug] [2026-03-27T03:51:33.302Z] <<< [apiv2][body] GET https://firebaserules.googleapis.com/v1/projects/studio-2511212328-1383b/rulesets/eace0de4-6910-40c1-b198-b25376a5e79c [omitted]
+[info] i  firestore: uploading rules firestore.rules... 
+[debug] [2026-03-27T03:51:33.305Z] Checked if tokens are valid: true, expires at: 1774586662546
+[debug] [2026-03-27T03:51:33.305Z] Checked if tokens are valid: true, expires at: 1774586662546
+[debug] [2026-03-27T03:51:33.305Z] >>> [apiv2][query] POST https://firebaserules.googleapis.com/v1/projects/studio-2511212328-1383b/rulesets [none]
+[debug] [2026-03-27T03:51:33.305Z] >>> [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/studio-2511212328-1383b/rulesets [omitted]
+[debug] [2026-03-27T03:51:33.668Z] <<< [apiv2][status] POST https://firebaserules.googleapis.com/v1/projects/studio-2511212328-1383b/rulesets 200
+[debug] [2026-03-27T03:51:33.668Z] <<< [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/studio-2511212328-1383b/rulesets {"name":"projects/studio-2511212328-1383b/rulesets/46745f99-49fd-4e1a-98e6-0b4c1b277c7b","source":{"files":[{"content":"rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n\n    function isSignedIn() {\n      return request.auth != null;\n    }\n\n    function isOwner(userId) {\n      return request.auth != null && request.auth.uid == userId;\n    }\n    \n    function isAdmin() {\n      return request.auth != null && request.auth.token.email == 'zonamotores.ve@gmail.com';\n    }\n\n    // Concesionarios - public read for business login\n    match /concesionarios/{concesionarioId} {\n      allow read: if true;\n      allow write: if true;\n      \n      match /staff/{staffId} {\n        allow read: if true;\n        allow write: if true;\n      }\n      \n      match /{subcollection}/{docId} {\n        allow read: if true;\n        allow write: if true;\n      }\n    }\n\n    match /users/{userId} {\n      // User profiles are public to read for dealership pages and listing details.\n      // Phone numbers are already public within vehicle listings.\n      allow get, list: if true;\n      // Only the owner or an admin can make changes to their own profile.\n      allow write: if isOwner(userId) || isAdmin();\n\n      // Vehicle listings are a subcollection of users\n      match /vehicleListings/{listingId} {\n        // Anyone can get a single listing\n        allow get: if true;\n        \n        // Only the owner of the user document or an admin can create or delete their own listings\n        // OR allow SaaS Business to sync vehicles without Firebase Auth\n        allow create: if isOwner(userId) || isAdmin() || (request.resource.data.seller.isSaaSBusiness == true && request.resource.data.seller.uid == userId);\n        \n        allow delete: if isOwner(userId) || isAdmin() || (resource.data.seller.isSaaSBusiness == true && resource.data.seller.uid == userId);\n        \n        // For updates:\n        // 1. The owner or an admin can update any field.\n        // 2. Any user can update ONLY the 'viewCount' or 'contactRequests' fields.\n        // 3. SaaS Business can update \n        allow update: if (isOwner(userId) || isAdmin()) ||\n                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewCount']) ||\n                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['contactRequests']) ||\n                       (request.resource.data.seller.isSaaSBusiness == true && request.resource.data.seller.uid == userId);\n      }\n\n      match /favorites/{vehicleId} {\n        // A user can only manage their own favorites\n        allow read, write, delete: if isOwner(userId);\n      }\n      \n      match /subscription/{subscriptionId} {\n        // A user can only manage their own subscription\n        allow read, write: if isOwner(userId);\n      }\n\n      match /notifications/{notificationId} {\n        // A user can only read and manage their own notifications\n        allow read, write: if isOwner(userId);\n      }\n    }\n\n    // This rule allows a collection group query on 'vehicleListings'.\n    // It's required to let anyone list all vehicles across all users.\n    // A composite index will need to be created in Firestore for this to work.\n    match /{path=**}/vehicleListings/{listingId} {\n      allow list: if true;\n    }\n\n    // This collection is no longer used, so we deny all access to prevent confusion.\n    match /vehicle_listings/{listingId} {\n      allow read, write: if false;\n    }\n\n    // vehicle_meta can be read by anyone\n    match /vehicle_meta/{docId} {\n      allow get, list: if true;\n    }\n\n    // exchangeRates can be read by anyone\n    match /exchangeRates/{rateId} {\n        allow get, list: if true;\n    }\n  }\n}\n","name":"firestore.rules"}]},"createTime":"2026-03-27T03:51:33.765039Z","metadata":{"services":["cloud.firestore"]}}
+[debug] [2026-03-27T03:51:33.668Z] [rules] created ruleset projects/studio-2511212328-1383b/rulesets/46745f99-49fd-4e1a-98e6-0b4c1b277c7b
+[debug] [2026-03-27T03:51:33.669Z] [rules] releasing cloud.firestore/(default) with ruleset projects/studio-2511212328-1383b/rulesets/46745f99-49fd-4e1a-98e6-0b4c1b277c7b
+[debug] [2026-03-27T03:51:33.669Z] Checked if tokens are valid: true, expires at: 1774586662546
+[debug] [2026-03-27T03:51:33.669Z] Checked if tokens are valid: true, expires at: 1774586662546
+[debug] [2026-03-27T03:51:33.669Z] >>> [apiv2][query] PATCH https://firebaserules.googleapis.com/v1/projects/studio-2511212328-1383b/releases/cloud.firestore/(default) [none]
+[debug] [2026-03-27T03:51:33.669Z] >>> [apiv2][body] PATCH https://firebaserules.googleapis.com/v1/projects/studio-2511212328-1383b/releases/cloud.firestore/(default) {"release":{"name":"projects/studio-2511212328-1383b/releases/cloud.firestore/(default)","rulesetName":"projects/studio-2511212328-1383b/rulesets/46745f99-49fd-4e1a-98e6-0b4c1b277c7b"}}
+[debug] [2026-03-27T03:51:34.008Z] <<< [apiv2][status] PATCH https://firebaserules.googleapis.com/v1/projects/studio-2511212328-1383b/releases/cloud.firestore/(default) 200
+[debug] [2026-03-27T03:51:34.008Z] <<< [apiv2][body] PATCH https://firebaserules.googleapis.com/v1/projects/studio-2511212328-1383b/releases/cloud.firestore/(default) {"name":"projects/studio-2511212328-1383b/releases/cloud.firestore","rulesetName":"projects/studio-2511212328-1383b/rulesets/46745f99-49fd-4e1a-98e6-0b4c1b277c7b","createTime":"2026-01-23T03:22:23.565327Z","updateTime":"2026-03-27T03:51:34.107167Z"}
+[debug] [2026-03-27T03:51:34.008Z] [rules] updated release projects/studio-2511212328-1383b/releases/cloud.firestore
+[info] +  firestore: released rules firestore.rules to cloud.firestore 
+[info] 
+[info] +  Deploy complete! 
+[info] 
+[info] Project Console: https://console.firebase.google.com/project/studio-2511212328-1383b/overview
+[debug] [2026-03-27T03:51:39.244Z] Error: Timed out.
+    at Timeout._onTimeout (C:\Users\joel1\AppData\Local\npm-cache\_npx\7750544ccf494d8b\node_modules\firebase-tools\lib\utils.js:308:49)
+    at listOnTimeout (node:internal/timers:588:17)
+    at process.processTimers (node:internal/timers:523:7)
+[error] 
+[error] Error: An unexpected error has occurred.

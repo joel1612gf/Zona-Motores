@@ -6,7 +6,9 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { Car, PlusCircle, Menu } from 'lucide-react';
-import { useUser } from '@/firebase';
+import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
+import { useDoc } from '@/firebase/firestore/use-doc';
 import { Sheet, SheetContent, SheetTrigger, SheetClose, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { NotificationBell } from '@/components/notification-bell';
 
@@ -18,8 +20,17 @@ const AuthButton = dynamic(() => import('@/components/auth-button').then(mod => 
 
 export function SiteHeader() {
   const { user } = useUser();
+  const firestore = useFirestore();
   const router = useRouter();
   const [loginOpen, setLoginOpen] = useState(false);
+
+  const profileRef = useMemoFirebase(() => {
+    if (!user) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [firestore, user]);
+
+  const { data: profileData } = useDoc(profileRef);
+  const isDealer = (profileData as any)?.accountType === 'dealer';
 
   const handleNewListingClick = () => {
     if (user) {
@@ -94,10 +105,12 @@ export function SiteHeader() {
         </div>
 
         <div className="flex flex-1 items-center justify-end space-x-1 sm:space-x-2">
-          <Button variant="secondary" size="sm" className="h-9 px-2 sm:px-3" onClick={handleNewListingClick}>
-            <PlusCircle className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Publicar</span>
-          </Button>
+          {!isDealer && (
+            <Button variant="secondary" size="sm" className="h-9 px-2 sm:px-3" onClick={handleNewListingClick}>
+              <PlusCircle className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Publicar</span>
+            </Button>
+          )}
           <AuthButton open={loginOpen} onOpenChange={setLoginOpen} />
           <NotificationBell />
         </div>

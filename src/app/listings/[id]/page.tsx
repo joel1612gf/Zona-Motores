@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useRouter, notFound } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useUser, useFirestore, useStorage, errorEmitter, FirestorePermissionError, useDoc, useMemoFirebase } from '@/firebase';
+import { useUser, useFirestore, useStorage, errorEmitter, FirestorePermissionError, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { useFavorites } from '@/context/favorites-context';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, type CarouselApi } from '@/components/ui/carousel';
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger, DialogHeader, DialogClose } from '@/components/ui/dialog';
@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle as CardTitleComponent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { collectionGroup, query, where, getDocs, limit, doc, updateDoc, deleteDoc, serverTimestamp, increment } from 'firebase/firestore';
+import { collection, collectionGroup, query, where, getDocs, limit, doc, updateDoc, deleteDoc, serverTimestamp, increment } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -62,6 +62,7 @@ import { Map, AdvancedMarker, Pin } from '@vis.gl/react-google-maps';
 import { MapsProvider } from '@/components/maps-provider';
 import { Skeleton } from '@/components/ui/skeleton';
 import { UserProfile, Vehicle } from '@/lib/types';
+import { StaffMember } from '@/lib/business-types';
 import { ADMIN_EMAIL } from '@/lib/constants';
 
 
@@ -90,6 +91,8 @@ interface ContactDialogProps {
   isContactDialogOpen: boolean;
   setIsContactDialogOpen: (open: boolean) => void;
   displaySeller: UserProfile;
+  activeSellerName: string;
+  activeContactPhone: string;
   handleContactClick: () => void;
   countdown: number;
   createWhatsAppLink: () => string;
@@ -99,6 +102,8 @@ function ContactDialog({
   isContactDialogOpen,
   setIsContactDialogOpen,
   displaySeller,
+  activeSellerName,
+  activeContactPhone,
   handleContactClick,
   countdown,
   createWhatsAppLink
@@ -106,16 +111,16 @@ function ContactDialog({
   return (
     <Dialog open={isContactDialogOpen} onOpenChange={setIsContactDialogOpen}>
       <DialogTrigger asChild>
-        <Button className="w-full" disabled={!displaySeller.phone}>
+        <Button className="w-full" disabled={!activeContactPhone}>
           <Phone className="mr-2 h-4 w-4" />
-          {displaySeller.phone ? 'Mostrar Número de Teléfono' : 'Teléfono no disponible'}
+          {activeContactPhone ? 'Mostrar Número de Teléfono' : 'Teléfono no disponible'}
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Contactar al Vendedor</DialogTitle>
           <DialogDescription>
-            Estás a punto de contactar a {displaySeller.displayName} por WhatsApp.
+            Estás a punto de contactar a {activeSellerName} por WhatsApp.
           </DialogDescription>
         </DialogHeader>
         <div className="py-4 space-y-4">
@@ -196,6 +201,43 @@ function ListingDetailContent() {
 
   const { data: sellerInfo, isLoading: isSellerLoading } = useDoc<UserProfile>(sellerProfileRef);
 
+  // Robust lookup for the SaaS business Id if not present in the vehicle doc (backward compatibility)
+  const businessByOwnerQuery = useMemoFirebase(() => {
+    if (!firestore || !vehicle?.sellerId) return null;
+    return query(collection(firestore, 'concesionarios'), where('owner_uid', '==', vehicle.sellerId), limit(1));
+  }, [firestore, vehicle?.sellerId]);
+
+  const { data: saasBusinessDocs } = useCollection<any>(businessByOwnerQuery);
+  const isDealerListing = (vehicle?.seller?.accountType === 'dealer') || (sellerInfo?.accountType === 'dealer') || (saasBusinessDocs && saasBusinessDocs.length > 0);
+  
+  const foundBusinessId = vehicle?.seller?.businessId || sellerInfo?.businessId || (saasBusinessDocs && saasBusinessDocs.length > 0 ? saasBusinessDocs[0].id : null);
+
+  const displaySeller = isDealerListing
+    ? { 
+        ...sellerInfo, 
+        ...vehicle?.seller, 
+        businessId: foundBusinessId,
+        accountType: 'dealer' as const 
+      }
+    : (sellerInfo || vehicle?.seller);
+
+  const staffMemberRef = useMemoFirebase(() => {
+    if (!firestore || !vehicle?.asignado_a || !foundBusinessId) return null;
+    return doc(firestore, 'concesionarios', foundBusinessId, 'staff', vehicle.asignado_a);
+  }, [firestore, vehicle?.asignado_a, foundBusinessId]);
+
+  const { data: staffInfo } = useDoc<StaffMember>(staffMemberRef);
+
+  const saasBusinessInfo = (saasBusinessDocs && saasBusinessDocs.length > 0) ? saasBusinessDocs[0] : null;
+
+  const displayLocation = (isDealerListing && saasBusinessInfo?.geolocalizacion)
+    ? {
+        ...vehicle?.location,
+        lat: saasBusinessInfo.geolocalizacion.latitude,
+        lon: saasBusinessInfo.geolocalizacion.longitude,
+      }
+    : (vehicle?.location || { city: 'Caracas', state: 'Miranda', lat: 10.4806, lon: -66.9036 });
+
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isContactDialogOpen, setIsContactDialogOpen] = useState(false);
@@ -266,15 +308,22 @@ function ListingDetailContent() {
     return () => { carouselApi.off('select', onSelect); };
   }, [carouselApi]);
 
-  const displaySeller = sellerInfo || vehicle?.seller;
+  // Active contact info (overrides if salesman is assigned)
+  const activeSellerName = (vehicle?.asignado_a && isDealerListing)
+    ? `${displaySeller?.displayName || 'Concesionario'} (${staffInfo?.nombre || vehicle.assignedSeller?.nombre || 'Vendedor'})`
+    : (displaySeller?.displayName || 'Vendedor');
+
+  const activeContactPhone = (vehicle?.asignado_a && isDealerListing)
+    ? (staffInfo?.telefono || vehicle.assignedSeller?.telefono || displaySeller?.phone || '')
+    : (displaySeller?.phone || '');
 
   const createWhatsAppLink = () => {
-    if (!vehicle || !displaySeller?.phone) return '';
+    if (!vehicle || !activeContactPhone) return '';
 
-    const sellerName = displaySeller.displayName;
+    const sellerName = activeSellerName;
     const vehicleInfo = `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
     const price = formatCurrency(vehicle.priceUSD);
-    const phoneNumber = displaySeller.phone.replace(/[^0-9+]/g, '');
+    const phoneNumber = activeContactPhone.replace(/[^0-9+]/g, '');
 
     const summaryItems: string[] = [];
     if (vehicle.hasAC) summaryItems.push("tiene aire acondicionado");
@@ -674,7 +723,7 @@ function ListingDetailContent() {
       <CardHeader>
         <h1 className="font-headline text-2xl sm:text-3xl font-bold">{`${vehicle.year} ${vehicle.make} ${vehicle.model}`}</h1>
         <div className="flex items-center gap-2 pt-2 text-muted-foreground">
-          <MapPin className="h-4 w-4" /> <span>{`${vehicle.location.city}, ${vehicle.location.state}`}</span>
+          <MapPin className="h-4 w-4" /> <span>{`${displayLocation.city}, ${displayLocation.state}`}</span>
         </div>
       </CardHeader>
       <CardContent>
@@ -714,7 +763,7 @@ function ListingDetailContent() {
         )}
         <div>
           <div className="font-semibold flex items-center gap-2">
-            {displaySeller.displayName}
+            {activeSellerName}
             {displaySeller.isVerified && (
               <Badge variant="secondary" className="border-green-300 bg-green-100 text-green-800 dark:border-green-700 dark:bg-green-900/50 dark:text-green-300">
                 <ShieldCheck className="h-3 w-3 mr-1" />Verificado
@@ -879,6 +928,8 @@ function ListingDetailContent() {
                   isContactDialogOpen={isContactDialogOpen}
                   setIsContactDialogOpen={setIsContactDialogOpen}
                   displaySeller={displaySeller}
+                  activeSellerName={activeSellerName}
+                  activeContactPhone={activeContactPhone}
                   handleContactClick={handleContactClick}
                   countdown={countdown}
                   createWhatsAppLink={createWhatsAppLink}
@@ -894,7 +945,7 @@ function ListingDetailContent() {
                     <div className="h-40 w-full cursor-pointer relative group">
                       <Map
                         mapId="listing_detail_map_mobile"
-                        defaultCenter={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
+                        center={{ lat: displayLocation.lat, lng: displayLocation.lon }}
                         defaultZoom={12}
                         gestureHandling={'none'}
                         zoomControl={false}
@@ -904,7 +955,7 @@ function ListingDetailContent() {
                         clickableIcons={false}
                         className="w-full h-full"
                       >
-                        <AdvancedMarker position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}>
+                        <AdvancedMarker position={{ lat: displayLocation.lat, lng: displayLocation.lon }}>
                           <CarMarker />
                         </AdvancedMarker>
                       </Map>
@@ -921,14 +972,14 @@ function ListingDetailContent() {
                     </DialogHeader>
                     <Map
                       mapId="listing_detail_map_dialog"
-                      defaultCenter={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
+                      center={{ lat: displayLocation.lat, lng: displayLocation.lon }}
                       defaultZoom={15}
                       streetViewControl={false}
                       mapTypeControl={false}
                       fullscreenControl={false}
                       className="w-full h-full"
                     >
-                      <AdvancedMarker position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}>
+                      <AdvancedMarker position={{ lat: displayLocation.lat, lng: displayLocation.lon }}>
                         <CarMarker />
                       </AdvancedMarker>
                     </Map>
@@ -960,6 +1011,8 @@ function ListingDetailContent() {
                     isContactDialogOpen={isContactDialogOpen}
                     setIsContactDialogOpen={setIsContactDialogOpen}
                     displaySeller={displaySeller}
+                    activeSellerName={activeSellerName}
+                    activeContactPhone={activeContactPhone}
                     handleContactClick={handleContactClick}
                     countdown={countdown}
                     createWhatsAppLink={createWhatsAppLink}
@@ -975,7 +1028,7 @@ function ListingDetailContent() {
                       <div className="h-40 w-full cursor-pointer relative group">
                         <Map
                           mapId="listing_detail_map_desktop"
-                          defaultCenter={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
+                          center={{ lat: displayLocation.lat, lng: displayLocation.lon }}
                           defaultZoom={12}
                           gestureHandling={'none'}
                           zoomControl={false}
@@ -985,7 +1038,7 @@ function ListingDetailContent() {
                           clickableIcons={false}
                           className="w-full h-full"
                         >
-                          <AdvancedMarker position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}>
+                          <AdvancedMarker position={{ lat: displayLocation.lat, lng: displayLocation.lon }}>
                             <CarMarker />
                           </AdvancedMarker>
                         </Map>
@@ -1002,14 +1055,14 @@ function ListingDetailContent() {
                       </DialogHeader>
                       <Map
                         mapId="listing_detail_map_dialog_desktop"
-                        defaultCenter={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}
+                        center={{ lat: displayLocation.lat, lng: displayLocation.lon }}
                         defaultZoom={15}
                         streetViewControl={false}
                         mapTypeControl={false}
                         fullscreenControl={false}
                         className="w-full h-full"
                       >
-                        <AdvancedMarker position={{ lat: vehicle.location.lat, lng: vehicle.location.lon }}>
+                        <AdvancedMarker position={{ lat: displayLocation.lat, lng: displayLocation.lon }}>
                           <CarMarker />
                         </AdvancedMarker>
                       </Map>

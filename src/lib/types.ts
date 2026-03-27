@@ -12,6 +12,9 @@ export type UserProfile = {
   heroUrl?: string;
   address?: string;
   isBlocked?: boolean;
+  isSaaSBusiness?: boolean;
+  saasSlug?: string;
+  businessId?: string;
 };
 
 export type ImageInfo = {
@@ -65,6 +68,11 @@ export type Vehicle = {
 
   acceptsConsignment?: boolean;
   consignmentRadiusKm?: number;
+  assignedSeller?: {
+    nombre: string;
+    telefono: string;
+  };
+  asignado_a?: string;
   createdAt: Timestamp;
   status?: 'active' | 'paused' | 'sold';
   viewCount?: number;

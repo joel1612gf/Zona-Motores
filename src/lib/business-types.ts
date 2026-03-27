@@ -123,6 +123,7 @@ export type Concesionario = {
   banner_url?: string;
   telefono?: string;
   email?: string;
+  marketplaceEmail?: string; // Tightly coupled marketplace credential email
   clave_maestra_hash: string; // SHA-256
   owner_uid: string; // Firebase Auth UID of the owner's personal account
   plan_activo: boolean; // Manually controlled by admin
@@ -140,6 +141,7 @@ export type ConcesionarioConfig = {
 export type StaffMember = {
   id: string;
   nombre: string;
+  telefono?: string;
   foto_url?: string;
   rol: BusinessRole;
   pin_hash: string; // SHA-256 of 4-6 digit PIN

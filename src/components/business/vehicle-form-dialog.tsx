@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useBusinessAuth } from '@/context/business-auth-context';
-import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, serverTimestamp, setDoc, deleteDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useFirestore, useStorage } from '@/firebase';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -39,7 +39,7 @@ const BODY_TYPES = ['Sedán', 'SUV', 'Pickup', 'Hatchback', 'Coupé', 'Van', 'Ca
 const COLORS = ['Blanco', 'Negro', 'Gris', 'Plata', 'Rojo', 'Azul', 'Verde', 'Marrón', 'Dorado', 'Naranja', 'Amarillo', 'Beige', 'Otro'];
 
 export function VehicleFormDialog({ open, onOpenChange, editingVehicle, concesionarioId, onSave }: VehicleFormDialogProps) {
-  const { canSeeCosts, staffList } = useBusinessAuth();
+  const { canSeeCosts, staffList, concesionario } = useBusinessAuth();
   const firestore = useFirestore();
   const storage = useStorage();
   const { toast } = useToast();
@@ -313,7 +313,7 @@ export function VehicleFormDialog({ open, onOpenChange, editingVehicle, concesio
           },
         } : {}),
         ...(asignadoA ? { asignado_a: asignadoA } : {}),
-        updated_at: serverTimestamp(),
+        updated_at: serverTimestamp() as any,
       };
 
       if (editingVehicle) {
@@ -323,8 +323,76 @@ export function VehicleFormDialog({ open, onOpenChange, editingVehicle, concesio
       } else {
         vehicleData.created_at = serverTimestamp();
         const colRef = collection(firestore, 'concesionarios', concesionarioId, 'inventario');
-        await addDoc(colRef, vehicleData);
+        const newDocRef = await addDoc(colRef, vehicleData);
+        editingVehicle = { ...vehicleData, id: newDocRef.id } as StockVehicle; // Mock so the ID is available for sync
         toast({ title: '¡Agregado!', description: 'El vehículo fue agregado al inventario.' });
+      }
+
+      // Sync to public marketplace
+      const finalVehicleId = editingVehicle?.id;
+      if (concesionario && finalVehicleId) {
+        if (!concesionario.owner_uid) {
+          console.warn('[VehicleForm] Sync skipped: concesionario.owner_uid is undefined');
+        } else {
+          const publicRef = doc(firestore, 'users', concesionario.owner_uid, 'vehicleListings', finalVehicleId);
+          
+          if (estadoStock === 'publico_web') {
+            // Add or update in public web
+            const publicVehicleData = {
+              id: finalVehicleId,
+              sellerId: concesionario.owner_uid,
+              make,
+              model,
+              year,
+              priceUSD: precioVenta,
+              mileage,
+              bodyType: bodyType || 'Sedán',
+              transmission,
+              engine: engine || 'N/A',
+              exteriorColor: exteriorColor || 'Otro',
+              ownerCount: 1,
+              tireLife: 100,
+              hasAC: true,
+              hasSoundSystem: true,
+              hadMajorCrash: false,
+              isOperational: true,
+              isSignatory: true,
+              acceptsTradeIn: false,
+              description,
+              images: uploadedImages,
+              seller: {
+                uid: concesionario.owner_uid,
+                displayName: concesionario.nombre_empresa,
+                accountType: 'dealer',
+                logoUrl: concesionario.logo_url || '',
+                heroUrl: concesionario.banner_url || '',
+                address: concesionario.direccion,
+                isVerified: true,
+                isSaaSBusiness: true,
+                saasSlug: concesionario.slug,
+                businessId: concesionario.id,
+                phone: concesionario.telefono || ''
+              },
+              location: {
+                city: 'Caracas', // TODO: Add city/state to business settings if needed
+                state: 'Miranda',
+                lat: concesionario.geolocalizacion?.latitude || 10.4806,
+                lon: concesionario.geolocalizacion?.longitude || -66.9036
+              },
+              asignado_a: asignadoA || null,
+              assignedSeller: asignadoA ? (() => {
+                const staff = staffList.find(s => s.id === asignadoA);
+                return staff ? { nombre: staff.nombre, telefono: staff.telefono || '' } : null;
+              })() : null,
+              createdAt: (editingVehicle as any)?.created_at || serverTimestamp(),
+              status: 'active'
+            };
+            await setDoc(publicRef, publicVehicleData);
+          } else if (editingVehicle && (editingVehicle as any).estado_stock === 'publico_web') {
+            // Was public, now it's not -> delete from public web
+            await deleteDoc(publicRef);
+          }
+        }
       }
 
       onOpenChange(false);

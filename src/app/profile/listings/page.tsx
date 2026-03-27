@@ -4,7 +4,8 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useFirestore, useUser, useMemoFirebase, useCollection } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { collection, query, orderBy, doc, collectionGroup, where } from 'firebase/firestore';
+import { useDoc } from '@/firebase/firestore/use-doc';
 import type { Vehicle } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -17,13 +18,31 @@ export default function MyListingsPage() {
   const router = useRouter();
   const firestore = useFirestore();
 
+  const profileRef = useMemoFirebase(() => {
+    if (!user) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [firestore, user]);
+
+  const { data: profileData } = useDoc(profileRef);
+  const isDealer = (profileData as any)?.accountType === 'dealer';
+  const businessId = (profileData as any)?.businessId;
+
   const myListingsQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
+    
+    if (profileData && isDealer && businessId) {
+      return query(
+        collectionGroup(firestore, 'vehicleListings'),
+        where('seller.businessId', '==', businessId),
+        orderBy('createdAt', 'desc')
+      );
+    }
+
     return query(
       collection(firestore, 'users', user.uid, 'vehicleListings'),
       orderBy('createdAt', 'desc')
     );
-  }, [user, firestore]);
+  }, [user, firestore, profileData, isDealer, businessId]);
 
   const { data: listings, isLoading: areListingsLoading } = useCollection<Vehicle>(myListingsQuery);
 
@@ -48,12 +67,14 @@ export default function MyListingsPage() {
     <div className="container max-w-6xl mx-auto py-12">
       <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
         <h1 className="font-headline text-2xl sm:text-3xl font-bold">Mis Publicaciones</h1>
-        <Button asChild>
-          <Link href="/listings/new">
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Publicar Nuevo Vehículo
-          </Link>
-        </Button>
+        {!isDealer && (
+          <Button asChild>
+            <Link href="/listings/new">
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Publicar Nuevo Vehículo
+            </Link>
+          </Button>
+        )}
       </div>
 
       {listings && listings.length > 0 ? (
@@ -65,13 +86,17 @@ export default function MyListingsPage() {
       ) : (
         <div className="text-center py-16 border-2 border-dashed rounded-lg bg-card">
           <h2 className="text-2xl font-semibold font-headline">Aún no tienes publicaciones</h2>
-          <p className="text-muted-foreground mt-2 mb-6">¿Qué esperas para vender tu vehículo?</p>
-          <Button asChild>
-            <Link href="/listings/new">
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Crear mi primera publicación
-            </Link>
-          </Button>
+          <p className="text-muted-foreground mt-2 mb-6">
+            {isDealer ? 'Las publicaciones de tu concesionario aparecerán aquí automáticamente desde tu panel de gestión.' : '¿Qué esperas para vender tu vehículo?'}
+          </p>
+          {!isDealer && (
+            <Button asChild>
+              <Link href="/listings/new">
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Crear mi primera publicación
+              </Link>
+            </Button>
+          )}
         </div>
       )}
     </div>

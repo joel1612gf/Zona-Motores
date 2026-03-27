@@ -2,24 +2,26 @@
 
 import { useState, useEffect } from 'react';
 import { useBusinessAuth } from '@/context/business-auth-context';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { useFirestore, useStorage } from '@/firebase';
+import { useFirestore, useStorage, useFirebase } from '@/firebase';
 import { APIProvider, Map, AdvancedMarker, Pin } from '@vis.gl/react-google-maps';
 import { GeoPoint } from 'firebase/firestore';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, Upload, Plus, X, Building2, MapPin, LocateFixed } from 'lucide-react';
+import { Loader2, Save, Upload, Plus, X, Building2, MapPin, LocateFixed, Eye, EyeOff, Link as LinkIcon, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 import Image from 'next/image';
 
 export default function SettingsPage() {
   const { concesionario, hasPermission, loadConcesionario } = useBusinessAuth();
   const firestore = useFirestore();
   const storage = useStorage();
+  const { auth } = useFirebase();
   const { toast } = useToast();
 
   const [isSaving, setIsSaving] = useState(false);
@@ -44,6 +46,13 @@ export default function SettingsPage() {
   const [markerPos, setMarkerPos] = useState<{ lat: number; lng: number } | null>(null);
   const [mapCenter, setMapCenter] = useState({ lat: 10.4806, lng: -66.9036 }); // Caracas default
 
+  // Marketplace Credentials
+  const [marketplaceEmail, setMarketplaceEmail] = useState('');
+  const [marketplacePassword, setMarketplacePassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLinkingMarketplace, setIsLinkingMarketplace] = useState(false);
+  const [marketplaceLinkedEmail, setMarketplaceLinkedEmail] = useState<string | null>(null);
+
   const permission = hasPermission('settings');
 
   // Load initial values
@@ -67,6 +76,10 @@ export default function SettingsPage() {
       const pos = { lat: concesionario.geolocalizacion.latitude, lng: concesionario.geolocalizacion.longitude };
       setMarkerPos(pos);
       setMapCenter(pos);
+    }
+    if (concesionario.marketplaceEmail) {
+      setMarketplaceLinkedEmail(concesionario.marketplaceEmail);
+      setMarketplaceEmail(concesionario.marketplaceEmail);
     }
   }, [concesionario]);
 
@@ -94,6 +107,58 @@ export default function SettingsPage() {
 
   const removeMetodoPago = (metodo: string) => {
     setMetodosPago(metodosPago.filter(m => m !== metodo));
+  };
+
+  const handleLinkMarketplace = async () => {
+    if (!marketplaceEmail || !marketplacePassword) {
+      toast({ title: 'Faltan datos', description: 'Por favor, ingresa correo y contraseña.', variant: 'destructive' });
+      return;
+    }
+
+    // Validate password strongness
+    if (marketplacePassword.length < 8 || !/[A-Z]/.test(marketplacePassword) || !/[a-z]/.test(marketplacePassword) || !/[0-9]/.test(marketplacePassword)) {
+      toast({ title: 'Contraseña débil', description: 'Debe tener al menos 8 caracteres, mayúscula, minúscula, número y símbolo.', variant: 'destructive' });
+      return;
+    }
+
+    if (!auth || !concesionario) return;
+
+    setIsLinkingMarketplace(true);
+    try {
+      // 1. Create User in Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(auth, marketplaceEmail, marketplacePassword);
+      const user = userCredential.user;
+
+      // 2. Create the User Document with 'dealer' accountType
+      await setDoc(doc(firestore, 'users', user.uid), {
+        uid: user.uid,
+        email: marketplaceEmail,
+        tipo_cuenta: 'dealer',
+        accountType: 'dealer',
+        businessId: concesionario.id,
+        nombre: 'Concesionario: ' + concesionario.nombre_empresa,
+        created_at: new Date()
+      });
+
+      // 3. Update Concesionario
+      await updateDoc(doc(firestore, 'concesionarios', concesionario.id), {
+        marketplaceEmail: marketplaceEmail
+      });
+
+      setMarketplaceLinkedEmail(marketplaceEmail);
+      setMarketplacePassword('');
+      toast({ title: 'Cuenta Creada', description: 'Se han vinculado las credenciales para el Marketplace exitosamente.' });
+
+    } catch (err: any) {
+      console.error(err);
+      if (err.code === 'auth/email-already-in-use') {
+        toast({ title: 'Correo en uso', description: 'Este correo ya pertenece a otra cuenta de Zona Motores.', variant: 'destructive' });
+      } else {
+        toast({ title: 'Error', description: 'Hubo un error al crear las credenciales. Intentalo de nuevo.', variant: 'destructive' });
+      }
+    } finally {
+      setIsLinkingMarketplace(false);
+    }
   };
 
   const handleSave = async () => {
@@ -269,8 +334,8 @@ export default function SettingsPage() {
               </div>
             </div>
 
-             {/* GPS Map */}
-             <div className="space-y-3 pt-2">
+            {/* GPS Map */}
+            <div className="space-y-3 pt-2">
               <Label className="flex items-center gap-2">
                 <MapPin className="h-4 w-4" /> Ubicación del Local (GPS)
               </Label>
@@ -298,9 +363,9 @@ export default function SettingsPage() {
                 )}
               </div>
               {markerPos && (
-                 <p className="text-[10px] text-muted-foreground">
-                   Coordenadas: {markerPos.lat.toFixed(6)}, {markerPos.lng.toFixed(6)}
-                 </p>
+                <p className="text-[10px] text-muted-foreground">
+                  Coordenadas: {markerPos.lat.toFixed(6)}, {markerPos.lng.toFixed(6)}
+                </p>
               )}
             </div>
           </CardContent>
@@ -388,6 +453,98 @@ export default function SettingsPage() {
               )}
             </div>
           </CardContent>
+        </Card>
+
+        {/* Marketplace Credentials */}
+        <Card className="lg:col-span-2 border-primary/20 bg-white">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <LinkIcon className="h-5 w-5 text-primary" />
+              Credenciales del Marketplace (Web Normal)
+            </CardTitle>
+            <CardDescription>
+              Crea una cuenta exclusiva para que tu equipo pueda revisar el stock del concesionario directamente desde la web pública y acceder a ella (Marketplace), sin necesidad de usar tu cuenta personal de dueño.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {marketplaceLinkedEmail ? (
+              <div className="bg-background border rounded-lg p-4 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                    <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-500" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-sm">Cuenta vinculada</h4>
+                    <p className="text-sm text-muted-foreground">{marketplaceLinkedEmail}</p>
+                  </div>
+                </div>
+                <Badge variant="outline" className="bg-green-50 dark:bg-green-900/10 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800">
+                  Activa
+                </Badge>
+              </div>
+            ) : null}
+
+            <div className="bg-background border rounded-lg p-5 space-y-4 shadow-sm">
+              {!marketplaceLinkedEmail && (
+                <div className="flex items-start gap-2 text-sm text-muted-foreground bg-blue-50 dark:bg-blue-900/10 p-3 rounded-md mb-2">
+                  <AlertCircle className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+                  <p>Ingresa un correo y una contraseña fuerte. Al guardar, se creará una cuenta y podrás usarla inmediatamente en el inicio de sesión del ecosistema Zona Motores.</p>
+                </div>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="marketplace-email">Correo (Marketplace)</Label>
+                  <Input
+                    id="marketplace-email"
+                    type="email"
+                    placeholder="concesionario@ejemplo.com"
+                    value={marketplaceEmail}
+                    onChange={e => setMarketplaceEmail(e.target.value)}
+                    disabled={isReadOnly || !!marketplaceLinkedEmail} // Disable if already linked for now to prevent complicated email-change workflows
+                  />
+                </div>
+                {!marketplaceLinkedEmail && (
+                  <div className="space-y-2">
+                    <Label htmlFor="marketplace-password">Contraseña (Mín. 8, Mayús, Minús, Número)</Label>
+                    <div className="relative">
+                      <Input
+                        id="marketplace-password"
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="••••••••"
+                        value={marketplacePassword}
+                        onChange={e => setMarketplacePassword(e.target.value)}
+                        disabled={isReadOnly}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+          {!isReadOnly && !marketplaceLinkedEmail && (
+            <CardFooter className="bg-background/50 border-t justify-end py-4">
+              <Button onClick={handleLinkMarketplace} disabled={isLinkingMarketplace || !marketplaceEmail || !marketplacePassword}>
+                {isLinkingMarketplace ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creando cuenta...
+                  </>
+                ) : (
+                  <>
+                    <LinkIcon className="mr-2 h-4 w-4" />
+                    Crear y Vincular Cuenta
+                  </>
+                )}
+              </Button>
+            </CardFooter>
+          )}
         </Card>
       </div>
 

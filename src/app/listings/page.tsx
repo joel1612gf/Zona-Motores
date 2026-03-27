@@ -167,8 +167,8 @@ function ListingsPageContent() {
       if (filters.bodyType !== 'all') q = query(q, where('bodyType', '==', filters.bodyType));
       if (filters.transmission !== 'all') q = query(q, where('transmission', '==', filters.transmission));
 
-      // Ordering: Promoted first (those with a future date), then by creation date.
-      q = query(q, orderBy('promotionExpiresAt', 'desc'), orderBy('createdAt', 'desc'));
+      // Ordering: By creation date.
+      q = query(q, orderBy('createdAt', 'desc'));
 
       // Pagination
       if (loadMore && lastDocRef.current) {

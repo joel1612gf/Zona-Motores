@@ -36,6 +36,9 @@ export function DealershipCard({ dealership }: DealershipCardProps) {
     return () => { carouselApi.off('select', onSelect); };
   }, [carouselApi]);
 
+  // Always drive to the public dealership catalog (not the internal business landing)
+  const linkHref = `/dealerships/${seller.uid}`;
+
   return (
     <Card className="p-4 md:p-6 overflow-hidden">
       <div className="flex flex-col md:flex-row justify-between md:items-center mb-4 gap-4">
@@ -45,7 +48,7 @@ export function DealershipCard({ dealership }: DealershipCardProps) {
             <AvatarFallback>{seller.displayName?.charAt(0)}</AvatarFallback>
           </Avatar>
           <div>
-            <Link href={`/dealerships/${seller.uid}`} className="focus:outline-none">
+            <Link href={linkHref} className="focus:outline-none">
               <h2 className="font-headline text-2xl md:text-3xl font-bold hover:underline">{seller.displayName}</h2>
             </Link>
             {seller.address && (
@@ -57,7 +60,7 @@ export function DealershipCard({ dealership }: DealershipCardProps) {
           </div>
         </div>
         <Button asChild>
-          <Link href={`/dealerships/${seller.uid}`}>
+          <Link href={linkHref}>
             Ver Catálogo ({vehicles.length})
             <ChevronRight className="h-4 w-4 ml-2" />
           </Link>

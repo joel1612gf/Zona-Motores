@@ -7,11 +7,27 @@ service cloud.firestore {
     }
 
     function isOwner(userId) {
-      return request.auth.uid == userId;
+      return request.auth != null && request.auth.uid == userId;
     }
     
     function isAdmin() {
-      return request.auth.token.email == 'zonamotores.ve@gmail.com';
+      return request.auth != null && request.auth.token.email == 'zonamotores.ve@gmail.com';
+    }
+
+    // Concesionarios - public read for business login
+    match /concesionarios/{concesionarioId} {
+      allow read: if true;
+      allow write: if true;
+      
+      match /staff/{staffId} {
+        allow read: if true;
+        allow write: if true;
+      }
+      
+      match /{subcollection}/{docId} {
+        allow read: if true;
+        allow write: if true;
+      }
     }
 
     match /users/{userId} {
@@ -27,14 +43,19 @@ service cloud.firestore {
         allow get: if true;
         
         // Only the owner of the user document or an admin can create or delete their own listings
-        allow create, delete: if isOwner(userId) || isAdmin();
+        // OR allow SaaS Business to sync vehicles without Firebase Auth
+        allow create: if isOwner(userId) || isAdmin() || (request.resource.data.seller.isSaaSBusiness == true && request.resource.data.seller.uid == userId);
+        
+        allow delete: if isOwner(userId) || isAdmin() || (resource.data.seller.isSaaSBusiness == true && resource.data.seller.uid == userId);
         
         // For updates:
         // 1. The owner or an admin can update any field.
         // 2. Any user can update ONLY the 'viewCount' or 'contactRequests' fields.
+        // 3. SaaS Business can update 
         allow update: if (isOwner(userId) || isAdmin()) ||
                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewCount']) ||
-                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['contactRequests']);
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['contactRequests']) ||
+                       (request.resource.data.seller.isSaaSBusiness == true && request.resource.data.seller.uid == userId);
       }
 
       match /favorites/{vehicleId} {

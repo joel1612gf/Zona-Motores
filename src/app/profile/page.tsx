@@ -33,10 +33,19 @@ const phoneRegex = new RegExp(/^\+[1-9]\d{1,14}$/);
 const profileSchema = z.object({
   displayName: z.string().min(3, { message: 'El nombre debe tener al menos 3 caracteres.' }).max(50),
   phone: z.string().optional().refine((val) => !val || phoneRegex.test(val), {
-    message: "Formato inválido. Usa el formato internacional, ej: +584121234567."
+    message: "Formato inválido. Asegúrate de incluir el + y el código de país."
   }),
-  address: z.string().optional(),
+  nombre_empresa: z.string().optional(),
+  direccion: z.string().optional(),
 });
+
+const COUNTRY_CODES = [
+  { code: '+58', label: 'VE +58' },
+  { code: '+1', label: 'US +1' },
+  { code: '+57', label: 'CO +57' },
+  { code: '+507', label: 'PA +507' },
+  { code: '+34', label: 'ES +34' },
+];
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
 
@@ -82,6 +91,9 @@ export default function ProfilePage() {
   const [isDealerDialogOpen, setIsDealerDialogOpen] = useState(false);
   const [isActivatingDealer, setIsActivatingDealer] = useState(false);
 
+  // Phone prefix state for profile editing
+  const [selectedCountryCode, setSelectedCountryCode] = useState('+58');
+
 
   const profileRef = useMemoFirebase(() => {
     if (!user) return null;
@@ -95,7 +107,8 @@ export default function ProfilePage() {
     defaultValues: {
       displayName: '',
       phone: '',
-      address: '',
+      nombre_empresa: '',
+      direccion: '',
     },
   });
 
@@ -119,11 +132,21 @@ export default function ProfilePage() {
   useEffect(() => {
     const data = profileData as any;
     if (user && data) {
+      const dbPhone = data?.phone || user.phoneNumber || '';
+      
+      // Try to extract country code from existing phone
+      const matchedCode = COUNTRY_CODES.find(c => dbPhone.startsWith(c.code));
+      if (matchedCode) {
+        setSelectedCountryCode(matchedCode.code);
+      }
+      
       reset({
         displayName: user.displayName || '',
-        phone: data?.phone || user.phoneNumber || '',
-        address: data?.address || '',
+        phone: dbPhone,
+        nombre_empresa: data?.nombre_empresa || '',
+        direccion: data?.direccion || data?.address || '',
       });
+
       if (data.logoUrl) setLogoPreview(data.logoUrl);
       if (data.heroUrl) setHeroPreview(data.heroUrl);
     } else if (user) {
@@ -135,15 +158,17 @@ export default function ProfilePage() {
   }, [user, profileData, reset]);
 
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    let timer: NodeJS.Timeout | undefined;
     if (isCodeSent && countdown > 0) {
       timer = setInterval(() => {
         setCountdown((prev) => prev - 1);
       }, 1000);
     } else if (countdown === 0) {
-      clearInterval(timer);
+      if (timer) clearInterval(timer);
     }
-    return () => clearInterval(timer);
+    return () => {
+      if (timer) clearInterval(timer);
+    };
   }, [isCodeSent, countdown]);
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'hero') => {
@@ -241,10 +266,11 @@ export default function ProfilePage() {
     const updatePayload: any = {
       displayName: data.displayName,
       phone: data.phone || null,
+      nombre_empresa: (data as any).nombre_empresa || null,
+      direccion: (data as any).direccion || null,
     };
 
     if (isDealer) {
-      updatePayload.address = data.address || null;
       if (logoFile) updatePayload.logoUrl = newLogoUrl;
       if (heroFile) updatePayload.heroUrl = newHeroUrl;
     }
@@ -292,10 +318,16 @@ export default function ProfilePage() {
     if (!recaptchaContainer) return;
 
     if ((window as any).recaptchaVerifier) {
-      (window as any).recaptchaVerifier.clear();
+      try {
+        (window as any).recaptchaVerifier.clear();
+      } catch (e) {
+        console.warn("Error al limpiar reCAPTCHA previo:", e);
+      }
+      (window as any).recaptchaVerifier = null;
     }
 
-    (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, recaptchaContainer, {
+    try {
+      (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
       'size': 'invisible',
       'callback': (response: any) => { },
       'expired-callback': () => {
@@ -304,6 +336,10 @@ export default function ProfilePage() {
         toast({ title: 'reCAPTCHA expirado', description: 'Por favor, intenta enviar el código de nuevo.', variant: 'destructive' });
       }
     });
+    } catch (error) {
+      console.error("Error al inicializar RecaptchaVerifier:", error);
+      return null;
+    }
 
     return (window as any).recaptchaVerifier;
   }
@@ -334,13 +370,18 @@ export default function ProfilePage() {
     const appVerifier = setupRecaptcha();
 
     try {
-      const result = await linkWithPhoneNumber(user, phoneNumber, appVerifier);
+      if (!appVerifier) throw new Error("Recaptcha no inicializado");
+      
+      const phoneNumberToVerify = phoneNumber.trim();
+      
+      console.log("Intentando verificar número:", phoneNumberToVerify);
+      const result = await linkWithPhoneNumber(user, phoneNumberToVerify, appVerifier);
       setConfirmationResult(result);
       setIsCodeSent(true);
       setCountdown(60);
-      toast({ title: 'Código SMS Enviado', description: `Se ha enviado un código a ${phoneNumber}.` });
+      toast({ title: 'Código SMS Enviado', description: `Se ha enviado un código a ${phoneNumberToVerify}.` });
     } catch (error: any) {
-      console.error("Error sending phone verification code:", error);
+      console.error("Error completo de Firebase Auth:", error);
 
       if (error.code === 'auth/provider-already-linked') {
         toast({
@@ -486,8 +527,8 @@ export default function ProfilePage() {
     setIsActivatingDealer(true);
 
     const payload: any = { accountType: 'dealer' };
-    const address = getValues('address');
-    if (address) payload.address = address;
+    const address = getValues('direccion');
+    if (address) payload.direccion = address;
 
     setDoc(profileRef, payload, { merge: true })
       .then(() => {
@@ -620,11 +661,48 @@ export default function ProfilePage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phone">Número de Teléfono</Label>
-                  <Input id="phone" type="tel" {...register('phone')} placeholder="+584121234567" disabled={isPhoneNumberVerified} />
+                  <div className="flex gap-2">
+                    <Select 
+                      disabled={isPhoneNumberVerified} 
+                      value={selectedCountryCode} 
+                      onValueChange={(val) => {
+                        setSelectedCountryCode(val);
+                        const currentVal = getValues('phone');
+                        if (currentVal && !currentVal.startsWith('+')) {
+                          reset({ ...getValues(), phone: val + currentVal });
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-[100px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {COUNTRY_CODES.map(c => (
+                          <SelectItem key={c.code} value={c.code}>{c.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input 
+                      id="phone" 
+                      type="tel" 
+                      {...register('phone')} 
+                      placeholder="4121234567" 
+                      disabled={isPhoneNumberVerified}
+                      onChange={(e) => {
+                        let val = e.target.value.replace(/[^0-9+]/g, '');
+                        // Force prefix if missing
+                        if (val && !val.startsWith('+')) {
+                          val = selectedCountryCode + val;
+                        }
+                        e.target.value = val;
+                        register('phone').onChange(e);
+                      }}
+                    />
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     {isPhoneNumberVerified
                       ? "El número verificado no se puede cambiar."
-                      : "Usa el formato internacional (ej: +584121234567)."}
+                      : "Ingresa tu número después del código de país."}
                   </p>
                   {errors.phone && <p className="text-sm text-destructive">{errors.phone.message}</p>}
                 </div>
@@ -646,9 +724,14 @@ export default function ProfilePage() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="space-y-2">
-                    <Label htmlFor="address">Dirección</Label>
-                    <Input id="address" {...register('address')} placeholder="Ej: Av. Principal, Edif. XYZ, Local 1" />
-                    {errors.address && <p className="text-sm text-destructive">{errors.address.message}</p>}
+                    <Label htmlFor="nombre_empresa">Nombre del Concesionario / Negocio</Label>
+                    <Input id="nombre_empresa" {...register('nombre_empresa' as any)} placeholder="Ej: Tu Concesionario C.A." />
+                    <p className="text-xs text-muted-foreground">Este nombre aparecerá en tu catálogo público.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="direccion">Direcciones (Dirección Fiscal)</Label>
+                    <Input id="direccion" {...register('direccion')} placeholder="Ej: Av. Principal, Edif. XYZ, Local 1" />
+                    {errors.direccion && <p className="text-sm text-destructive">{errors.direccion.message}</p>}
                   </div>
                   <div className="space-y-4">
                     <Label>Logo (recomendado: 1:1, ej: 400x400px)</Label>
@@ -666,22 +749,7 @@ export default function ProfilePage() {
                       </Button>
                     </div>
                   </div>
-                  <div className="space-y-4">
-                    <Label>Imagen de Portada (recomendado: 16:9, ej: 1600x900px)</Label>
-                    <div className="flex items-center gap-4">
-                      <div className="relative aspect-video w-full max-w-sm rounded-md border-2 border-dashed bg-muted overflow-hidden">
-                        {heroPreview ? (
-                          <Image src={heroPreview} alt="Vista previa de la portada" fill objectFit="cover" />
-                        ) : (
-                          <div className="h-full w-full flex items-center justify-center"><UploadCloud className="h-8 w-8 text-muted-foreground" /></div>
-                        )}
-                      </div>
-                      <Input id="hero-upload" type="file" accept="image/*" onChange={(e) => handleImageSelect(e, 'hero')} className="hidden" />
-                      <Button type="button" variant="outline" onClick={() => document.getElementById('hero-upload')?.click()}>
-                        {heroPreview ? 'Cambiar Portada' : 'Subir Portada'}
-                      </Button>
-                    </div>
-                  </div>
+                  {/* Se elimina la opción de portada para usar fondo azul corporativo uniforme */}
                 </CardContent>
               </Card>
             )}
@@ -899,7 +967,7 @@ export default function ProfilePage() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="dealer-address">Dirección del Concesionario</Label>
-              <Input id="dealer-address" {...register('address')} placeholder="Ej: Av. Principal, Edif. XYZ, Local 1" />
+              <Input id="dealer-address" {...register('direccion')} placeholder="Ej: Av. Principal, Edif. XYZ, Local 1" />
             </div>
             <Button onClick={handleConfirmDealerActivation} disabled={isActivatingDealer} className="w-full">
               {isActivatingDealer && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

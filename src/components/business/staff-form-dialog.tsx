@@ -27,6 +27,7 @@ export function StaffFormDialog({ open, onOpenChange, editingStaff, concesionari
   const { toast } = useToast();
 
   const [nombre, setNombre] = useState('');
+  const [telefono, setTelefono] = useState('');
   const [rol, setRol] = useState<BusinessRole>('vendedor');
   const [pin, setPin] = useState('');
   const [pinConfirm, setPinConfirm] = useState('');
@@ -40,6 +41,7 @@ export function StaffFormDialog({ open, onOpenChange, editingStaff, concesionari
   useEffect(() => {
     if (editingStaff) {
       setNombre(editingStaff.nombre);
+      setTelefono(editingStaff.telefono || '');
       setRol(editingStaff.rol);
       setComision(editingStaff.comision_porcentaje ?? '');
       setSueldo(editingStaff.sueldo ?? '');
@@ -47,6 +49,7 @@ export function StaffFormDialog({ open, onOpenChange, editingStaff, concesionari
       setPinConfirm('');
     } else {
       setNombre('');
+      setTelefono('');
       setRol('vendedor');
       setPin('');
       setPinConfirm('');
@@ -83,6 +86,7 @@ export function StaffFormDialog({ open, onOpenChange, editingStaff, concesionari
     try {
       const staffData: Record<string, unknown> = {
         nombre: nombre.trim(),
+        telefono: telefono.trim() || null,
         rol,
         activo: true,
       };
@@ -128,15 +132,26 @@ export function StaffFormDialog({ open, onOpenChange, editingStaff, concesionari
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="staff-nombre">Nombre</Label>
-            <Input
-              id="staff-nombre"
-              value={nombre}
-              onChange={e => setNombre(e.target.value)}
-              placeholder="Nombre del empleado"
-              autoFocus
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="staff-nombre">Nombre</Label>
+              <Input
+                id="staff-nombre"
+                value={nombre}
+                onChange={e => setNombre(e.target.value)}
+                placeholder="Nombre"
+                autoFocus
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="staff-telefono">Teléfono</Label>
+              <Input
+                id="staff-telefono"
+                value={telefono}
+                onChange={e => setTelefono(e.target.value)}
+                placeholder="+58412..."
+              />
+            </div>
           </div>
 
           <div className="space-y-2">
