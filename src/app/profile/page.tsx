@@ -127,12 +127,19 @@ export default function ProfilePage() {
     }
   }, [isAuthLoading, user, router]);
 
-  const isDealer = useMemo(() => (profileData as any)?.accountType === 'dealer', [profileData]);
-
   // Detect if this user owns a Business SaaS concesionario
   const [saasData, setSaasData] = useState<{ slug: string } | null>(null);
-  const isSaaSAccount = !!saasData;
-  const saasSlug = saasData?.slug || '';
+  
+  const isSaaSAccount = useMemo(() => {
+    const data = (profileData as any);
+    return !!saasData || !!data?.isSaaSBusiness || !!data?.saasSlug || !!data?.businessId;
+  }, [saasData, profileData]);
+
+  const saasSlug = saasData?.slug || (profileData as any)?.saasSlug || '';
+  const isDealer = useMemo(() => {
+    const type = (profileData as any)?.accountType;
+    return type === 'dealer' || isSaaSAccount;
+  }, [profileData, isSaaSAccount]);
 
   useEffect(() => {
     const detectSaaS = async () => {
@@ -143,15 +150,32 @@ export default function ProfilePage() {
       }
       console.log('[Profile] Detecting SaaS for uid:', user.uid);
       try {
+        // Query by owner_uid
         const q = query(collection(firestore, 'concesionarios'), where('owner_uid', '==', user.uid));
         const snap = await getDocs(q);
-        console.log('[Profile] SaaS query result:', snap.size, 'docs');
+        
         if (!snap.empty) {
           const d = snap.docs[0].data();
-          console.log('[Profile] Found concesionario slug:', d.slug);
           setSaasData({ slug: d.slug || '' });
+        } else if (user.email) {
+          // Fallback 1: Query by marketplaceEmail
+          const q2 = query(collection(firestore, 'concesionarios'), where('marketplaceEmail', '==', user.email));
+          const snap2 = await getDocs(q2);
+          if (!snap2.empty) {
+             const d = snap2.docs[0].data();
+             setSaasData({ slug: d.slug || '' });
+          } else {
+             // Fallback 2: Query by regular email
+             const q3 = query(collection(firestore, 'concesionarios'), where('email', '==', user.email));
+             const snap3 = await getDocs(q3);
+             if (!snap3.empty) {
+                const d = snap3.docs[0].data();
+                setSaasData({ slug: d.slug || '' });
+             } else {
+                setSaasData(null);
+             }
+          }
         } else {
-          console.log('[Profile] No concesionario found for this user');
           setSaasData(null);
         }
       } catch (err) {
@@ -622,8 +646,8 @@ export default function ProfilePage() {
 
   return (
     <div className="container max-w-4xl mx-auto py-12">
-      {/* Cédula alert for existing accounts */}
-      {!hasCedula && (
+      {/* Cédula alert for existing accounts - Hidden for SaaS */}
+      {!hasCedula && !isSaaSAccount && (
         <Card className="mb-8 border-yellow-500 bg-yellow-50/50 dark:bg-yellow-900/20">
           <CardHeader>
             <CardTitle className="text-yellow-800 dark:text-yellow-300">Perfil desactualizado</CardTitle>
@@ -655,11 +679,12 @@ export default function ProfilePage() {
                   value={cedulaNumber}
                   onChange={(e) => setCedulaNumber(e.target.value.replace(/\D/g, ''))}
                   maxLength={8}
+                  disabled={isSaaSAccount}
                 />
               </div>
               <Button
                 onClick={handleSaveCedula}
-                disabled={isSavingCedula || cedulaNumber.length < 5}
+                disabled={isSavingCedula || cedulaNumber.length < 5 || isSaaSAccount}
                 variant="outline"
                 className="bg-yellow-50 hover:bg-yellow-100 dark:bg-yellow-900/50 dark:hover:bg-yellow-900/80 border-yellow-500/50"
               >
@@ -697,7 +722,8 @@ export default function ProfilePage() {
 
       <div className="grid gap-8 md:grid-cols-3 items-start">
         <div className="md:col-span-2">
-          <form onSubmit={handleSubmit(onSaveChanges)} className="space-y-8">
+          {!isSaaSAccount ? (
+            <form onSubmit={handleSubmit(onSaveChanges)} className="space-y-8">
             <Card>
               <CardHeader>
                 <CardTitle>Información General</CardTitle>
@@ -788,12 +814,12 @@ export default function ProfilePage() {
                 <CardContent className="space-y-6">
                   <div className="space-y-2">
                     <Label htmlFor="nombre_empresa">Nombre del Concesionario / Negocio</Label>
-                    <Input id="nombre_empresa" {...register('nombre_empresa' as any)} placeholder="Ej: Tu Concesionario C.A." />
+                    <Input id="nombre_empresa" {...register('nombre_empresa' as any)} placeholder="Ej: Tu Concesionario C.A." disabled={isSaaSAccount} />
                     <p className="text-xs text-muted-foreground">Este nombre aparecerá en tu catálogo público.</p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="direccion">Direcciones (Dirección Fiscal)</Label>
-                    <Input id="direccion" {...register('direccion')} placeholder="Ej: Av. Principal, Edif. XYZ, Local 1" />
+                    <Input id="direccion" {...register('direccion')} placeholder="Ej: Av. Principal, Edif. XYZ, Local 1" disabled={isSaaSAccount} />
                     {errors.direccion && <p className="text-sm text-destructive">{errors.direccion.message}</p>}
                   </div>
                   <div className="space-y-4">
@@ -806,8 +832,8 @@ export default function ProfilePage() {
                           <div className="h-full w-full flex items-center justify-center"><UploadCloud className="h-8 w-8 text-muted-foreground" /></div>
                         )}
                       </div>
-                      <Input id="logo-upload" type="file" accept="image/*" onChange={(e) => handleImageSelect(e, 'logo')} className="hidden" />
-                      <Button type="button" variant="outline" onClick={() => document.getElementById('logo-upload')?.click()}>
+                      <Input id="logo-upload" type="file" accept="image/*" onChange={(e) => handleImageSelect(e, 'logo')} className="hidden" disabled={isSaaSAccount} />
+                      <Button type="button" variant="outline" onClick={() => document.getElementById('logo-upload')?.click()} disabled={isSaaSAccount}>
                         {logoPreview ? 'Cambiar Logo' : 'Subir Logo'}
                       </Button>
                     </div>
@@ -839,9 +865,30 @@ export default function ProfilePage() {
               )}
             </CardFooter>
           </form>
+          ) : (
+            <Card className="border-dashed bg-muted/20 border-2">
+              <CardContent className="py-20 text-center space-y-4">
+                <div className="mx-auto h-16 w-16 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
+                  <Store className="h-8 w-8 text-blue-500" />
+                </div>
+                <div className="max-w-xs mx-auto">
+                  <h3 className="font-semibold text-lg">Perfil Empresarial</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Este perfil está vinculado a una cuenta Business SaaS. Toda la configuración se maneja desde tu panel exclusivo.
+                  </p>
+                </div>
+                <Button asChild variant="outline" className="mt-4">
+                   <Link href={saasSlug ? `/business/${saasSlug}` : '/business'}>
+                      Acceder al Panel Business
+                   </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </div>
         <div className="space-y-6 md:sticky md:top-24">
-          <Card>
+          {!isSaaSAccount && (
+            <Card>
             <CardHeader>
               <CardTitle>Verificación</CardTitle>
               <CardDescription>Completa las verificaciones para generar más confianza.</CardDescription>
@@ -882,6 +929,7 @@ export default function ProfilePage() {
               </div>
             </CardContent>
           </Card>
+          )}
 
           {/* Plan Card */}
           <Card>
