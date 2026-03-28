@@ -23,10 +23,15 @@ import {
   CheckCircle2,
   Car,
   PauseCircle,
+  DollarSign,
+  FileText,
+  Pencil,
 } from 'lucide-react';
 import Image from 'next/image';
 import type { StockVehicle, StockStatus } from '@/lib/business-types';
 import { VehicleFormDialog } from '@/components/business/vehicle-form-dialog';
+import { VehicleCostsDialog } from '@/components/business/vehicle-costs-dialog';
+import { VehicleInfoExtraDialog } from '@/components/business/vehicle-info-extra-dialog';
 import { formatCurrency } from '@/lib/utils';
 
 const STATUS_CONFIG: Record<StockStatus, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
@@ -51,6 +56,8 @@ export default function InventoryPage() {
   const [activeTab, setActiveTab] = useState('todos');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<StockVehicle | null>(null);
+  const [costsTarget, setCostsTarget] = useState<StockVehicle | null>(null);
+  const [infoExtraTarget, setInfoExtraTarget] = useState<StockVehicle | null>(null);
 
   const permission = hasPermission('inventory');
 
@@ -109,7 +116,7 @@ export default function InventoryPage() {
     setDialogOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = (_vehicleId?: string) => {
     // Reload vehicles
     window.location.reload();
   };
@@ -263,7 +270,7 @@ export default function InventoryPage() {
                       )}
 
                       {/* Actions */}
-                      <div className="pt-2">
+                      <div className="pt-2 space-y-1.5">
                         <Button
                           variant="outline"
                           size="sm"
@@ -273,6 +280,37 @@ export default function InventoryPage() {
                           <Eye className="h-4 w-4 mr-2" />
                           Ver Descripción
                         </Button>
+                        {!isReadOnly && (
+                          <div className="grid grid-cols-3 gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="w-full text-xs h-8 text-muted-foreground hover:text-foreground"
+                              onClick={() => { setEditingVehicle(vehicle); setDialogOpen(true); }}
+                            >
+                              <Pencil className="h-3 w-3 mr-1" />
+                              Editar
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="w-full text-xs h-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                              onClick={() => setCostsTarget(vehicle)}
+                            >
+                              <DollarSign className="h-3 w-3 mr-1" />
+                              Costos
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="w-full text-xs h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                              onClick={() => setInfoExtraTarget(vehicle)}
+                            >
+                              <FileText className="h-3 w-3 mr-1" />
+                              Docs
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -291,6 +329,28 @@ export default function InventoryPage() {
         concesionarioId={concesionario?.id || ''}
         onSave={handleSave}
       />
+
+      {/* Quick-access Costs dialog */}
+      {costsTarget && (
+        <VehicleCostsDialog
+          open={!!costsTarget}
+          onOpenChange={(open) => { if (!open) setCostsTarget(null); }}
+          vehicle={costsTarget}
+          concesionarioId={concesionario?.id || ''}
+          onSave={handleSave}
+        />
+      )}
+
+      {/* Quick-access Info Extra dialog */}
+      {infoExtraTarget && (
+        <VehicleInfoExtraDialog
+          open={!!infoExtraTarget}
+          onOpenChange={(open) => { if (!open) setInfoExtraTarget(null); }}
+          vehicle={infoExtraTarget}
+          concesionarioId={concesionario?.id || ''}
+          onSave={handleSave}
+        />
+      )}
     </div>
   );
 }

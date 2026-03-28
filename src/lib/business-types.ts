@@ -171,6 +171,18 @@ export type GastoAdecuacion = {
   monto: number;
 };
 
+export type VehicleInfoExtra = {
+  cedula_propietario?: string;
+  placa?: string;
+  serial_niv?: string;
+  serial_carroceria?: string;
+  serial_chasis?: string;
+  serial_carrozado?: string;
+  serial_motor?: string;
+  clase?: string;
+  tipo?: string;
+};
+
 export type StockVehicle = {
   id: string;
   // Vehicle info (same fields as public Vehicle)
@@ -186,6 +198,19 @@ export type StockVehicle = {
   placa?: string;
   images: { url: string; alt: string; hint?: string }[];
   description: string;
+
+  // Technical details (Marketplace sync)
+  hadMajorCrash?: boolean;
+  hasAC?: boolean;
+  isOperational?: boolean;
+  isSignatory?: boolean;
+  doorCount?: number;
+  is4x4?: boolean;
+  hasSoundSystem?: boolean;
+  isArmored?: boolean;
+  acceptsTradeIn?: boolean;
+  ownerCount?: number;
+  tireLife?: number;
 
   // Stock-specific fields
   estado_stock: StockStatus;
@@ -203,6 +228,9 @@ export type StockVehicle = {
 
   // Assigned seller
   asignado_a?: string; // staffId
+
+  // Extra legal/document info (for delivery notes)
+  info_extra?: VehicleInfoExtra;
 
   // Link to public listing
   publicacion_web_id?: string;

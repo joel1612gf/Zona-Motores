@@ -20,7 +20,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, MailCheck, MailWarning, ShieldCheck, Phone, FileText, UploadCloud, Crown, Zap, Shield, ArrowUpRight, Store } from 'lucide-react';
+import { Loader2, MailCheck, MailWarning, ShieldCheck, Phone, FileText, UploadCloud, Crown, Zap, Shield, ArrowUpRight, Store, Lock } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { useSubscription } from '@/context/subscription-context';
@@ -128,6 +128,38 @@ export default function ProfilePage() {
   }, [isAuthLoading, user, router]);
 
   const isDealer = useMemo(() => (profileData as any)?.accountType === 'dealer', [profileData]);
+
+  // Detect if this user owns a Business SaaS concesionario
+  const [saasData, setSaasData] = useState<{ slug: string } | null>(null);
+  const isSaaSAccount = !!saasData;
+  const saasSlug = saasData?.slug || '';
+
+  useEffect(() => {
+    const detectSaaS = async () => {
+      // Wait until auth is fully loaded before querying
+      if (isAuthLoading || !user) {
+        console.log('[Profile] Skipping SaaS detection — auth loading:', isAuthLoading, 'user:', !!user);
+        return;
+      }
+      console.log('[Profile] Detecting SaaS for uid:', user.uid);
+      try {
+        const q = query(collection(firestore, 'concesionarios'), where('owner_uid', '==', user.uid));
+        const snap = await getDocs(q);
+        console.log('[Profile] SaaS query result:', snap.size, 'docs');
+        if (!snap.empty) {
+          const d = snap.docs[0].data();
+          console.log('[Profile] Found concesionario slug:', d.slug);
+          setSaasData({ slug: d.slug || '' });
+        } else {
+          console.log('[Profile] No concesionario found for this user');
+          setSaasData(null);
+        }
+      } catch (err) {
+        console.error('[Profile] SaaS detection error:', err);
+      }
+    };
+    detectSaaS();
+  }, [user, firestore, isAuthLoading]);
 
   useEffect(() => {
     const data = profileData as any;
@@ -640,6 +672,29 @@ export default function ProfilePage() {
       )}
 
       <h1 className="font-headline text-3xl font-bold mb-8">Mi Perfil</h1>
+
+      {/* SaaS account lock banner */}
+      {isSaaSAccount && (
+        <div className="mb-8 p-4 rounded-xl border border-blue-200 bg-blue-50/60 dark:bg-blue-900/20 dark:border-blue-800 flex gap-3 items-start">
+          <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/50 shrink-0">
+            <Lock className="h-5 w-5 text-blue-600" />
+          </div>
+          <div className="flex-1">
+            <p className="font-semibold text-blue-900 dark:text-blue-200">Perfil gestionado por el concesionario</p>
+            <p className="text-sm text-blue-700 dark:text-blue-400 mt-0.5">
+              Este usuario está vinculado a un concesionario Business SaaS. Los datos del perfil solo pueden ser editados por el dueño del concesionario desde el panel de administración.
+            </p>
+            {saasSlug && (
+              <Link href={`/business/${saasSlug}`} className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:underline mt-2">
+                <Store className="h-3.5 w-3.5" />
+                Ir al Panel del Concesionario
+                <ArrowUpRight className="h-3 w-3" />
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-8 md:grid-cols-3 items-start">
         <div className="md:col-span-2">
           <form onSubmit={handleSubmit(onSaveChanges)} className="space-y-8">
@@ -651,7 +706,7 @@ export default function ProfilePage() {
               <CardContent className="space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="displayName">Nombre Completo o del Concesionario</Label>
-                  <Input id="displayName" {...register('displayName')} />
+                  <Input id="displayName" {...register('displayName')} disabled={isSaaSAccount} />
                   {errors.displayName && <p className="text-sm text-destructive">{errors.displayName.message}</p>}
                 </div>
                 <div className="space-y-2">
@@ -714,6 +769,14 @@ export default function ProfilePage() {
                   </div>
                 )}
               </CardContent>
+              {isSaaSAccount && (
+                <div className="px-6 pb-4">
+                  <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <Lock className="h-3 w-3" />
+                    Campos bloqueados. Edítalos desde el panel del concesionario.
+                  </p>
+                </div>
+              )}
             </Card>
 
             {isDealer && (
@@ -755,18 +818,25 @@ export default function ProfilePage() {
             )}
 
             <CardFooter className="px-0">
-              <div className="flex items-center gap-4">
-                <Button type="submit" disabled={isSubmitting || uploadProgress !== null || isProfileLoading || isFormLoading}>
-                  {(isSubmitting || uploadProgress !== null) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Guardar Cambios
-                </Button>
-                {uploadProgress !== null && (
-                  <div className="w-48">
-                    <Progress value={uploadProgress} className="h-2" />
-                    <p className="text-xs text-muted-foreground mt-1">Subiendo... {uploadProgress.toFixed(0)}%</p>
-                  </div>
-                )}
-              </div>
+              {isSaaSAccount ? (
+                <p className="text-sm text-muted-foreground flex items-center gap-2">
+                  <Lock className="h-4 w-4" />
+                  Solo el dueño puede guardar cambios desde el Business SaaS.
+                </p>
+              ) : (
+                <div className="flex items-center gap-4">
+                  <Button type="submit" disabled={isSubmitting || uploadProgress !== null || isProfileLoading || isFormLoading}>
+                    {(isSubmitting || uploadProgress !== null) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Guardar Cambios
+                  </Button>
+                  {uploadProgress !== null && (
+                    <div className="w-48">
+                      <Progress value={uploadProgress} className="h-2" />
+                      <p className="text-xs text-muted-foreground mt-1">Subiendo... {uploadProgress.toFixed(0)}%</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </CardFooter>
           </form>
         </div>
