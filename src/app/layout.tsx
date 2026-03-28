@@ -26,6 +26,9 @@ export const metadata: Metadata = {
     template: '%s | Zona Motores',
   },
   description: 'El mercado #1 para comprar y vender carros, camionetas y motos en Venezuela. Encuentra tu próximo vehículo de forma segura, rápida y fácil. Anuncios verificados y precios reales.',
+  icons: {
+    icon: '/favicon.png',
+  },
 };
 
 

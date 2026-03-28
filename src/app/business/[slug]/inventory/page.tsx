@@ -22,6 +22,7 @@ import {
   BookmarkCheck,
   CheckCircle2,
   Car,
+  PauseCircle,
 } from 'lucide-react';
 import Image from 'next/image';
 import type { StockVehicle, StockStatus } from '@/lib/business-types';
@@ -31,6 +32,7 @@ import { formatCurrency } from '@/lib/utils';
 const STATUS_CONFIG: Record<StockStatus, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
   privado_taller: { label: 'En Taller', color: 'bg-yellow-500/10 text-yellow-700 border-yellow-500/30', icon: Wrench },
   publico_web: { label: 'Publicado', color: 'bg-green-500/10 text-green-700 border-green-500/30', icon: Globe },
+  pausado: { label: 'Pausado', color: 'bg-orange-500/10 text-orange-700 border-orange-500/30', icon: PauseCircle },
   reservado: { label: 'Reservado', color: 'bg-blue-500/10 text-blue-700 border-blue-500/30', icon: BookmarkCheck },
   vendido: { label: 'Vendido', color: 'bg-gray-500/10 text-gray-500 border-gray-500/30', icon: CheckCircle2 },
 };

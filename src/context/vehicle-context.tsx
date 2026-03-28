@@ -102,7 +102,8 @@ export function VehicleProvider({ children }: { children: ReactNode }) {
         }
 
         // Auto-delete paused listings older than DELETE_THRESHOLD_DAYS
-        if (listing.status === 'paused' && daysSinceCreation > DELETE_THRESHOLD_DAYS) {
+        // EXCLUDE SaaS: They manage their own lifecycle
+        if (listing.status === 'paused' && daysSinceCreation > DELETE_THRESHOLD_DAYS && !listing.seller?.isSaaSBusiness) {
           promises.push(
             (async () => {
               // Notify before deleting
@@ -128,7 +129,8 @@ export function VehicleProvider({ children }: { children: ReactNode }) {
         }
 
         // Auto-pause active listings older than PAUSE_THRESHOLD_DAYS
-        if (listing.status === 'active' && daysSinceCreation > PAUSE_THRESHOLD_DAYS) {
+        // EXCLUDE SaaS: They manage their own lifecycle
+        if (listing.status === 'active' && daysSinceCreation > PAUSE_THRESHOLD_DAYS && !listing.seller?.isSaaSBusiness) {
           promises.push(
             (async () => {
               await updateDoc(vehicleRef, { status: 'paused' });
@@ -145,7 +147,8 @@ export function VehicleProvider({ children }: { children: ReactNode }) {
         }
 
         // Warn about upcoming pause (between day 6 and 7)
-        if (listing.status === 'active' && daysSinceCreation > EXPIRING_SOON_THRESHOLD_DAYS && daysSinceCreation <= PAUSE_THRESHOLD_DAYS) {
+        // EXCLUDE SaaS: They manage their own lifecycle
+        if (listing.status === 'active' && daysSinceCreation > EXPIRING_SOON_THRESHOLD_DAYS && daysSinceCreation <= PAUSE_THRESHOLD_DAYS && !listing.seller?.isSaaSBusiness) {
           promises.push(
             createNotificationIfNotExists(firestore, listing.sellerId, 'listing_expiring_soon', listing.id, {
               title: 'Tu publicación se pausará pronto',

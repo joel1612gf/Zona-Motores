@@ -33,6 +33,7 @@ import {
     RefreshCw,
     AlertTriangle,
     Clock,
+    User,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { doc, deleteDoc, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
@@ -124,9 +125,13 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
     const handleToggleStatus = async () => {
         if (!user) return;
         setIsTogglingStatus(true);
+        const isSaaS = vehicle.seller?.isSaaSBusiness === true;
         const newStatus = vehicle.status === 'active' ? 'paused' : 'active';
+        
         try {
-            const vehicleRef = doc(firestore, 'users', user.uid, 'vehicleListings', vehicle.id);
+            // Use the correct owner UID (SaaS owner or current user)
+            const ownerUid = isSaaS ? (vehicle.seller.uid || user.uid) : user.uid;
+            const vehicleRef = doc(firestore, 'users', ownerUid, 'vehicleListings', vehicle.id);
 
             const updatePayload: { status: string; createdAt?: any } = { status: newStatus };
             // If reactivating, reset the timer.
@@ -135,6 +140,20 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
             }
 
             await updateDoc(vehicleRef, updatePayload);
+
+            // SYNC BACK TO BUSINESS SAAS
+            if (isSaaS && vehicle.seller?.businessId) {
+                const businessId = vehicle.seller.businessId;
+                const inventoryRef = doc(firestore, 'concesionarios', businessId, 'inventario', vehicle.id);
+                // Map marketplace 'paused' -> business 'pausado', 'active' -> 'publico_web'
+                const newStockStatus = newStatus === 'active' ? 'publico_web' : 'pausado';
+                
+                await updateDoc(inventoryRef, {
+                    estado_stock: newStockStatus,
+                    updated_at: serverTimestamp()
+                });
+            }
+
             toast({
                 title: `Publicación ${newStatus === 'active' ? 'Reactivada' : 'Pausada'}`,
                 description: `Tu ${vehicle.make} ${vehicle.model} ahora está ${newStatus === 'active' ? 'activa de nuevo' : 'pausada'}.`,
@@ -193,11 +212,12 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
 
     const currentStatus = statusMap[vehicle.status || 'active'];
     const isPromotionActive = vehicle.promotionExpiresAt && vehicle.promotionExpiresAt.toDate() > new Date();
-    const isLegacy = vehicle.promotionExpiresAt === undefined;
+    const isSaaS = vehicle.seller?.isSaaSBusiness === true;
+    const isLegacy = vehicle.promotionExpiresAt === undefined && !isSaaS;
 
     // Calculate days until auto-pause (7-day window from creation)
     const daysUntilPause = (() => {
-        if (vehicle.status !== 'active' || !vehicle.createdAt) return null;
+        if (vehicle.status !== 'active' || !vehicle.createdAt || isSaaS) return null;
         const createdDate = vehicle.createdAt.toDate();
         const msPerDay = 1000 * 60 * 60 * 24;
         const daysSinceCreation = Math.floor((Date.now() - createdDate.getTime()) / msPerDay);
@@ -255,6 +275,20 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
                             </Badge>
                         );
                     })()}
+                    {isSaaS && (
+                        <div className="flex flex-wrap gap-2 mt-1">
+                            <Badge variant="secondary" className="border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-400 w-fit flex items-center gap-1">
+                                <RefreshCw className="h-3 w-3 animate-pulse" />
+                                Gestionado vía Business SaaS
+                            </Badge>
+                            {vehicle.assignedSeller?.nombre && (
+                                <Badge variant="outline" className="border-purple-200 bg-purple-50/50 text-purple-700 dark:border-purple-900 dark:bg-purple-900/20 dark:text-purple-300 w-fit flex items-center gap-1">
+                                    <User className="h-3 w-3" />
+                                    Vendedor: {vehicle.assignedSeller.nombre}
+                                </Badge>
+                            )}
+                        </div>
+                    )}
                     <p className="font-headline text-lg font-semibold text-primary mt-1">{formatCurrency(vehicle.priceUSD)}</p>
                     <p className="text-sm text-muted-foreground mt-1">{vehicle.mileage.toLocaleString()} km &middot; {vehicle.location.city}</p>
                     {daysUntilPause !== null && (
@@ -287,6 +321,20 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
                     );
                 })()}
                 <p className="font-headline text-lg font-semibold text-primary mt-1">{formatCurrency(vehicle.priceUSD)}</p>
+                {isSaaS && (
+                    <div className="flex flex-wrap gap-2 mt-2 mb-1">
+                        <Badge variant="secondary" className="border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-400 text-[10px] py-0 h-5 flex items-center gap-1">
+                            <RefreshCw className="h-3 w-3 animate-pulse" />
+                            SaaS
+                        </Badge>
+                        {vehicle.assignedSeller?.nombre && (
+                            <Badge variant="outline" className="border-purple-200 bg-purple-50/50 text-purple-700 dark:border-purple-900 dark:bg-purple-900/20 dark:text-purple-300 text-[10px] py-0 h-5 flex items-center gap-1">
+                                <User className="h-3 w-3" />
+                                {vehicle.assignedSeller.nombre}
+                            </Badge>
+                        )}
+                    </div>
+                )}
                 <p className="text-sm text-muted-foreground mt-1">{vehicle.mileage.toLocaleString()} km &middot; {vehicle.location.city}</p>
                 {daysUntilPause !== null && (
                     <p className={cn(
@@ -359,87 +407,101 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
                     </Alert>
                 ) : (
                     <div className="flex flex-wrap items-center gap-2 mt-4">
+                        {/* Always show "VER" button */}
                         <Button asChild variant="outline" size="sm">
                             <Link href={`/listings/${vehicle.id}`}>
                                 <Eye className="mr-1.5 h-4 w-4" />
                                 Ver
                             </Link>
                         </Button>
-                        <Button asChild variant="outline" size="sm">
-                            <Link href={`/listings/${vehicle.id}/edit`}>
-                                <Pencil className="mr-1.5 h-4 w-4" />
-                                Editar
-                            </Link>
-                        </Button>
+
+                        {/* EDIT and DELETE: ONLY for non-SaaS */}
+                        {!isSaaS && (
+                            <>
+                                <Button asChild variant="outline" size="sm">
+                                    <Link href={`/listings/${vehicle.id}/edit`}>
+                                        <Pencil className="mr-1.5 h-4 w-4" />
+                                        Editar
+                                    </Link>
+                                </Button>
+
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <Button variant="outline" size="sm" disabled={isDeleting}>
+                                            <Trash2 className="mr-1.5 h-4 w-4" />
+                                            Borrar
+                                        </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>¿Estás seguro que quieres eliminar esta publicación?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                Esta acción no se puede deshacer. Esto eliminará permanentemente la publicación
+                                                de "{`${vehicle.year} ${vehicle.make} ${vehicle.model}`}" de nuestros servidores.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                            <AlertDialogAction
+                                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                                onClick={handleDelete}
+                                                disabled={isDeleting}>
+                                                {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                                Sí, eliminar
+                                            </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            </>
+                        )}
+
+                        {/* TOGGLE STATUS (Pause/Activate): Now available for ALL (including SaaS) */}
                         <Button variant="outline" size="sm" onClick={handleToggleStatus} disabled={isTogglingStatus || vehicle.status === 'sold'}>
                             {isTogglingStatus ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> :
                                 (vehicle.status === 'active' ? <Pause className="mr-1.5 h-4 w-4" /> : <Play className="mr-1.5 h-4 w-4" />)}
                             {vehicle.status === 'active' ? 'Pausar' : 'Activar'}
                         </Button>
 
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button variant="outline" size="sm" disabled={isDeleting}>
-                                    <Trash2 className="mr-1.5 h-4 w-4" />
-                                    Borrar
-                                </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>¿Estás seguro que quieres eliminar esta publicación?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                        Esta acción no se puede deshacer. Esto eliminará permanentemente la publicación
-                                        de "{`${vehicle.year} ${vehicle.make} ${vehicle.model}`}" de nuestros servidores.
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction
-                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                        onClick={handleDelete}
-                                        disabled={isDeleting}>
-                                        {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        Sí, eliminar
-                                    </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
-
-                        {limits.maxPromotionsPerMonth === 0 ? (
-                            <Button asChild variant="secondary" size="sm">
-                                <Link href="/pricing">
-                                    <Rocket className="mr-1.5 h-4 w-4" />
-                                    Promocionar (Ver Planes)
-                                </Link>
-                            </Button>
-                        ) : (
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button variant="secondary" size="sm" disabled={isPromoting || isPromotionActive || !canPromote()}>
-                                        <Rocket className="mr-1.5 h-4 w-4" />
-                                        {isPromotionActive ? 'Promocionado' : `Promocionar (${promotionsRemaining})`}
+                        {/* PROMOTE (Only for non-SaaS or as per logic) */}
+                        {!isSaaS && (
+                            <>
+                                {limits.maxPromotionsPerMonth === 0 ? (
+                                    <Button asChild variant="secondary" size="sm">
+                                        <Link href="/pricing">
+                                            <Rocket className="mr-1.5 h-4 w-4" />
+                                            Promocionar (Ver Planes)
+                                        </Link>
                                     </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>Promocionar Anuncio</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                            Destaca tu anuncio y llega a más compradores. Los anuncios promocionados aparecen al principio de los resultados de búsqueda.
-                                            <br /><br />
-                                            <strong>Te quedan {promotionsRemaining} promociones este mes</strong> en tu plan.
-                                        </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <div className="grid grid-cols-2 gap-4 my-4">
-                                        <Button variant="outline" onClick={() => handlePromote(limits.promotionDays)} disabled={isPromoting}>
-                                            {isPromoting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                            {limits.promotionDays} Días
-                                        </Button>
-                                    </div>
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
+                                ) : (
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <Button variant="secondary" size="sm" disabled={isPromoting || isPromotionActive || !canPromote()}>
+                                                <Rocket className="mr-1.5 h-4 w-4" />
+                                                {isPromotionActive ? 'Promocionado' : `Promocionar (${promotionsRemaining})`}
+                                            </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>Promocionar Anuncio</AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                    Destaca tu anuncio y llega a más compradores. Los anuncios promocionados aparecen al principio de los resultados de búsqueda.
+                                                    <br /><br />
+                                                    <strong>Te quedan {promotionsRemaining} promociones este mes</strong> en tu plan.
+                                                </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <div className="grid grid-cols-2 gap-4 my-4">
+                                                <Button variant="outline" onClick={() => handlePromote(limits.promotionDays)} disabled={isPromoting}>
+                                                    {isPromoting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                                    {limits.promotionDays} Días
+                                                </Button>
+                                            </div>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
+                                )}
+                            </>
                         )}
 
                         {vehicle.marketplaceUrl && (

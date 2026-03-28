@@ -85,6 +85,18 @@ export function VehicleCard({ vehicle, isFeatured = false }: { vehicle: Vehicle;
         <CardContent className="px-2 pt-1 pb-2 sm:p-4 flex flex-col flex-grow">
           <div className="space-y-1">
             <h3 className="font-headline text-base sm:text-lg font-bold truncate">{`${vehicle.year} ${vehicle.make} ${vehicle.model}`}</h3>
+            {vehicle.seller.isSaaSBusiness && (
+                <div className="flex flex-wrap gap-1 mb-1">
+                    <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 hover:bg-blue-500/15 border-blue-500/20 text-[10px] py-0 px-2 h-5">
+                      Business SaaS
+                    </Badge>
+                    {vehicle.assignedSeller && (
+                      <Badge variant="secondary" className="bg-purple-500/10 text-purple-600 hover:bg-purple-500/15 border-purple-500/20 text-[10px] py-0 px-2 h-5 capitalize">
+                        {vehicle.assignedSeller.nombre}
+                      </Badge>
+                    )}
+                </div>
+            )}
             <p className="text-xs sm:text-sm text-muted-foreground">{vehicle.mileage.toLocaleString()} km</p>
           </div>
           <div className="flex-grow" />

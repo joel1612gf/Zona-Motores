@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useBusinessAuth } from '@/context/business-auth-context';
-import { doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, deleteDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,7 @@ import {
   TrendingUp,
   Package,
   UserRound,
+  PauseCircle,
 } from 'lucide-react';
 import Image from 'next/image';
 import {
@@ -50,6 +51,7 @@ import { formatCurrency } from '@/lib/utils';
 const STATUS_CONFIG: Record<StockStatus, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
   privado_taller: { label: 'En Taller', color: 'bg-yellow-500/10 text-yellow-700 border-yellow-500/30', icon: Wrench },
   publico_web: { label: 'Publicado', color: 'bg-green-500/10 text-green-700 border-green-500/30', icon: Globe },
+  pausado: { label: 'Pausado', color: 'bg-orange-500/10 text-orange-700 border-orange-500/30', icon: PauseCircle },
   reservado: { label: 'Reservado', color: 'bg-blue-500/10 text-blue-700 border-blue-500/30', icon: BookmarkCheck },
   vendido: { label: 'Vendido', color: 'bg-gray-500/10 text-gray-500 border-gray-500/30', icon: CheckCircle2 },
 };
@@ -121,6 +123,69 @@ export default function VehicleDetailPage() {
     try {
       const docRef = doc(firestore, 'concesionarios', concesionario.id, 'inventario', vehicle.id);
       await updateDoc(docRef, { estado_stock: newStatus });
+      
+      // SYNC TO MARKETPLACE
+      if (concesionario.owner_uid) {
+        const publicRef = doc(firestore, 'users', concesionario.owner_uid, 'vehicleListings', vehicle.id);
+        
+        if (newStatus === 'publico_web' || newStatus === 'pausado') {
+          // Prepare complete data (mostly based on current vehicle state)
+          const publicVehicleData = {
+            id: vehicle.id,
+            sellerId: concesionario.owner_uid,
+            make: vehicle.make,
+            model: vehicle.model,
+            year: vehicle.year,
+            priceUSD: vehicle.precio_venta,
+            mileage: vehicle.mileage,
+            bodyType: vehicle.bodyType || 'Sedán',
+            transmission: vehicle.transmission,
+            engine: vehicle.engine || 'N/A',
+            exteriorColor: vehicle.exteriorColor || 'Otro',
+            ownerCount: 1,
+            tireLife: 100,
+            hasAC: true,
+            hasSoundSystem: true,
+            hadMajorCrash: false,
+            isOperational: true,
+            isSignatory: true,
+            acceptsTradeIn: false,
+            description: vehicle.description || '',
+            images: vehicle.images || [],
+            seller: {
+              uid: concesionario.owner_uid,
+              displayName: concesionario.nombre_empresa,
+              accountType: 'dealer',
+              logoUrl: concesionario.logo_url || '',
+              heroUrl: concesionario.banner_url || '',
+              address: concesionario.direccion,
+              isVerified: true,
+              isSaaSBusiness: true,
+              saasSlug: concesionario.slug,
+              businessId: concesionario.id,
+              phone: concesionario.telefono || ''
+            },
+            location: {
+              city: 'Caracas', // Default to Caracas for now or use business location if exists
+              state: 'Miranda',
+              lat: concesionario.geolocalizacion?.latitude || 10.4806,
+              lon: concesionario.geolocalizacion?.longitude || -66.9036
+            },
+            asignado_a: vehicle.asignado_a || null,
+            assignedSeller: vehicle.asignado_a ? (() => {
+              const staff = staffList.find(s => s.id === vehicle.asignado_a);
+              return staff ? { nombre: staff.nombre, telefono: staff.telefono || '' } : null;
+            })() : null,
+            createdAt: (vehicle as any).created_at || serverTimestamp(),
+            status: newStatus === 'publico_web' ? 'active' : 'paused'
+          };
+          await setDoc(publicRef, publicVehicleData);
+        } else if (vehicle.estado_stock === 'publico_web' || vehicle.estado_stock === 'pausado') {
+          // It was in the marketplace, now it's not -> delete
+          await deleteDoc(publicRef);
+        }
+      }
+
       setVehicle({ ...vehicle, estado_stock: newStatus });
       toast({ title: 'Estado actualizado', description: `El vehículo ahora está: ${STATUS_CONFIG[newStatus].label}` });
     } catch (error) {
@@ -388,6 +453,7 @@ export default function VehicleDetailPage() {
                   <SelectContent>
                     <SelectItem value="privado_taller">🔧 En Taller</SelectItem>
                     <SelectItem value="publico_web">🌐 Publicado</SelectItem>
+                    <SelectItem value="pausado">🟠 Pausado</SelectItem>
                     <SelectItem value="reservado">📌 Reservado</SelectItem>
                     <SelectItem value="vendido">✅ Vendido</SelectItem>
                   </SelectContent>

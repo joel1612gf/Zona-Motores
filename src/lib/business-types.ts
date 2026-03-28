@@ -151,7 +151,7 @@ export type StaffMember = {
   created_at: Timestamp;
 };
 
-export type StockStatus = 'privado_taller' | 'publico_web' | 'reservado' | 'vendido';
+export type StockStatus = 'privado_taller' | 'publico_web' | 'pausado' | 'reservado' | 'vendido';
 
 export type GastoCategoria = 'mecanica' | 'pintura' | 'lavado' | 'tapiceria' | 'cauchos_frenos' | 'electrico' | 'otros';
 

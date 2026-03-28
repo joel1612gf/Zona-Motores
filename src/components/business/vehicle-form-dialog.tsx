@@ -336,7 +336,7 @@ export function VehicleFormDialog({ open, onOpenChange, editingVehicle, concesio
         } else {
           const publicRef = doc(firestore, 'users', concesionario.owner_uid, 'vehicleListings', finalVehicleId);
           
-          if (estadoStock === 'publico_web') {
+          if (estadoStock === 'publico_web' || estadoStock === 'pausado') {
             // Add or update in public web
             const publicVehicleData = {
               id: finalVehicleId,
@@ -385,7 +385,7 @@ export function VehicleFormDialog({ open, onOpenChange, editingVehicle, concesio
                 return staff ? { nombre: staff.nombre, telefono: staff.telefono || '' } : null;
               })() : null,
               createdAt: (editingVehicle as any)?.created_at || serverTimestamp(),
-              status: 'active'
+              status: estadoStock === 'publico_web' ? 'active' : 'paused'
             };
             await setDoc(publicRef, publicVehicleData);
           } else if (editingVehicle && (editingVehicle as any).estado_stock === 'publico_web') {
@@ -579,6 +579,7 @@ export function VehicleFormDialog({ open, onOpenChange, editingVehicle, concesio
                   <SelectContent>
                     <SelectItem value="privado_taller">En Taller</SelectItem>
                     <SelectItem value="publico_web">Publicado</SelectItem>
+                    <SelectItem value="pausado">Pausado</SelectItem>
                     <SelectItem value="reservado">Reservado</SelectItem>
                     <SelectItem value="vendido">Vendido</SelectItem>
                   </SelectContent>
