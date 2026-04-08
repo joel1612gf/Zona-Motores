@@ -129,36 +129,30 @@ export function PurchaseHistoryDialog({
       const element = document.getElementById('history-print-root');
       if (!element) return;
 
+      // Make the element visible but positioned far off-screen so it has
+      // full computed styles. Cloning from display:none causes layout issues.
+      element.style.display = 'block';
+      element.style.position = 'fixed';
+      element.style.top = '0px';
+      element.style.left = '-99999px';
+      element.style.zIndex = '-9999';
+
       try {
-        // Clone only the needed page based on the requested mode.
         const printRoot = element.querySelector('.print-root');
         if (!printRoot) return;
 
         // Determine which page div to capture: first child = summary, second child = retention.
         const pageDivs = Array.from(printRoot.children) as HTMLElement[];
-        let targetDiv: HTMLElement | null = null;
+        let targetEl: HTMLElement | null = null;
         if (mode === 'summary') {
-          targetDiv = pageDivs[0] ?? null;
+          targetEl = pageDivs[0] ?? null;
         } else if (mode === 'retention') {
-          // When both pages are rendered, the retention page is the second child.
-          // If only retention is rendered (printMode === 'retention'), it will be the first child.
-          targetDiv = pageDivs.length > 1 ? pageDivs[1] : pageDivs[0] ?? null;
+          targetEl = pageDivs.length > 1 ? pageDivs[1] : pageDivs[0] ?? null;
         }
-        if (!targetDiv) return;
+        if (!targetEl) return;
 
-        const wrapper = document.createElement('div');
-        wrapper.style.position = 'absolute';
-        wrapper.style.left = '-9999px';
-        wrapper.style.top = '0';
-        wrapper.style.width = '210mm';
-        wrapper.style.height = '297mm';
-        wrapper.style.overflow = 'hidden';
-        document.body.appendChild(wrapper);
-
-        const clone = targetDiv.cloneNode(true) as HTMLElement;
-        wrapper.appendChild(clone);
-
-        const images = clone.querySelectorAll('img');
+        // Wait for images inside the target element to load
+        const images = targetEl.querySelectorAll('img');
         await Promise.all(Array.from(images).map(img => {
           if (img.complete) return Promise.resolve();
           return new Promise(resolve => {
@@ -167,15 +161,16 @@ export function PurchaseHistoryDialog({
           });
         }));
 
-        // Use html2canvas + jsPDF directly so we control the exact capture dimensions.
         // A4 at 96 dpi: 210mm × 297mm → 794px × 1123px
         const A4_W = Math.round(210 * 96 / 25.4); // 794
         const A4_H = Math.round(297 * 96 / 25.4); // 1123
 
+        const SCALE = 2;
         const html2canvasLib = (await import('html2canvas')).default;
-        const canvas = await html2canvasLib(clone, {
-          scale: 2,
+        const canvas = await html2canvasLib(targetEl, {
+          scale: SCALE,
           useCORS: true,
+          allowTaint: true,
           logging: false,
           scrollX: 0,
           scrollY: 0,
@@ -185,13 +180,13 @@ export function PurchaseHistoryDialog({
           windowHeight: A4_H,
         });
 
-        // Crop the canvas to exact A4 dimensions to avoid extra height.
+        // Crop canvas at full 2x resolution to preserve sharpness.
         const croppedCanvas = document.createElement('canvas');
-        croppedCanvas.width = A4_W;
-        croppedCanvas.height = A4_H;
+        croppedCanvas.width = A4_W * SCALE;
+        croppedCanvas.height = A4_H * SCALE;
         const ctx = croppedCanvas.getContext('2d');
         if (ctx) {
-          ctx.drawImage(canvas, 0, 0, A4_W, A4_H, 0, 0, A4_W, A4_H);
+          ctx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, A4_W * SCALE, A4_H * SCALE);
         }
 
         const { jsPDF } = await import('jspdf');
@@ -200,23 +195,25 @@ export function PurchaseHistoryDialog({
           : `Retencion_IVA_${(compra as any).numero_comprobante || 'N_A'}.pdf`;
 
         const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-        // Ensure we are on the first (and only) page
-        pdf.setPage(1);
-        const imgData = croppedCanvas.toDataURL('image/jpeg', 0.98);
+        const imgData = croppedCanvas.toDataURL('image/jpeg', 0.85);
         pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
-        // Remove any extra pages that might have been added automatically (keep only the first page)
         if (pdf.getNumberOfPages && pdf.getNumberOfPages() > 1) {
           while (pdf.getNumberOfPages() > 1) {
             pdf.deletePage(pdf.getNumberOfPages());
           }
         }
         pdf.save(filename);
-
-        document.body.removeChild(wrapper);
       } catch (err) {
         console.error('Error generating PDF:', err);
+      } finally {
+        // Always restore the element to its hidden state
+        element.style.display = 'none';
+        element.style.position = 'absolute';
+        element.style.top = '0';
+        element.style.left = '0';
+        element.style.zIndex = '9999';
       }
-    }, 300);
+    }, 400);
   };
 
   const filteredCompras = useMemo(() => {
@@ -570,7 +567,7 @@ export function PurchaseHistoryDialog({
             <div className="print-root text-black font-sans bg-white w-[210mm]">
               {/* PAGE 1: PURCHASE SUMMARY */}
               {(printMode === 'both' || printMode === 'summary') && (
-                <div className={hasRetention && printMode === 'both' ? 'page-break-after' : ''} style={{ padding: '10mm 15mm 0 15mm', height: '297mm', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', position: 'relative' }}>
+                <div className={hasRetention && printMode === 'both' ? 'page-break-after' : ''} style={{ padding: '8mm 15mm 5mm 15mm', height: '297mm', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', position: 'relative' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
                     <div>{concesionario?.logo_url
                       ? <img src={concesionario.logo_url} alt="Logo" style={{ width: 65, height: 65, objectFit: 'contain' }} />
@@ -596,6 +593,12 @@ export function PurchaseHistoryDialog({
                       <p style={{ margin: '2px 0' }}><strong>Tasa BCV:</strong> {printData.tasa_cambio ? `Bs ${printData.tasa_cambio.toFixed(2)}` : 'N/A'}</p>
                       <p style={{ margin: '2px 0' }}><strong>Cargado por:</strong> {printData.creado_por || 'Administrador'}</p>
                       {hasRetention && <p style={{ margin: '2px 0' }}><strong>N° Retención IVA:</strong> {(printData as any).numero_comprobante}</p>}
+                    </div>
+                    {/* Disclaimer centered at the bottom of the grid box */}
+                    <div style={{ gridColumn: '1 / span 2', textAlign: 'center', marginTop: 8, borderTop: '0.5px solid #ffffffff', paddingTop: 6 }}>
+                      <p style={{ margin: 0, fontSize: 10, color: '#9ca3af', fontStyle: 'italic' }}>
+                        Este documento no tiene validez fiscal.
+                      </p>
                     </div>
                   </div>
                   <h3 style={{ fontWeight: 'bold', borderBottom: '1.5px solid #dbeafe', paddingBottom: 4, marginBottom: 7, fontSize: 12, color: '#2563eb', textTransform: 'uppercase' }}>Lista de Productos</h3>
@@ -655,15 +658,13 @@ export function PurchaseHistoryDialog({
                       )}
                     </div>
                   </div>
-                  <div style={{ marginTop: 'auto', textAlign: 'center', paddingBottom: '8mm', paddingTop: '4mm' }}>
-                    <p style={{ fontSize: 10, color: '#9ca3af', margin: 0 }}>www.zonamotores.com</p>
-                  </div>
+
                 </div>
               )}
 
               {/* PAGE 2: COMPROBANTE DE RETENCIÓN (conditional) */}
               {hasRetention && (printMode === 'both' || printMode === 'retention') && (
-                <div style={{ padding: '10mm 15mm 0 15mm', height: '297mm', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', position: 'relative' }}>
+                <div style={{ padding: '8mm 15mm 5mm 15mm', height: '284mm', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', position: 'relative' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
                     <div>
                       {concesionario?.logo_url ? (
@@ -737,11 +738,11 @@ export function PurchaseHistoryDialog({
                       </tr>
                     </tbody>
                   </table>
-                  <p style={{ fontSize: 10, color: '#6b7280', textAlign: 'center', fontStyle: 'italic', padding: '10px 0' }}>
+                  <p style={{ fontSize: 9, color: '#6b7280', textAlign: 'center', fontStyle: 'italic', padding: '4px 0' }}>
                     Este comprobante se emite en función a lo establecido en la Providencia Administrativa N° SNAT/2025/000054 de fecha 02/07/2025 Publicada en Gaceta Oficial Nro. 43.171 de fecha 16 de Julio de 2025
                   </p>
-                  <div style={{ marginTop: 'auto', paddingBottom: '8mm' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 50, marginBottom: '10mm' }}>
+                  <div style={{ marginTop: 'auto', paddingBottom: 0 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 40, marginBottom: '2mm' }}>
                       <div style={{ borderTop: '1px solid #374151', paddingTop: 8, textAlign: 'center', fontSize: 11 }}>
                         <p style={{ margin: 0 }}>Firma y Sello Agente de Retención</p>
                         <p style={{ margin: 0, color: '#6b7280' }}>({concesionario?.nombre_empresa})</p>
@@ -751,7 +752,7 @@ export function PurchaseHistoryDialog({
                         <p style={{ margin: 0, color: '#6b7280' }}>Nombre/Firma/Cédula/Fecha</p>
                       </div>
                     </div>
-                    <p style={{ textAlign: 'center', fontSize: 10, color: '#9ca3af', margin: 0 }}>www.zonamotores.com</p>
+
                   </div>
                 </div>
               )}
