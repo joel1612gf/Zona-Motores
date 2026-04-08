@@ -25,7 +25,8 @@ export type BusinessModule =
   | 'consignment'
   | 'calendar'
   | 'web_sync'
-  | 'commissions';
+  | 'commissions'
+  | 'products';
 
 /**
  * Permission matrix defining which modules each role can access.
@@ -46,6 +47,7 @@ export const ROLE_PERMISSIONS: Record<BusinessRole, Record<BusinessModule, Permi
     calendar: 'full',
     web_sync: 'full',
     commissions: 'full',
+    products: 'full',
   },
   encargado: {
     dashboard: 'read',
@@ -59,6 +61,7 @@ export const ROLE_PERMISSIONS: Record<BusinessRole, Record<BusinessModule, Permi
     calendar: 'full',
     web_sync: 'full',
     commissions: 'read',
+    products: 'full',
   },
   secretario: {
     dashboard: false,
@@ -72,6 +75,7 @@ export const ROLE_PERMISSIONS: Record<BusinessRole, Record<BusinessModule, Permi
     calendar: 'read',
     web_sync: 'full',
     commissions: false,
+    products: 'read',
   },
   vendedor: {
     dashboard: false,
@@ -85,6 +89,7 @@ export const ROLE_PERMISSIONS: Record<BusinessRole, Record<BusinessModule, Permi
     calendar: 'full',
     web_sync: false,
     commissions: 'own',
+    products: 'read',
   },
   cajero: {
     dashboard: false,
@@ -98,6 +103,7 @@ export const ROLE_PERMISSIONS: Record<BusinessRole, Record<BusinessModule, Permi
     calendar: false,
     web_sync: false,
     commissions: false,
+    products: 'read',
   },
 };
 
@@ -136,6 +142,8 @@ export type ConcesionarioConfig = {
   estructura_comision: number; // Default commission percentage for sellers
   metodos_pago: string[]; // e.g. ['Zelle', 'Pago Móvil', 'Efectivo', 'Transferencia']
   margen_consignacion_porcentaje: number; // Default markup for consignment vehicles
+  tasa_cambio_manual?: number; // Manual Bs/$ exchange rate
+  tasa_cambio_auto?: boolean; // If true, auto-fetch from BCV
 };
 
 export type StaffMember = {
@@ -284,6 +292,94 @@ export type CierreCaja = {
   aprobado_por_id?: string;
   aprobado_por_nombre?: string;
   aprobado_at?: Timestamp;
+};
+
+// ==================== PRODUCTS MODULE ====================
+
+export type ProductCategory =
+  | 'aceites_lubricantes'
+  | 'repuestos_mecanicos'
+  | 'electrico_electronico'
+  | 'accesorios'
+  | 'herramientas'
+  | 'limpieza_detailing'
+  | 'otros';
+
+export const PRODUCT_CATEGORY_LABELS: Record<ProductCategory, string> = {
+  aceites_lubricantes: 'Aceites y Lubricantes',
+  repuestos_mecanicos: 'Repuestos Mecánicos',
+  electrico_electronico: 'Eléctrico / Electrónico',
+  accesorios: 'Accesorios',
+  herramientas: 'Herramientas',
+  limpieza_detailing: 'Limpieza y Detailing',
+  otros: 'Otros',
+};
+
+export type Producto = {
+  id: string;
+  codigo: string; // barcode or internal code
+  nombre: string;
+  descripcion?: string;
+  categoria: ProductCategory;
+  precio_venta_usd: number;
+  costo_usd: number; // last purchase cost
+  stock_actual: number;
+  stock_minimo: number;
+  aplica_iva: boolean;
+  proveedor_id?: string;
+  created_at: Timestamp;
+  updated_at?: Timestamp;
+};
+
+export type Proveedor = {
+  id: string;
+  nombre: string;
+  rif: string;
+  isRetentionAgent: boolean; // True if subject to IVA retention
+  porcentaje_retencion_iva: number; // 0, 75, or 100
+  direccion?: string;
+  contacto_nombre?: string;
+  contacto_telefono?: string;
+  created_at: Timestamp;
+};
+
+export type CompraItem = {
+  producto_id: string;
+  codigo?: string;
+  nombre: string;
+  cantidad: number;
+  costo_unitario_usd: number;
+  subtotal_usd: number;
+  aplica_iva: boolean;
+};
+
+export type Compra = {
+  id: string;
+  proveedor_id: string;
+  proveedor_nombre: string;
+  proveedor_rif?: string;
+  proveedor_direccion?: string;
+  numero_factura?: string;
+  numero_control?: string;
+  fecha_factura?: string; // ISO date string e.g. "2026-03-15"
+  items: CompraItem[];
+  tipo_pago: 'contado' | 'credito';
+  dias_credito?: number;
+  fecha_vencimiento?: Timestamp;
+  subtotal_usd: number;
+  iva_monto: number;
+  total_usd: number;
+  total_bs: number;
+  tasa_cambio: number;
+  moneda_original?: 'usd' | 'bs';
+  estado: 'pendiente' | 'pagada';
+  creado_por: string;
+  created_at: Timestamp;
+  // Retention fields (only present when proveedor is a retention agent and iva > 0)
+  numero_comprobante?: string; // e.g. "20260400000001"
+  porcentaje_retencion_aplicado?: number; // 75 or 100
+  monto_retenido?: number; // iva_monto * porcentaje / 100
+  neto_a_pagar?: number; // total_usd - monto_retenido
 };
 
 // ==================== HELPERS ====================

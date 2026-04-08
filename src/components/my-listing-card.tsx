@@ -277,10 +277,7 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
                     })()}
                     {isSaaS && (
                         <div className="flex flex-wrap gap-2 mt-1">
-                            <Badge variant="secondary" className="border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-400 w-fit flex items-center gap-1">
-                                <RefreshCw className="h-3 w-3 animate-pulse" />
-                                Gestionado vía Business SaaS
-                            </Badge>
+
                             {vehicle.assignedSeller?.nombre && (
                                 <Badge variant="outline" className="border-purple-200 bg-purple-50/50 text-purple-700 dark:border-purple-900 dark:bg-purple-900/20 dark:text-purple-300 w-fit flex items-center gap-1">
                                     <User className="h-3 w-3" />
@@ -323,10 +320,7 @@ export function MyListingCard({ vehicle }: { vehicle: Vehicle }) {
                 <p className="font-headline text-lg font-semibold text-primary mt-1">{formatCurrency(vehicle.priceUSD)}</p>
                 {isSaaS && (
                     <div className="flex flex-wrap gap-2 mt-2 mb-1">
-                        <Badge variant="secondary" className="border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-400 text-[10px] py-0 h-5 flex items-center gap-1">
-                            <RefreshCw className="h-3 w-3 animate-pulse" />
-                            SaaS
-                        </Badge>
+
                         {vehicle.assignedSeller?.nombre && (
                             <Badge variant="outline" className="border-purple-200 bg-purple-50/50 text-purple-700 dark:border-purple-900 dark:bg-purple-900/20 dark:text-purple-300 text-[10px] py-0 h-5 flex items-center gap-1">
                                 <User className="h-3 w-3" />

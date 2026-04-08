@@ -9,6 +9,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -46,7 +48,7 @@ export default function InventoryPage() {
   const params = useParams();
   const router = useRouter();
   const slug = params.slug as string;
-  const { concesionario, hasPermission, canSeeCosts } = useBusinessAuth();
+  const { concesionario, hasPermission, canSeeCosts, currentRole } = useBusinessAuth();
   const firestore = useFirestore();
   const { toast } = useToast();
 
@@ -58,8 +60,23 @@ export default function InventoryPage() {
   const [editingVehicle, setEditingVehicle] = useState<StockVehicle | null>(null);
   const [costsTarget, setCostsTarget] = useState<StockVehicle | null>(null);
   const [infoExtraTarget, setInfoExtraTarget] = useState<StockVehicle | null>(null);
+  const [vendorModeEnabled, setVendorModeEnabled] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('zm_vendor_mode') === 'true';
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('zm_vendor_mode', vendorModeEnabled ? 'true' : 'false');
+    }
+  }, [vendorModeEnabled]);
+
 
   const permission = hasPermission('inventory');
+  const canToggleVendorMode = currentRole === 'dueno' || currentRole === 'encargado' || currentRole === 'secretario';
+  const isVendorMode = currentRole === 'vendedor' || vendorModeEnabled;
 
   // Load vehicles
   useEffect(() => {
@@ -88,7 +105,10 @@ export default function InventoryPage() {
     let list = vehicles;
 
     // Filter by tab
-    if (activeTab !== 'todos') {
+    if (activeTab === 'todos') {
+      // Exclude sold from "Todos"
+      list = list.filter(v => v.estado_stock !== 'vendido');
+    } else {
       list = list.filter(v => v.estado_stock === activeTab);
     }
 
@@ -104,7 +124,9 @@ export default function InventoryPage() {
   }, [vehicles, activeTab, searchQuery]);
 
   const statusCounts = useMemo(() => {
-    const counts: Record<string, number> = { todos: vehicles.length };
+    // Count only non-sold for "todos"
+    const nonSoldCount = vehicles.filter(v => v.estado_stock !== 'vendido').length;
+    const counts: Record<string, number> = { todos: nonSoldCount };
     vehicles.forEach(v => {
       counts[v.estado_stock] = (counts[v.estado_stock] || 0) + 1;
     });
@@ -129,7 +151,8 @@ export default function InventoryPage() {
     );
   }
 
-  const isReadOnly = permission === 'read';
+  const isReadOnly = isVendorMode || permission === 'read';
+  const effectiveCanSeeCosts = !isVendorMode && canSeeCosts;
 
   return (
     <div className="space-y-6">
@@ -138,15 +161,27 @@ export default function InventoryPage() {
         <div>
           <h1 className="text-3xl font-bold font-headline">Inventario</h1>
           <p className="text-muted-foreground mt-1">
-            {vehicles.length} vehículo{vehicles.length !== 1 ? 's' : ''} en stock
+            {statusCounts.todos} vehículo{statusCounts.todos !== 1 ? 's' : ''} en stock
           </p>
         </div>
-        {!isReadOnly && (
-          <Button onClick={handleAddVehicle} size="lg">
-            <Plus className="h-4 w-4 mr-2" />
-            Agregar Vehículo
-          </Button>
-        )}
+        <div className="flex flex-wrap items-center gap-3">
+          {canToggleVendorMode && (
+            <div className="flex items-center space-x-2 bg-muted/40 py-1.5 px-3 rounded-full border shadow-sm">
+              <Switch
+                id="vendor-mode"
+                checked={vendorModeEnabled}
+                onCheckedChange={setVendorModeEnabled}
+              />
+              <Label htmlFor="vendor-mode" className="text-sm font-semibold cursor-pointer">Modo Vendedor</Label>
+            </div>
+          )}
+          {!isReadOnly && (
+            <Button onClick={handleAddVehicle} size="lg">
+              <Plus className="h-4 w-4 mr-2" />
+              Agregar Vehículo
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Search */}
@@ -216,7 +251,11 @@ export default function InventoryPage() {
                 const ganancia = (vehicle.precio_venta || 0) - totalInvertido;
 
                 return (
-                  <Card key={vehicle.id} className="overflow-hidden group hover:shadow-lg transition-all hover:-translate-y-0.5">
+                  <Card 
+                    key={vehicle.id} 
+                    className="overflow-hidden group hover:shadow-lg transition-all hover:-translate-y-0.5 cursor-pointer"
+                    onClick={() => router.push(`/business/${slug}/inventory/${vehicle.id}`)}
+                  >
                     {/* Image */}
                     <div className="relative aspect-video bg-muted">
                       {mainImage ? (
@@ -254,7 +293,7 @@ export default function InventoryPage() {
                         </p>
                       )}
 
-                      {canSeeCosts && vehicle.costo_compra > 0 && (
+                      {effectiveCanSeeCosts && vehicle.costo_compra > 0 && (
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
                           <span>Costo: {formatCurrency(totalInvertido)}</span>
                           <span className={ganancia >= 0 ? 'text-green-600 font-semibold' : 'text-red-500 font-semibold'}>
@@ -270,7 +309,7 @@ export default function InventoryPage() {
                       )}
 
                       {/* Actions */}
-                      <div className="pt-2 space-y-1.5">
+                      <div className="pt-2 space-y-1.5" onClick={(e) => e.stopPropagation()}>
                         <Button
                           variant="outline"
                           size="sm"

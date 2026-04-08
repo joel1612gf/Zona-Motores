@@ -13,7 +13,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, Upload, Plus, X, Building2, MapPin, LocateFixed, Eye, EyeOff, Link as LinkIcon, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Loader2, Save, Upload, Plus, X, Building2, MapPin, DollarSign, AlertCircle, CheckCircle2, Eye, EyeOff, Link as LinkIcon } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import Image from 'next/image';
 
@@ -41,6 +42,8 @@ export default function SettingsPage() {
   const [margenConsignacion, setMargenConsignacion] = useState(15);
   const [metodosPago, setMetodosPago] = useState<string[]>([]);
   const [nuevoMetodo, setNuevoMetodo] = useState('');
+  const [tasaCambioManual, setTasaCambioManual] = useState('');
+  const [tasaCambioAuto, setTasaCambioAuto] = useState(false);
 
   // Location
   const [markerPos, setMarkerPos] = useState<{ lat: number; lng: number } | null>(null);
@@ -71,6 +74,8 @@ export default function SettingsPage() {
       setMargenConsignacion(concesionario.configuracion.margen_consignacion_porcentaje || 15);
       const mp = concesionario.configuracion.metodos_pago;
       setMetodosPago(Array.isArray(mp) ? mp : typeof mp === 'string' ? (mp as string).split(',').map(s => s.trim()) : []);
+      setTasaCambioManual(String(concesionario.configuracion.tasa_cambio_manual || ''));
+      setTasaCambioAuto(concesionario.configuracion.tasa_cambio_auto ?? false);
     }
     if (concesionario.geolocalizacion) {
       const pos = { lat: concesionario.geolocalizacion.latitude, lng: concesionario.geolocalizacion.longitude };
@@ -198,6 +203,8 @@ export default function SettingsPage() {
           estructura_comision: estructuraComision,
           margen_consignacion_porcentaje: margenConsignacion,
           metodos_pago: metodosPago,
+          tasa_cambio_manual: parseFloat(tasaCambioManual) || 0,
+          tasa_cambio_auto: tasaCambioAuto,
         },
       });
 
@@ -385,6 +392,7 @@ export default function SettingsPage() {
                 type="number"
                 min={0}
                 max={100}
+                step="any"
                 value={margenMinimo}
                 onChange={e => setMargenMinimo(Number(e.target.value))}
                 disabled={isReadOnly}
@@ -399,6 +407,7 @@ export default function SettingsPage() {
                 type="number"
                 min={0}
                 max={100}
+                step="any"
                 value={estructuraComision}
                 onChange={e => setEstructuraComision(Number(e.target.value))}
                 disabled={isReadOnly}
@@ -413,6 +422,7 @@ export default function SettingsPage() {
                 type="number"
                 min={0}
                 max={500}
+                step="any"
                 value={margenConsignacion}
                 onChange={e => setMargenConsignacion(Number(e.target.value))}
                 disabled={isReadOnly}
@@ -452,6 +462,61 @@ export default function SettingsPage() {
                 </div>
               )}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Tasa de Cambio */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5" /> Tasa de Cambio (Bs/$)
+            </CardTitle>
+            <CardDescription>Define la tasa usada en compras de productos e inventario</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Auto toggle */}
+            <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/30">
+              <div>
+                <p className="text-sm font-medium">Calcular automáticamente (BCV)</p>
+                <p className="text-xs text-muted-foreground">Obtiene la tasa BCV desde pydolarve.org al cargar una compra</p>
+              </div>
+              <Switch
+                checked={tasaCambioAuto}
+                onCheckedChange={setTasaCambioAuto}
+                disabled={isReadOnly}
+              />
+            </div>
+
+            {/* Manual rate */}
+            {!tasaCambioAuto ? (
+              <div className="space-y-1.5 mt-2">
+                <Label htmlFor="tasa-manual">Tasa Manual (Bs por $)</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground">Bs</span>
+                  <Input
+                    id="tasa-manual"
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    placeholder="ej: 92.50"
+                    className="pl-9"
+                    value={tasaCambioManual}
+                    onChange={e => setTasaCambioManual(e.target.value)}
+                    disabled={isReadOnly}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">Esta tasa se usará temporalmente si el BCV llega a fallar, o siempre si está en modo manual.</p>
+              </div>
+            ) : (
+              <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 mt-2 flex items-start gap-3">
+                <DollarSign className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">Sincronización Activa</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">La tasa se obtendrá automáticamente del Banco Central de Venezuela al calcular precios y compras.</p>
+                </div>
+              </div>
+            )}
+            <p className="text-xs text-amber-600 font-medium mt-2">Recuerda que debes darle al botón azul "Guardar Cambios" al final de la página para aplicar esta configuración.</p>
           </CardContent>
         </Card>
 

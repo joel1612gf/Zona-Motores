@@ -209,9 +209,10 @@ export function StaffFormDialog({ open, onOpenChange, editingStaff, concesionari
                 type="number"
                 min={0}
                 max={100}
+                step="any"
                 value={comision}
                 onChange={e => setComision(e.target.value ? Number(e.target.value) : '')}
-                placeholder="5"
+                placeholder="0.5"
               />
             </div>
             <div className="space-y-2">
@@ -220,6 +221,7 @@ export function StaffFormDialog({ open, onOpenChange, editingStaff, concesionari
                 id="staff-sueldo"
                 type="number"
                 min={0}
+                step="any"
                 value={sueldo}
                 onChange={e => setSueldo(e.target.value ? Number(e.target.value) : '')}
                 placeholder="Opcional"

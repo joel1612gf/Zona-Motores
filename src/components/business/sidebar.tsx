@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   Package,
   ShoppingCart,
+  ShoppingBag,
   Users,
   UserCog,
   Settings,
@@ -23,6 +24,7 @@ import {
   ChevronRight,
   Menu,
   CalendarDays,
+  CarIcon
 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -38,7 +40,8 @@ type SidebarItem = {
 function getSidebarItems(slug: string): SidebarItem[] {
   return [
     { module: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, href: `/business/${slug}/dashboard` },
-    { module: 'inventory', label: 'Inventario', icon: Package, href: `/business/${slug}/inventory` },
+    { module: 'inventory', label: 'Inventario', icon: CarIcon, href: `/business/${slug}/inventory` },
+    { module: 'products', label: 'Productos', icon: ShoppingBag, href: `/business/${slug}/products` },
     { module: 'sales', label: 'Ventas', icon: ShoppingCart, href: `/business/${slug}/sales` },
     { module: 'clients', label: 'Clientes', icon: Users, href: `/business/${slug}/clients` },
     { module: 'consignment', label: 'Consignación', icon: Handshake, href: `/business/${slug}/consignment` },

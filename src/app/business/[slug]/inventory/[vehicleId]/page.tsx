@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useBusinessAuth } from '@/context/business-auth-context';
 import { doc, getDoc, updateDoc, deleteDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
+import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -27,9 +28,11 @@ import {
   CheckCircle2,
   DollarSign,
   TrendingUp,
-  Package,
   UserRound,
   PauseCircle,
+  ChevronLeft,
+  ChevronRight,
+  X,
 } from 'lucide-react';
 import Image from 'next/image';
 import {
@@ -43,6 +46,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { PhotoSlider } from 'react-photo-view';
+import 'react-photo-view/dist/react-photo-view.css';
 import type { StockVehicle, StockStatus, GastoCategoria } from '@/lib/business-types';
 import { GASTO_CATEGORIA_LABELS, ROLE_LABELS } from '@/lib/business-types';
 import { VehicleFormDialog } from '@/components/business/vehicle-form-dialog';
@@ -71,9 +76,23 @@ export default function VehicleDetailPage() {
   const [isChangingStatus, setIsChangingStatus] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [marketPrice, setMarketPrice] = useState<{ message: string; found: boolean } | null>(null);
+  const [viewerVisible, setViewerVisible] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
 
   const permission = hasPermission('inventory');
-  const isReadOnly = permission === 'read';
+  
+  // Initialize vendor mode from session storage
+  const [vendorModeEnabled] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('zm_vendor_mode') === 'true';
+    }
+    return false;
+  });
+
+  const currentRole = useBusinessAuth().currentRole;
+  const isVendorMode = currentRole === 'vendedor' || vendorModeEnabled;
+  const isReadOnly = isVendorMode || permission === 'read';
+  const effectiveCanSeeCosts = !isVendorMode && canSeeCosts;
 
   // Load vehicle
   useEffect(() => {
@@ -248,7 +267,10 @@ export default function VehicleDetailPage() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className={cn(
+      "space-y-6 transition-all duration-300",
+      isVendorMode ? "max-w-5xl mx-auto p-4 sm:p-6" : ""
+    )}>
       {/* Back + Actions */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <Button variant="ghost" onClick={() => router.push(`/business/${slug}/inventory`)} className="gap-2">
@@ -285,42 +307,64 @@ export default function VehicleDetailPage() {
         )}
       </div>
 
-      <div className="grid md:grid-cols-3 gap-6 items-start">
+      <div className={cn(
+        "grid gap-6 items-start transition-all duration-300",
+        isVendorMode ? "grid-cols-1" : "md:grid-cols-3"
+      )}>
         {/* Main Column */}
-        <div className="md:col-span-2 space-y-6">
+        <div className={cn(
+          "space-y-6",
+          isVendorMode ? "w-full" : "md:col-span-2"
+        )}>
           {/* Image Gallery */}
           {vehicle.images && vehicle.images.length > 0 ? (
-            <Carousel className="w-full">
-              <CarouselContent>
-                {vehicle.images.map((image, index) => (
-                  <CarouselItem key={index}>
-                    <Card className="overflow-hidden">
-                      <CardContent className="flex aspect-video items-center justify-center p-0 relative">
-                        <Image
-                          src={image.url}
-                          alt={image.alt}
-                          width={1200}
-                          height={800}
-                          className="object-cover w-full h-full"
-                          priority={index === 0}
-                        />
-                        {vehicle.images.length > 1 && (
-                          <Badge variant="secondary" className="absolute bottom-3 right-3 bg-background/80 backdrop-blur-sm">
-                            {index + 1} / {vehicle.images.length}
-                          </Badge>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </CarouselItem>
-                ))}
-              </CarouselContent>
-              {vehicle.images.length > 1 && (
-                <>
-                  <CarouselPrevious className="ml-12" />
-                  <CarouselNext className="mr-12" />
-                </>
-              )}
-            </Carousel>
+            <>
+              <Carousel className="w-full">
+                <CarouselContent>
+                  {vehicle.images.map((image, index) => (
+                    <CarouselItem key={index}>
+                      <Card className="overflow-hidden">
+                        <CardContent 
+                          className="flex aspect-video items-center justify-center p-0 relative cursor-pointer group hover:opacity-95 transition-opacity"
+                          onClick={() => {
+                            setViewerIndex(index);
+                            setViewerVisible(true);
+                          }}
+                        >
+                          <Image
+                            src={image.url}
+                            alt={image.alt || "Vehículo"}
+                            fill
+                            className="object-cover"
+                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                          />
+                          {vehicle.images!.length > 1 && (
+                            <Badge variant="secondary" className="absolute bottom-3 right-3 bg-background/80 backdrop-blur-sm z-10 pointer-events-none">
+                              {index + 1} / {vehicle.images!.length}
+                            </Badge>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </CarouselItem>
+                  ))}
+                </CarouselContent>
+                {vehicle.images.length > 1 && (
+                  <>
+                    <CarouselPrevious className="ml-12" />
+                    <CarouselNext className="mr-12" />
+                  </>
+                )}
+              </Carousel>
+
+              <PhotoSlider
+                images={vehicle.images.map((item) => ({ src: item.url, key: item.url }))}
+                visible={viewerVisible}
+                onClose={() => setViewerVisible(false)}
+                index={viewerIndex}
+                onIndexChange={setViewerIndex}
+                maskClosable={true}
+              />
+            </>
           ) : (
             <Card className="overflow-hidden">
               <CardContent className="flex aspect-video items-center justify-center bg-muted">
@@ -371,36 +415,39 @@ export default function VehicleDetailPage() {
               <Separator />
 
               {/* Specs Grid */}
-              <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                <div className="flex items-center gap-2">
-                  <Gauge className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="font-semibold">Kilometraje</span>
+              {/* Specs Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Gauge className="h-4 w-4 shrink-0" />
+                    <span>Kilometraje</span>
+                  </div>
+                  <p className="font-semibold text-base">{vehicle.mileage?.toLocaleString() || 0} km</p>
                 </div>
-                <span className="text-muted-foreground">{vehicle.mileage?.toLocaleString() || 0} km</span>
 
-                <div className="flex items-center gap-2">
-                  <Palette className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="font-semibold">Color</span>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Palette className="h-4 w-4 shrink-0" />
+                    <span>Color</span>
+                  </div>
+                  <p className="font-semibold text-base">{vehicle.exteriorColor || '—'}</p>
                 </div>
-                <span className="text-muted-foreground">{vehicle.exteriorColor || '—'}</span>
 
-                <div className="flex items-center gap-2">
-                  <Settings2 className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="font-semibold">Motor</span>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Settings2 className="h-4 w-4 shrink-0" />
+                    <span>Motor</span>
+                  </div>
+                  <p className="font-semibold text-base">{vehicle.engine || '—'}</p>
                 </div>
-                <span className="text-muted-foreground">{vehicle.engine || '—'}</span>
 
-                <div className="flex items-center gap-2">
-                  <Car className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="font-semibold">Transmisión</span>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Car className="h-4 w-4 shrink-0" />
+                    <span>Transmisión</span>
+                  </div>
+                  <p className="font-semibold text-base">{vehicle.transmission || '—'}</p>
                 </div>
-                <span className="text-muted-foreground">{vehicle.transmission || '—'}</span>
-
-                <div className="flex items-center gap-2">
-                  <Package className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="font-semibold">Carrocería</span>
-                </div>
-                <span className="text-muted-foreground">{vehicle.bodyType || '—'}</span>
               </div>
 
               {/* Description */}
@@ -415,7 +462,7 @@ export default function VehicleDetailPage() {
               )}
 
               {/* Assigned seller */}
-              {assignedStaff && (
+              {assignedStaff && !isVendorMode && (
                 <>
                   <Separator />
                   <div className="flex items-center gap-3">
@@ -434,120 +481,120 @@ export default function VehicleDetailPage() {
         </div>
 
         {/* Sidebar Column */}
-        <div className="space-y-4">
-          {/* Status Change */}
-          {!isReadOnly && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Cambiar Estado</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Select
-                  value={vehicle.estado_stock}
-                  onValueChange={(v) => handleChangeStatus(v as StockStatus)}
-                  disabled={isChangingStatus}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="privado_taller">🔧 En Taller</SelectItem>
-                    <SelectItem value="publico_web">🌐 Publicado</SelectItem>
-                    <SelectItem value="pausado">🟠 Pausado</SelectItem>
-                    <SelectItem value="reservado">📌 Reservado</SelectItem>
-                    <SelectItem value="vendido">✅ Vendido</SelectItem>
-                  </SelectContent>
-                </Select>
-              </CardContent>
-            </Card>
-          )}
+        {!isVendorMode && (
+          <div className="space-y-4">
+            {/* Status Change */}
+            {!isReadOnly && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium">Cambiar Estado</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Select
+                    value={vehicle.estado_stock}
+                    onValueChange={(v) => handleChangeStatus(v as StockStatus)}
+                    disabled={isChangingStatus}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="privado_taller">🔧 En Taller</SelectItem>
+                      <SelectItem value="publico_web">🌐 Publicado</SelectItem>
+                      <SelectItem value="pausado">🟠 Pausado</SelectItem>
+                      <SelectItem value="reservado">📌 Reservado</SelectItem>
+                      <SelectItem value="vendido">✅ Vendido</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </CardContent>
+              </Card>
+            )}
 
-          {/* Costs Card - only for authorized roles */}
-          {canSeeCosts && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <DollarSign className="h-4 w-4" />
-                  Costos e Inversión
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {/* Purchase cost */}
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Costo de compra</span>
-                  <span className="font-medium">{formatCurrency(vehicle.costo_compra || 0)}</span>
-                </div>
+            {/* Costs Card - only for authorized roles */}
+            {effectiveCanSeeCosts && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" />
+                    Costos e Inversión
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {/* Purchase cost */}
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Costo de compra</span>
+                    <span className="font-medium">{formatCurrency(vehicle.costo_compra || 0)}</span>
+                  </div>
 
-                {/* Expenses by category */}
-                {Object.entries(gastosPorCategoria).length > 0 && (
-                  <div className="space-y-2">
-                    <Separator />
-                    <p className="text-xs font-semibold text-muted-foreground uppercase">Gastos de Adecuación</p>
-                    {Object.entries(gastosPorCategoria).map(([cat, data]) => (
-                      <div key={cat} className="space-y-1">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground flex items-center gap-1">
-                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">{GASTO_CATEGORIA_LABELS[cat as GastoCategoria] || cat}</Badge>
-                          </span>
-                          <span className="font-medium">{formatCurrency(data.total)}</span>
-                        </div>
-                        {data.items.map((item, i) => (
-                          item.descripcion && (
+                  {/* Expenses by category */}
+                  {Object.entries(gastosPorCategoria).length > 0 && (
+                    <div className="space-y-2">
+                      <Separator />
+                      <p className="text-xs font-semibold text-muted-foreground uppercase">Gastos de Adecuación</p>
+                      {Object.entries(gastosPorCategoria).map(([cat, data]) => (
+                        <div key={cat} className="space-y-1">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground flex items-center gap-1">
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0">{GASTO_CATEGORIA_LABELS[cat as GastoCategoria] || cat}</Badge>
+                            </span>
+                            <span className="font-medium">{formatCurrency(data.total)}</span>
+                          </div>
+                          {data.items.map((item, i) => (
                             <p key={i} className="text-xs text-muted-foreground pl-4">
                               — {item.descripcion}: {formatCurrency(item.monto)}
                             </p>
-                          )
-                        ))}
-                      </div>
-                    ))}
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <Separator />
+
+                  {/* Totals */}
+                  <div className="flex justify-between text-sm font-medium">
+                    <span>Total invertido</span>
+                    <span>{formatCurrency(totalInvertido)}</span>
                   </div>
-                )}
 
-                <Separator />
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Precio de venta</span>
+                    <span className="font-medium">{formatCurrency(vehicle.precio_venta || 0)}</span>
+                  </div>
 
-                {/* Totals */}
-                <div className="flex justify-between text-sm font-medium">
-                  <span>Total invertido</span>
-                  <span>{formatCurrency(totalInvertido)}</span>
-                </div>
+                  <Separator />
 
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Precio de venta</span>
-                  <span className="font-medium">{formatCurrency(vehicle.precio_venta || 0)}</span>
-                </div>
+                  <div className={`flex justify-between items-center text-base font-bold ${ganancia >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                    <span className="flex items-center gap-1">
+                      <TrendingUp className="h-4 w-4" />
+                      Ganancia
+                    </span>
+                    <span>{ganancia >= 0 ? '+' : ''}{formatCurrency(ganancia)}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
-                <Separator />
-
-                <div className={`flex justify-between items-center text-base font-bold ${ganancia >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                  <span className="flex items-center gap-1">
-                    <TrendingUp className="h-4 w-4" />
-                    Ganancia
-                  </span>
-                  <span>{ganancia >= 0 ? '+' : ''}{formatCurrency(ganancia)}</span>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Consignment info */}
-          {vehicle.es_consignacion && vehicle.consignacion_info && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Info Consignación</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Vendedor particular</span>
-                  <span>{vehicle.consignacion_info.vendedor_particular_id}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Comisión acordada</span>
-                  <span>{vehicle.consignacion_info.comision_acordada}%</span>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+            {/* Consignment info */}
+            {vehicle.es_consignacion && vehicle.consignacion_info && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium">Info Consignación</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Vendedor particular</span>
+                    <span>{vehicle.consignacion_info.vendedor_particular_id}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Comisión acordada</span>
+                    <span>{vehicle.consignacion_info.comision_acordada}%</span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Edit Dialog */}

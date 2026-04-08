@@ -623,7 +623,7 @@ export function VehicleFormDialog({ open, onOpenChange, editingVehicle, concesio
                   </div>
                   <div className="space-y-1.5">
                     <Label>Comisión Acordada (%)</Label>
-                    <Input type="number" min={0} max={100} value={consignacionComision} onChange={e => setConsignacionComision(Number(e.target.value))} />
+                    <Input type="number" min={0} max={100} step="any" value={consignacionComision} onChange={e => setConsignacionComision(Number(e.target.value))} />
                   </div>
                 </div>
               )}
