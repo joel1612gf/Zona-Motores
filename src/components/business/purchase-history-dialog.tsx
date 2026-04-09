@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useBusinessAuth } from '@/context/business-auth-context';
-import { collection, getDocs, query, orderBy, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, doc, getDoc, deleteDoc, updateDoc, serverTimestamp, increment } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import {
   Dialog,
@@ -13,21 +13,31 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Search, Loader2, Calendar, FileText, User, ChevronDown, ChevronUp, Printer, Download } from 'lucide-react';
+import { Search, Loader2, Calendar, FileText, User, ChevronDown, ChevronUp, Printer, Download, Trash2 } from 'lucide-react';
 import type { Compra } from '@/lib/business-types';
+import { useToast } from '@/hooks/use-toast';
 
 export function PurchaseHistoryDialog({
   open,
   onOpenChange,
+  onPurchaseDeleted,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onPurchaseDeleted?: () => void;
 }) {
   const { concesionario } = useBusinessAuth();
   const firestore = useFirestore();
+  const { toast } = useToast();
 
   const [compras, setCompras] = useState<Compra[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Delete modal state
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [compraToDelete, setCompraToDelete] = useState<Compra | null>(null);
+  const [deductInventory, setDeductInventory] = useState(true);
 
   // Filters
   const [searchGeneral, setSearchGeneral] = useState(''); // Proveedor o Factura
@@ -63,6 +73,62 @@ export function PurchaseHistoryDialog({
       console.error('Error cargando historial de compras:', e);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const executeDelete = async () => {
+    if (!compraToDelete || !concesionario) return;
+    try {
+      setIsDeleting(true);
+      
+      const itemsToDeduct = (compraToDelete.items || []).filter(i => 
+        i.producto_id && 
+        !i.producto_id.startsWith('new-') && 
+        !i.producto_id.startsWith('manual-')
+      );
+
+      if (deductInventory && itemsToDeduct.length > 0) {
+        // Restar productos del inventario uno por uno para asegurar que impacten
+        // Usamos una secuencia para evitar saturar si son muchos, aunque Promise.all suele estar bien
+        for (const item of itemsToDeduct) {
+          const qty = Number(item.cantidad);
+          if (isNaN(qty) || qty === 0) continue;
+          
+          const productRef = doc(firestore, 'concesionarios', concesionario.id, 'productos', item.producto_id);
+          await updateDoc(productRef, {
+            stock_actual: increment(-qty),
+            updated_at: serverTimestamp()
+          });
+        }
+        console.log(`Deducción de inventario completada para ${itemsToDeduct.length} productos.`);
+      }
+
+      await deleteDoc(doc(firestore, 'concesionarios', concesionario.id, 'compras', compraToDelete.id));
+      
+      setCompras(prev => prev.filter(c => c.id !== compraToDelete.id));
+      setExpandedRow(null);
+      setDeleteModalOpen(false);
+      
+      toast({ 
+        title: 'Factura anulada con éxito', 
+        description: deductInventory 
+          ? `La factura se borró y se descontó el stock de ${itemsToDeduct.length} ítems.` 
+          : 'La factura ha sido borrada.' 
+      });
+
+      if (onPurchaseDeleted) {
+        onPurchaseDeleted();
+      }
+    } catch (e) {
+      console.error('Error al eliminar factura:', e);
+      toast({ 
+        variant: 'destructive', 
+        title: 'Error', 
+        description: 'No se pudo completar la anulación. Revisa tu conexión.' 
+      });
+    } finally {
+      setIsDeleting(false);
+      setCompraToDelete(null);
     }
   };
 
@@ -483,9 +549,26 @@ export function PurchaseHistoryDialog({
                                       <span>TOTAL:</span>
                                       <span>${compra.total_usd.toFixed(2)}</span>
                                     </div>
-                                    <div className="flex justify-between text-muted-foreground mt-1 text-[10px]">
+                                    <div className="flex justify-between text-muted-foreground mt-1 text-[10px] mb-3">
                                       <span>Tasa BCV: {compra.tasa_cambio.toFixed(2)}</span>
                                       <span>Bs {compra.total_bs.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-end pt-3 border-t">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-destructive hover:bg-destructive hover:text-destructive-foreground h-8 text-xs px-2 gap-1.5"
+                                        disabled={isDeleting}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setCompraToDelete(compra);
+                                          setDeductInventory(true); // default true
+                                          setDeleteModalOpen(true);
+                                        }}
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                        Anular/Borrar Factura
+                                      </Button>
                                     </div>
                                   </div>
                                 </div>
@@ -502,6 +585,52 @@ export function PurchaseHistoryDialog({
           )}
         </div>
       </DialogContent>
+
+      <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+        <DialogContent className="max-w-sm p-5 border-destructive/20 shadow-xl">
+          <div className="flex flex-col items-center gap-4 text-center">
+            <div className="w-14 h-14 bg-destructive/10 text-destructive rounded-full flex items-center justify-center -mb-2">
+              <Trash2 className="w-7 h-7" />
+            </div>
+            <DialogTitle className="text-xl">¿Anular esta factura?</DialogTitle>
+            <p className="text-muted-foreground text-sm">
+              Esta acción es irreversible. La factura será eliminada permanentemente.
+            </p>
+
+            <div className="bg-muted p-4 mt-2 mb-2 w-full flex items-start gap-3 rounded-lg border text-left cursor-pointer transition-colors hover:bg-muted/80" onClick={() => setDeductInventory(!deductInventory)}>
+              <div className="flex items-center h-5 mt-0.5">
+                <input 
+                  type="checkbox" 
+                  checked={deductInventory} 
+                  onChange={e => setDeductInventory(e.target.checked)}
+                  onClick={e => e.stopPropagation()}
+                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary accent-primary" 
+                />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-semibold text-foreground">Eliminar del inventario</span>
+                <span className="text-xs text-muted-foreground mt-0.5">
+                  {(() => {
+                    const count = compraToDelete?.items?.filter(i => !i.producto_id.startsWith('new-')).reduce((a, b) => a + Number(b.cantidad), 0) || 0;
+                    if (count === 0) return "Esta compra no tiene productos vinculados al inventario.";
+                    return `Restará automáticamente ${count} unidades del stock actual.`;
+                  })()}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex w-full gap-3 pt-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={() => setDeleteModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="button" variant="destructive" className="flex-1" disabled={isDeleting} onClick={executeDelete}>
+                {isDeleting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                Sí, Anular
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Printable Sheet (hidden by default, only shown when printing) */}
       {printData && (() => {

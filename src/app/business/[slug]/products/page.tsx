@@ -358,7 +358,7 @@ export default function ProductsPage() {
       />
       <SuppliersDialog open={suppliersOpen} onOpenChange={setSuppliersOpen} />
       <PurchaseOrderDialog open={purchaseOpen} onOpenChange={setPurchaseOpen} onSaved={loadProductos} />
-      <PurchaseHistoryDialog open={purchaseHistoryOpen} onOpenChange={setPurchaseHistoryOpen} />
+      <PurchaseHistoryDialog open={purchaseHistoryOpen} onOpenChange={setPurchaseHistoryOpen} onPurchaseDeleted={loadProductos} />
     </div>
   );
 }

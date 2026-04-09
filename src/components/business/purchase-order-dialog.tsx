@@ -58,6 +58,7 @@ import {
   orderBy,
   increment,
   runTransaction,
+  where,
 } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { useBusinessAuth } from '@/context/business-auth-context';
@@ -138,6 +139,10 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
 
   const [pendingInvoiceItems, setPendingInvoiceItems] = useState<{ nombre: string; codigo: string; cantidad: number; costo_unitario_usd: number; aplica_iva: boolean }[]>([]);
   const [pendingNumeroFactura, setPendingNumeroFactura] = useState('');
+
+  // Duplicate Invoice Validation
+  const [duplicateInvoice, setDuplicateInvoice] = useState<any>(null);
+  const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false);
 
   // Load suppliers, products, and exchange rate
   useEffect(() => {
@@ -257,6 +262,9 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
     const qty = parseInt(itemQty);
     const cost = parseFloat(itemCosto) || 0;
     const isBs = invoiceCurrency === 'bs';
+    // If input is in Bs, convert it to USD. If input is direct in USD, use it directly.
+    // Notice that itemCosto was initialized as String((p.costo_usd * tasa).toFixed(2)) when selecting, or just p.costo_usd
+    // So the typed cost is interpreted as Bs if invoiceCurrency === 'bs'.
     const costoUsd = isBs && tasaCambio > 0 ? cost / tasaCambio : cost;
 
     if (qty <= 0 || cost < 0) { toast({ variant: 'destructive', title: 'Cantidad y costo deben ser mayores a 0.' }); return; }
@@ -425,6 +433,40 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
     if (step === 2) return true; // Precios: user can modify or skip
     if (step === 3) return tasaCambio > 0; // Resumen: need tasa
     return true;
+  };
+
+  const handleNextStepZero = async () => {
+    if (!concesionario?.id) return;
+    setIsCheckingDuplicate(true);
+    try {
+      const qFac = query(
+        collection(firestore, 'concesionarios', concesionario.id, 'compras'),
+        where('proveedor_id', '==', selectedProveedor),
+        where('numero_factura', '==', numeroFactura.trim())
+      );
+      const qCtrl = query(
+        collection(firestore, 'concesionarios', concesionario.id, 'compras'),
+        where('proveedor_id', '==', selectedProveedor),
+        where('numero_control', '==', numeroControl.trim())
+      );
+      const [snapFac, snapCtrl] = await Promise.all([getDocs(qFac), getDocs(qCtrl)]);
+      
+      if (!snapFac.empty) {
+        setDuplicateInvoice(snapFac.docs[0].data());
+        return;
+      }
+      if (!snapCtrl.empty) {
+        setDuplicateInvoice(snapCtrl.docs[0].data());
+        return;
+      }
+      
+      setStep(s => s + 1);
+    } catch (e) {
+      console.error(e);
+      setStep(s => s + 1);
+    } finally {
+      setIsCheckingDuplicate(false);
+    }
   };
 
   // Helpers to set print mode and print
@@ -758,8 +800,8 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                   </div>
                   {searchQuery && filteredProductos.length > 0 && !selectedProductId && (
                     <div className="border rounded-md bg-popover max-h-36 overflow-y-auto shadow-md">
-                      {filteredProductos.slice(0, 8).map(p => (
-                        <button key={p.id} className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors flex items-center justify-between" onClick={() => { setSelectedProductId(p.id); setSearchQuery(p.nombre); setItemCosto(String(p.costo_usd)); }}>
+                            {filteredProductos.slice(0, 8).map(p => (
+                        <button key={p.id} className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors flex items-center justify-between" onClick={() => { setSelectedProductId(p.id); setSearchQuery(p.nombre); setItemCosto(invoiceCurrency === 'bs' && tasaCambio > 0 ? (p.costo_usd * tasaCambio).toFixed(2) : String(p.costo_usd)); }}>
                           <span>{p.nombre}</span>
                           <span className="text-xs text-muted-foreground">{p.codigo}</span>
                         </button>
@@ -1062,7 +1104,8 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
               <ChevronLeft className="h-4 w-4 mr-1.5" /> {step > 0 ? 'Atrás' : 'Cancelar'}
             </Button>
             {step < STEPS.length - 1 ? (
-              <Button onClick={() => setStep(s => s + 1)} disabled={!canNext()}>
+              <Button onClick={() => step === 0 ? handleNextStepZero() : setStep(s => s + 1)} disabled={!canNext() || isCheckingDuplicate}>
+                {isCheckingDuplicate ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                 Siguiente <ChevronRight className="h-4 w-4 ml-1.5" />
               </Button>
             ) : (
@@ -1088,50 +1131,51 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
               </p>
             </div>
 
-            {/* Removing retention details block as requested */}
-
-            <div className="flex flex-col sm:flex-row gap-3 pt-2 w-full justify-center">
+            <div className="flex flex-col sm:flex-row gap-4 pt-4 w-full justify-center mt-2">
               {successData.numero_comprobante && (
-                <div className="flex gap-2">
+                <div className="flex bg-background border rounded-md shadow-sm overflow-hidden">
                   <Button
-                    variant="outline"
-                    className="gap-2"
+                    variant="ghost"
+                    className="rounded-none border-r px-4 gap-2 h-11"
                     onClick={handlePrintRetention}
                   >
                     <Printer className="w-4 h-4" />
                     Imprimir Retención
                   </Button>
                   <Button
-                    variant="outline"
-                    className="gap-2"
+                    variant="ghost"
+                    className="rounded-none px-3 h-11"
                     onClick={handleDownloadRetention}
-                    title="Descargar archivo PDF directamente"
+                    title="Descargar PDF"
                   >
                     <Download className="w-4 h-4" />
-                    Descargar
                   </Button>
                 </div>
               )}
-              <div className="flex gap-2">
+              <div className="flex bg-background border rounded-md shadow-sm overflow-hidden">
                 <Button
-                  variant="outline"
-                  className="gap-2"
+                  variant="ghost"
+                  className="rounded-none border-r px-4 gap-2 h-11"
                   onClick={handlePrintSummary}
                 >
                   <Printer className="w-4 h-4" />
                   Imprimir Resumen
                 </Button>
                 <Button
-                  variant="outline"
-                  className="gap-2"
+                  variant="ghost"
+                  className="rounded-none px-3 h-11"
                   onClick={handleDownloadSummary}
-                  title="Descargar archivo PDF directamente"
+                  title="Descargar PDF"
                 >
                   <Download className="w-4 h-4" />
-                  Descargar
                 </Button>
               </div>
+            </div>
+            
+            <div className="pt-4">
               <Button
+                size="lg"
+                className="w-full sm:w-auto px-10"
                 onClick={() => {
                   onSaved();
                   onOpenChange(false);
@@ -1395,6 +1439,38 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
           </div>
         );
       })()}
+
+      <Dialog open={!!duplicateInvoice} onOpenChange={(open) => !open && setDuplicateInvoice(null)}>
+        <DialogContent className="max-w-md text-center p-6">
+          <div className="mx-auto w-12 h-12 bg-destructive/10 text-destructive rounded-full flex items-center justify-center mb-4">
+            <AlertCircle className="w-6 h-6" />
+          </div>
+          <DialogTitle className="text-xl mb-2">Factura ya registrada</DialogTitle>
+          <div className="text-sm text-muted-foreground mb-6 space-y-2">
+            <p>Ya existe una factura en el sistema para este proveedor con el mismo número de factura o control.</p>
+            {duplicateInvoice && (
+              <div className="bg-muted p-3 rounded-md text-left mt-2">
+                <p><strong>N° Factura:</strong> {duplicateInvoice.numero_factura}</p>
+                <p><strong>N° Control:</strong> {duplicateInvoice.numero_control}</p>
+                <p><strong>Total:</strong> ${duplicateInvoice.total_usd.toFixed(2)}</p>
+                <p><strong>Cargado por:</strong> {duplicateInvoice.creado_por}</p>
+              </div>
+            )}
+            <p className="font-semibold text-destructive mt-2">No se puede registrar de nuevo.</p>
+          </div>
+          <div className="flex justify-center gap-3">
+            <Button variant="outline" onClick={() => setDuplicateInvoice(null)} className="w-full">
+              Volver Atrás
+            </Button>
+            <Button variant="default" onClick={() => {
+              setDuplicateInvoice(null);
+              onOpenChange(false);
+            }} className="w-full">
+              Ver Historial
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
