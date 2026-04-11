@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useBusinessAuth } from '@/context/business-auth-context';
-import { collection, addDoc, updateDoc, doc, serverTimestamp, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, serverTimestamp, setDoc, deleteDoc, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useFirestore, useStorage } from '@/firebase';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -22,6 +22,8 @@ import type {
   StockStatus,
   GastoAdecuacion,
   GastoCategoria,
+  Cliente,
+  VehiculoRequerido,
 } from '@/lib/business-types';
 import { GASTO_CATEGORIA_LABELS } from '@/lib/business-types';
 import { formatCurrency } from '@/lib/utils';
@@ -482,6 +484,38 @@ export function VehicleFormDialog({ open, onOpenChange, editingVehicle, concesio
             await deleteDoc(publicRef);
           }
         }
+      }
+
+      // Wishlist check
+      const checkWishlists = async () => {
+        try {
+          const clientsRef = collection(firestore, 'concesionarios', concesionarioId, 'clientes');
+          const snap = await getDocs(clientsRef);
+          const clientsWithWishlist = snap.docs.map((d: any) => ({ id: d.id, ...d.data() } as Cliente))
+            .filter((c: Cliente) => c.vehiculos_requeridos && c.vehiculos_requeridos.length > 0);
+
+          for (const client of clientsWithWishlist) {
+            const matches = client.vehiculos_requeridos?.filter((req: VehiculoRequerido) => 
+              req.status === 'pendiente' &&
+              req.make.toLowerCase() === make.toLowerCase() &&
+              (req.model.toLowerCase() === model.toLowerCase() || model.toLowerCase().includes(req.model.toLowerCase()))
+            );
+
+            if (matches && matches.length > 0) {
+              toast({
+                title: '✨ Coincidencia en Wishlist',
+                description: `${client.nombre} ${client.apellido} busca un ${make} ${model}. ¡Contáctalo!`,
+                variant: 'default',
+              });
+            }
+          }
+        } catch (e) {
+          console.error('[Wishlist Check] Error:', e);
+        }
+      };
+
+      if (!editingVehicle) {
+        checkWishlists();
       }
 
       setUploadProgress(100);

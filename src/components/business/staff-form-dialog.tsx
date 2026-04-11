@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, DollarSign, Percent, Target, Briefcase, Shield } from 'lucide-react';
 import { hashSHA256, ROLE_LABELS, type StaffMember, type BusinessRole } from '@/lib/business-types';
 
 interface StaffFormDialogProps {
@@ -31,8 +31,13 @@ export function StaffFormDialog({ open, onOpenChange, editingStaff, concesionari
   const [rol, setRol] = useState<BusinessRole>('vendedor');
   const [pin, setPin] = useState('');
   const [pinConfirm, setPinConfirm] = useState('');
-  const [comision, setComision] = useState<number | ''>('');
-  const [sueldo, setSueldo] = useState<number | ''>('');
+  
+  // Fintech Fields
+  const [baseSalaryUsd, setBaseSalaryUsd] = useState<number | ''>('');
+  const [commissionType, setCommissionType] = useState<'total_price' | 'net_profit'>('total_price');
+  const [commissionPercentage, setCommissionPercentage] = useState<number | ''>('');
+  const [monthlyGoal, setMonthlyGoal] = useState<number | ''>('');
+  
   const [isSaving, setIsSaving] = useState(false);
 
   const isEditing = !!editingStaff;
@@ -43,8 +48,10 @@ export function StaffFormDialog({ open, onOpenChange, editingStaff, concesionari
       setNombre(editingStaff.nombre);
       setTelefono(editingStaff.telefono || '');
       setRol(editingStaff.rol);
-      setComision(editingStaff.comision_porcentaje ?? '');
-      setSueldo(editingStaff.sueldo ?? '');
+      setBaseSalaryUsd(editingStaff.base_salary_usd ?? '');
+      setCommissionType(editingStaff.commission_type || 'total_price');
+      setCommissionPercentage(editingStaff.commission_percentage ?? '');
+      setMonthlyGoal(editingStaff.monthly_goal ?? '');
       setPin('');
       setPinConfirm('');
     } else {
@@ -53,8 +60,10 @@ export function StaffFormDialog({ open, onOpenChange, editingStaff, concesionari
       setRol('vendedor');
       setPin('');
       setPinConfirm('');
-      setComision('');
-      setSueldo('');
+      setBaseSalaryUsd('');
+      setCommissionType('total_price');
+      setCommissionPercentage('');
+      setMonthlyGoal('');
     }
   }, [editingStaff, open]);
 
@@ -84,15 +93,16 @@ export function StaffFormDialog({ open, onOpenChange, editingStaff, concesionari
 
     setIsSaving(true);
     try {
-      const staffData: Record<string, unknown> = {
+      const staffData: any = {
         nombre: nombre.trim(),
         telefono: telefono.trim() || null,
         rol,
         activo: true,
+        base_salary_usd: baseSalaryUsd !== '' ? Number(baseSalaryUsd) : null,
+        commission_type: commissionType,
+        commission_percentage: commissionPercentage !== '' ? Number(commissionPercentage) : null,
+        monthly_goal: monthlyGoal !== '' ? Number(monthlyGoal) : null,
       };
-
-      if (comision !== '') staffData.comision_porcentaje = Number(comision);
-      if (sueldo !== '') staffData.sueldo = Number(sueldo);
 
       // Hash PIN if provided
       if (pin) {
@@ -123,124 +133,170 @@ export function StaffFormDialog({ open, onOpenChange, editingStaff, concesionari
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEditing ? 'Editar Empleado' : 'Nuevo Empleado'}</DialogTitle>
+          <DialogTitle>{isEditing ? 'Configurar Perfil Fintech' : 'Nuevo Perfil Fintech'}</DialogTitle>
           <DialogDescription>
-            {isEditing ? 'Modifica los datos del empleado.' : 'Completa los datos para agregar un nuevo empleado.'}
+            {isEditing ? 'Ajusta los parámetros de compensación y metas del personal.' : 'Registra un nuevo miembro del equipo y sus metas.'}
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="staff-nombre">Nombre</Label>
-              <Input
-                id="staff-nombre"
-                value={nombre}
-                onChange={e => setNombre(e.target.value)}
-                placeholder="Nombre"
-                autoFocus
-              />
+        <form onSubmit={handleSubmit} className="space-y-6 pt-4">
+          {/* Basic Info */}
+          <div className="space-y-4">
+            <h4 className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+              <Briefcase className="h-3 w-3" /> Información Básica
+            </h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="staff-nombre">Nombre Completo</Label>
+                <Input
+                  id="staff-nombre"
+                  value={nombre}
+                  onChange={e => setNombre(e.target.value)}
+                  placeholder="Ej: Juan Pérez"
+                  autoFocus
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="staff-telefono">Teléfono</Label>
+                <Input
+                  id="staff-telefono"
+                  value={telefono}
+                  onChange={e => setTelefono(e.target.value)}
+                  placeholder="+58 412..."
+                />
+              </div>
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="staff-telefono">Teléfono</Label>
-              <Input
-                id="staff-telefono"
-                value={telefono}
-                onChange={e => setTelefono(e.target.value)}
-                placeholder="+58412..."
-              />
+              <Label htmlFor="staff-rol">Rol en el Negocio</Label>
+              <Select value={rol} onValueChange={(v) => setRol(v as BusinessRole)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {AVAILABLE_ROLES.map(r => (
+                    <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="staff-rol">Rol</Label>
-            <Select value={rol} onValueChange={(v) => setRol(v as BusinessRole)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {AVAILABLE_ROLES.map(r => (
-                  <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="staff-pin">
-                {isEditing ? 'Nuevo PIN (dejar vacío para no cambiar)' : 'PIN (4-6 dígitos)'}
-              </Label>
-              <Input
-                id="staff-pin"
-                type="password"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={6}
-                value={pin}
-                onChange={e => setPin(e.target.value.replace(/\D/g, ''))}
-                placeholder="••••"
-                className="font-mono tracking-wider"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="staff-pin-confirm">Confirmar PIN</Label>
-              <Input
-                id="staff-pin-confirm"
-                type="password"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={6}
-                value={pinConfirm}
-                onChange={e => setPinConfirm(e.target.value.replace(/\D/g, ''))}
-                placeholder="••••"
-                className="font-mono tracking-wider"
-              />
+          {/* Security */}
+          <div className="space-y-4 pt-2 border-t border-dashed">
+            <h4 className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+              <Shield className="h-3 w-3" /> Seguridad
+            </h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="staff-pin">
+                  {isEditing ? 'Nuevo PIN' : 'PIN (4-6 dígitos)'}
+                </Label>
+                <Input
+                  id="staff-pin"
+                  type="password"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  value={pin}
+                  onChange={e => setPin(e.target.value.replace(/\D/g, ''))}
+                  placeholder={isEditing ? '••••' : 'PIN de acceso'}
+                  className="font-mono tracking-wider"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="staff-pin-confirm">Confirmar PIN</Label>
+                <Input
+                  id="staff-pin-confirm"
+                  type="password"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  value={pinConfirm}
+                  onChange={e => setPinConfirm(e.target.value.replace(/\D/g, ''))}
+                  placeholder="Repetir PIN"
+                  className="font-mono tracking-wider"
+                />
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="staff-comision">Comisión (%)</Label>
-              <Input
-                id="staff-comision"
-                type="number"
-                min={0}
-                max={100}
-                step="any"
-                value={comision}
-                onChange={e => setComision(e.target.value ? Number(e.target.value) : '')}
-                placeholder="0.5"
-              />
+          {/* Compensation & Fintech */}
+          <div className="space-y-4 pt-2 border-t border-dashed">
+            <h4 className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+              <DollarSign className="h-3 w-3" /> Configuración Fintech
+            </h4>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="staff-salary">Sueldo Base ($)</Label>
+                <Input
+                  id="staff-salary"
+                  type="number"
+                  min={0}
+                  step="any"
+                  value={baseSalaryUsd}
+                  onChange={e => setBaseSalaryUsd(e.target.value ? Number(e.target.value) : '')}
+                  placeholder="Ej: 450"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="staff-goal" className="flex items-center gap-1.5"><Target className="h-3 w-3" /> Meta Mensual ($)</Label>
+                <Input
+                  id="staff-goal"
+                  type="number"
+                  min={0}
+                  step="any"
+                  value={monthlyGoal}
+                  onChange={e => setMonthlyGoal(e.target.value ? Number(e.target.value) : '')}
+                  placeholder="Ganancia objetivo"
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="staff-sueldo">Sueldo ($)</Label>
-              <Input
-                id="staff-sueldo"
-                type="number"
-                min={0}
-                step="any"
-                value={sueldo}
-                onChange={e => setSueldo(e.target.value ? Number(e.target.value) : '')}
-                placeholder="Opcional"
-              />
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="staff-comm-type">Base de Comisión</Label>
+                <Select value={commissionType} onValueChange={(v) => setCommissionType(v as any)}>
+                  <SelectTrigger id="staff-comm-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="total_price">Sobre Venta Total</SelectItem>
+                    <SelectItem value="net_profit">Sobre Ganancia Real</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="staff-comm-pct" className="flex items-center gap-1.5"><Percent className="h-3 w-3" /> Comisión (%)</Label>
+                <Input
+                  id="staff-comm-pct"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="any"
+                  value={commissionPercentage}
+                  onChange={e => setCommissionPercentage(e.target.value ? Number(e.target.value) : '')}
+                  placeholder="Ej: 5"
+                />
+              </div>
             </div>
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
               Cancelar
             </Button>
-            <Button type="submit" disabled={isSaving}>
+            <Button type="submit" disabled={isSaving} className="flex-1">
               {isSaving ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Guardando...
                 </>
               ) : (
-                isEditing ? 'Guardar Cambios' : 'Agregar Empleado'
+                isEditing ? 'Actualizar Perfil' : 'Crear Perfil'
               )}
             </Button>
           </DialogFooter>

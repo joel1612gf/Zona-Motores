@@ -3,8 +3,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useBusinessAuth } from '@/context/business-auth-context';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
-import { useFirestore } from '@/firebase';
+import { collection, getDocs, query, orderBy, updateDoc, doc } from 'firebase/firestore';
+import { useFirestore, useStorage } from '@/firebase';
+import { ref as storageRef, deleteObject } from 'firebase/storage';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -50,6 +51,7 @@ export default function InventoryPage() {
   const slug = params.slug as string;
   const { concesionario, hasPermission, canSeeCosts, currentRole } = useBusinessAuth();
   const firestore = useFirestore();
+  const storage = useStorage();
   const { toast } = useToast();
 
   const [vehicles, setVehicles] = useState<StockVehicle[]>([]);
@@ -89,6 +91,31 @@ export default function InventoryPage() {
         const snap = await getDocs(q);
         const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as StockVehicle));
         setVehicles(list);
+
+        // Cleanup: delete images of vehicles sold more than 30 days ago
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const toClean = list.filter(v =>
+          v.estado_stock === 'vendido' &&
+          v.images && v.images.length > 0 &&
+          v.fecha_venta && v.fecha_venta.toDate() < thirtyDaysAgo
+        );
+        if (toClean.length > 0) {
+          for (const v of toClean) {
+            try {
+              await Promise.all(v.images.map(img => {
+                try { return deleteObject(storageRef(storage, img.url)).catch(() => {}); }
+                catch { return Promise.resolve(); }
+              }));
+              await updateDoc(doc(firestore, 'concesionarios', concesionario!.id, 'inventario', v.id), { images: [] });
+            } catch (e) {
+              console.warn('[Inventory] Could not clean images for', v.id, e);
+            }
+          }
+          setVehicles(prev => prev.map(v =>
+            toClean.some(tc => tc.id === v.id) ? { ...v, images: [] } : v
+          ));
+        }
       } catch (error) {
         console.error('[Inventory] Error loading:', error);
         toast({ title: 'Error', description: 'No se pudo cargar el inventario.', variant: 'destructive' });

@@ -112,6 +112,7 @@ export function VehicleInfoExtraDialog({ open, onOpenChange, vehicle, concesiona
     try {
       const ref = doc(firestore, 'concesionarios', concesionarioId, 'inventario', vehicle.id);
       await updateDoc(ref, {
+        placa: info.placa || '', // Save at top level for easy access in listings
         info_extra: info,
         updated_at: serverTimestamp(),
       });

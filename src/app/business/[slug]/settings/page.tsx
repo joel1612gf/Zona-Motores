@@ -41,9 +41,11 @@ export default function SettingsPage() {
   const [estructuraComision, setEstructuraComision] = useState(5);
   const [margenConsignacion, setMargenConsignacion] = useState(15);
   const [metodosPago, setMetodosPago] = useState<string[]>([]);
+  const [metodosPagoDivisa, setMetodosPagoDivisa] = useState<string[]>([]);
   const [nuevoMetodo, setNuevoMetodo] = useState('');
   const [tasaCambioManual, setTasaCambioManual] = useState('');
   const [tasaCambioAuto, setTasaCambioAuto] = useState(false);
+  const [vehiculosExentosIva, setVehiculosExentosIva] = useState(true);
 
   // Location
   const [markerPos, setMarkerPos] = useState<{ lat: number; lng: number } | null>(null);
@@ -74,8 +76,10 @@ export default function SettingsPage() {
       setMargenConsignacion(concesionario.configuracion.margen_consignacion_porcentaje || 15);
       const mp = concesionario.configuracion.metodos_pago;
       setMetodosPago(Array.isArray(mp) ? mp : typeof mp === 'string' ? (mp as string).split(',').map(s => s.trim()) : []);
+      setMetodosPagoDivisa(concesionario.configuracion.metodos_pago_divisa || []);
       setTasaCambioManual(String(concesionario.configuracion.tasa_cambio_manual || ''));
       setTasaCambioAuto(concesionario.configuracion.tasa_cambio_auto ?? false);
+      setVehiculosExentosIva(concesionario.configuracion.vehiculos_exentos_iva !== false);
     }
     if (concesionario.geolocalizacion) {
       const pos = { lat: concesionario.geolocalizacion.latitude, lng: concesionario.geolocalizacion.longitude };
@@ -112,6 +116,13 @@ export default function SettingsPage() {
 
   const removeMetodoPago = (metodo: string) => {
     setMetodosPago(metodosPago.filter(m => m !== metodo));
+    setMetodosPagoDivisa(metodosPagoDivisa.filter(m => m !== metodo));
+  };
+
+  const toggleDivisaMetodo = (metodo: string) => {
+    setMetodosPagoDivisa(prev =>
+      prev.includes(metodo) ? prev.filter(m => m !== metodo) : [...prev, metodo]
+    );
   };
 
   const handleLinkMarketplace = async () => {
@@ -203,8 +214,10 @@ export default function SettingsPage() {
           estructura_comision: estructuraComision,
           margen_consignacion_porcentaje: margenConsignacion,
           metodos_pago: metodosPago,
+          metodos_pago_divisa: metodosPagoDivisa,
           tasa_cambio_manual: parseFloat(tasaCambioManual) || 0,
           tasa_cambio_auto: tasaCambioAuto,
+          vehiculos_exentos_iva: vehiculosExentosIva,
         },
       });
 
@@ -431,19 +444,47 @@ export default function SettingsPage() {
             </div>
 
             {/* Payment Methods */}
-            <div className="space-y-2">
-              <Label>Métodos de Pago Aceptados</Label>
-              <div className="flex flex-wrap gap-2 mb-2">
-                {metodosPago.map(metodo => (
-                  <Badge key={metodo} variant="secondary" className="gap-1 pl-3 pr-1 py-1">
-                    {metodo}
-                    {!isReadOnly && (
-                      <button onClick={() => removeMetodoPago(metodo)} className="ml-1 hover:text-destructive">
-                        <X className="h-3 w-3" />
-                      </button>
-                    )}
-                  </Badge>
-                ))}
+            <div className="space-y-3">
+              <div>
+                <Label>Métodos de Pago Aceptados</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">Marca con el símbolo <span className="font-bold text-amber-600">$</span> los métodos que son en Dólares/Divisas (activará el IGTF 3% en facturas de ventas).</p>
+              </div>
+              <div className="flex flex-col gap-2">
+                {metodosPago.map(metodo => {
+                  const isDivisa = metodosPagoDivisa.includes(metodo);
+                  return (
+                    <div key={metodo} className="flex items-center justify-between p-2.5 rounded-lg border bg-muted/30">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">{metodo}</span>
+                        {isDivisa && (
+                          <span className="text-xs bg-amber-100 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5 font-semibold">$ Divisa</span>
+                        )}
+                        {!isDivisa && (
+                          <span className="text-xs bg-blue-50 text-blue-600 border border-blue-100 rounded-full px-2 py-0.5">Bs</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {!isReadOnly && (
+                          <button
+                            onClick={() => toggleDivisaMetodo(metodo)}
+                            className={`text-xs px-2 py-1 rounded border transition-colors ${
+                              isDivisa 
+                                ? 'bg-amber-500 text-white border-amber-500 hover:bg-amber-600' 
+                                : 'bg-background text-muted-foreground border-border hover:border-amber-400 hover:text-amber-600'
+                            }`}
+                          >
+                            {isDivisa ? '✓ Divisa ($)' : 'Marcar como $'}
+                          </button>
+                        )}
+                        {!isReadOnly && (
+                          <button onClick={() => removeMetodoPago(metodo)} className="hover:text-destructive text-muted-foreground">
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
                 {metodosPago.length === 0 && (
                   <p className="text-sm text-muted-foreground">No hay métodos de pago configurados.</p>
                 )}
@@ -461,6 +502,26 @@ export default function SettingsPage() {
                   </Button>
                 </div>
               )}
+            </div>
+
+            {/* IVA Exento Vehículos */}
+            <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/30">
+              <div>
+                <p className="text-sm font-medium">Vehículos exentos de IVA</p>
+                <p className="text-xs text-muted-foreground">Si está activo, las facturas de venta no aplican IVA 16% (el monto se registra como exento según ley)</p>
+              </div>
+              <button
+                type="button"
+                disabled={isReadOnly}
+                onClick={() => setVehiculosExentosIva(v => !v)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  vehiculosExentosIva ? 'bg-primary' : 'bg-muted-foreground/30'
+                } disabled:opacity-50`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                  vehiculosExentosIva ? 'translate-x-6' : 'translate-x-1'
+                }`} />
+              </button>
             </div>
           </CardContent>
         </Card>

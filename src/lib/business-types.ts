@@ -141,9 +141,12 @@ export type ConcesionarioConfig = {
   margen_minimo: number; // Minimum profit margin percentage
   estructura_comision: number; // Default commission percentage for sellers
   metodos_pago: string[]; // e.g. ['Zelle', 'Pago Móvil', 'Efectivo', 'Transferencia']
+  metodos_pago_divisa?: string[]; // Subset of metodos_pago that are USD/foreign currency (triggers IGTF)
   margen_consignacion_porcentaje: number; // Default markup for consignment vehicles
   tasa_cambio_manual?: number; // Manual Bs/$ exchange rate
   tasa_cambio_auto?: boolean; // If true, auto-fetch from BCV
+  ultimo_numero_factura_ventas?: number; // Auto-incrementing invoice counter for sales
+  vehiculos_exentos_iva?: boolean; // If true, vehicles are IVA-exempt (no 16% IVA applied to sales invoices)
 };
 
 export type StaffMember = {
@@ -154,8 +157,11 @@ export type StaffMember = {
   rol: BusinessRole;
   pin_hash: string; // SHA-256 of 4-6 digit PIN
   activo: boolean;
-  sueldo?: number;
-  comision_porcentaje?: number;
+  // Payroll & Commissions (New fields for 2026)
+  base_salary_usd?: number;
+  commission_type?: 'total_price' | 'net_profit';
+  commission_percentage?: number;
+  monthly_goal?: number;
   created_at: Timestamp;
 };
 
@@ -245,12 +251,27 @@ export type StockVehicle = {
 
   created_at: Timestamp;
   updated_at?: Timestamp;
+  fecha_venta?: Timestamp; // Set when estado_stock becomes 'vendido' — used to auto-delete images after 30 days
+};
+
+export type VehicleInfoSnapshot = {
+  make: string;
+  model: string;
+  year: number;
+  placa?: string;
+  exteriorColor?: string;
+  serial_carroceria?: string;
+  serial_motor?: string;
+  clase?: string;
+  tipo?: string;
+  mileage?: number;
 };
 
 export type Venta = {
   id: string;
-  vehiculo_id: string;
+  vehiculo_id?: string;
   vehiculo_nombre: string; // e.g. "2020 Toyota Corolla"
+  comprador_id?: string; // Reference to the Cliente document
   comprador_nombre: string;
   comprador_telefono?: string;
   comprador_cedula?: string;
@@ -262,6 +283,42 @@ export type Venta = {
   ganancia_neta: number;
   fecha: Timestamp;
   recibo_url?: string;
+  // New fields for the 5-step wizard
+  tipo_venta?: 'vehiculo' | 'producto';
+  tipo_documento_emitido?: 'factura_fiscal' | 'nota_entrega';
+  numero_factura_venta?: string;   // e.g. "0000001" (progressive)
+  numero_control_venta?: string;   // e.g. "00-0000001" (progressive)
+  vehiculo_info?: VehicleInfoSnapshot; // Snapshot of vehicle data at sale time
+};
+
+export type VehiculoRequerido = {
+  id: string;
+  make: string;
+  model: string;
+  year_min?: number;
+  year_max?: number;
+  budget?: number;
+  status: 'pendiente' | 'completado' | 'cancelado';
+  created_at: Timestamp;
+};
+
+export type Cliente = {
+  id: string;
+  nombre: string;
+  apellido: string;
+  cedula_rif: string;
+  telefono?: string;
+  email?: string;
+  compras_ids: string[]; // List of sale IDs associated with this client
+  documentos_urls?: string[]; // URLs to PDFs of invoices/contracts
+  total_invertido: number; // Sum of all purchases
+  ultima_compra_fecha?: Timestamp;
+  traspaso_pendiente: boolean; // If true, the client hasn't delivered the new title yet
+  traspaso_fecha_limite?: Timestamp; // 30 days after last vehicle purchase
+  tags: string[]; // e.g. ["Comprador de Carros", "Cliente de Taller", "Inversionista"]
+  vehiculos_requeridos?: VehiculoRequerido[];
+  created_at: Timestamp;
+  updated_at?: Timestamp;
 };
 
 export type RegistroCaja = {

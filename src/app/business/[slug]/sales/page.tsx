@@ -7,9 +7,10 @@ import { useFirestore } from '@/firebase';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Receipt, User, Car, Calendar, DollarSign } from 'lucide-react';
+import { Plus, Receipt, User, Car, Calendar, DollarSign, History } from 'lucide-react';
 import type { Venta } from '@/lib/business-types';
 import { SaleFormDialog } from '@/components/business/sale-form-dialog';
+import { SaleHistoryDialog } from '@/components/business/sale-history-dialog';
 
 // Fallback formatters
 const formatMoney = (amount: number) => {
@@ -26,6 +27,7 @@ export default function SalesPage() {
   const { toast } = useToast();
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [ventas, setVentas] = useState<Venta[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -82,10 +84,16 @@ export default function SalesPage() {
           <p className="text-muted-foreground mt-1">Registro de negocios y cierres</p>
         </div>
         {!isReadOnly && (
-          <Button onClick={handleCreate}>
-            <Plus className="h-4 w-4 mr-2" />
-            Registrar Venta
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setHistoryOpen(true)}>
+              <History className="h-4 w-4 mr-2" />
+              Histórico
+            </Button>
+            <Button onClick={handleCreate}>
+              <Plus className="h-4 w-4 mr-2" />
+              Registrar Venta
+            </Button>
+          </div>
         )}
       </div>
 
@@ -168,6 +176,12 @@ export default function SalesPage() {
         onOpenChange={setDialogOpen}
         concesionarioId={concesionario?.id || ''}
         onSave={handleSaveSale}
+      />
+
+      {/* History Dialog */}
+      <SaleHistoryDialog
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
       />
     </div>
   );
