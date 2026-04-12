@@ -226,7 +226,7 @@ export default function ReportsPage() {
 
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative z-10">
-        <div className="space-y-1">
+        <div className="space-y-1 w-full md:w-auto">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-primary rounded-2xl shadow-lg shadow-primary/25">
               <PieChart className="h-6 w-6 text-primary-foreground" />
@@ -238,18 +238,18 @@ export default function ReportsPage() {
           </p>
         </div>
 
-        <div className="flex items-stretch gap-px rounded-2xl border bg-background shadow-sm overflow-hidden backdrop-blur-sm">
-          <div className="px-5 py-3 bg-muted/50 flex flex-col justify-center border-r min-w-[140px]">
+        <div className="flex flex-col sm:flex-row items-stretch gap-px rounded-2xl border bg-background shadow-sm overflow-hidden backdrop-blur-sm w-full sm:w-auto">
+          <div className="px-5 py-3 bg-muted/50 flex flex-col justify-center border-b sm:border-b-0 sm:border-r min-w-0 sm:min-w-[140px]">
             <p className="text-[10px] uppercase font-black text-muted-foreground tracking-widest mb-1">Tasa de Cambio</p>
             <p className="text-sm font-bold font-headline text-primary">{formatCurrency(bcvRate, 'VES')}</p>
           </div>
 
-          <div className="relative group min-w-[220px]">
+          <div className="relative group min-w-0 sm:min-w-[220px] flex-1">
             <Select
               value={selectedDate.toISOString()}
               onValueChange={(val) => setSelectedDate(new Date(val))}
             >
-              <SelectTrigger className="h-full border-none rounded-none px-5 py-3 bg-card hover:bg-muted/30 transition-colors focus:ring-0">
+              <SelectTrigger className="h-full border-none rounded-none px-5 py-3 bg-card hover:bg-muted/30 transition-colors focus:ring-0 w-full">
                 <div className="text-left">
                   <p className="text-[10px] uppercase font-black text-primary tracking-widest mb-1 flex items-center gap-1">
                     <Calendar className="h-2.5 w-2.5" /> Periodo Seleccionado
@@ -281,7 +281,7 @@ export default function ReportsPage() {
       </div>
 
       <Tabs defaultValue="finance" className="w-full relative z-10">
-        <TabsList className="bg-transparent h-auto p-0 gap-8 justify-start border-b w-full rounded-none mb-8">
+        <TabsList className="bg-transparent h-auto p-0 gap-4 sm:gap-8 justify-start border-b w-full rounded-none mb-8 flex-wrap">
           <ModernTabTrigger value="finance" label="Finanzas" icon={Calculator} />
           <ModernTabTrigger value="inventory" label="Inventario" icon={Layers} />
           <ModernTabTrigger value="fiscal" label="Fiscal (SENIAT)" icon={FileText} />
@@ -458,6 +458,47 @@ function ReportRow({ label, amount, hint, highlight, disabled }: any) {
 
 function AgingPill({ label, count, description, isActive, onClick }: any) {
   return (
-    <button onClick={onClick} className={cn("relative p-6 rounded-[2rem] border text-center transition-all duration-300 group overflow-hidden outline-none", isActive ? "bg-primary text-primary-foreground border-primary shadow-xl shadow-primary/20 scale-[1.02]" : "bg-primary/[0.03] border-primary/10 text-primary hover:border-primary/40 hover:bg-primary/[0.06] shadow-sm")}><div className={cn("absolute -right-2 -top-2 w-12 h-12 rounded-full blur-2xl transition-opacity", isActive ? "bg-white/20" : "bg-primary/20 opacity-0 group-hover:opacity-100")} /><div className="relative z-10"><p className="text-3xl font-bold font-headline tracking-tighter mb-1 leading-none text-primary group-data-[state=active]:text-white">{count}</p><p className={cn("text-[10px] font-black uppercase tracking-widest mb-2", isActive ? "text-primary-foreground/80" : "text-primary/70")}>{label}</p><span className={cn("px-2 py-0.5 rounded-full text-[8px] font-bold uppercase ring-1", isActive ? "bg-white/20 ring-white/30 text-white" : "bg-primary/5 ring-primary/20")}>{description}</span></div></button>
+    <button
+      onClick={onClick}
+      className={cn(
+        "relative p-6 rounded-[2rem] border text-center transition-all duration-300 group overflow-hidden outline-none",
+        isActive
+          ? "bg-primary text-primary-foreground border-primary shadow-xl shadow-primary/20 scale-[1.02]"
+          : "bg-primary/[0.03] border-primary/10 text-primary hover:border-primary/40 hover:bg-primary/[0.06] shadow-sm"
+      )}
+    >
+      <div
+        className={cn(
+          "absolute -right-2 -top-2 w-12 h-12 rounded-full blur-2xl transition-opacity",
+          isActive ? "bg-white/20" : "bg-primary/20 opacity-0 group-hover:opacity-100"
+        )}
+      />
+      <div className="relative z-10">
+        <p
+          className={cn(
+            "text-3xl font-bold font-headline tracking-tighter mb-1 leading-none transition-colors",
+            isActive ? "text-white" : "text-primary"
+          )}
+        >
+          {count}
+        </p>
+        <p
+          className={cn(
+            "text-[10px] font-black uppercase tracking-widest mb-2 transition-colors",
+            isActive ? "text-white/80" : "text-primary/70"
+          )}
+        >
+          {label}
+        </p>
+        <span
+          className={cn(
+            "px-2 py-0.5 rounded-full text-[8px] font-bold uppercase ring-1 transition-colors",
+            isActive ? "bg-white/20 ring-white/30 text-white" : "bg-primary/5 ring-primary/20"
+          )}
+        >
+          {description}
+        </span>
+      </div>
+    </button>
   );
 }
