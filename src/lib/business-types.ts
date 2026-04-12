@@ -27,7 +27,8 @@ export type BusinessModule =
   | 'web_sync'
   | 'commissions'
   | 'products'
-  | 'reports';
+  | 'reports'
+  | 'finance';
 
 /**
  * Permission matrix defining which modules each role can access.
@@ -50,6 +51,7 @@ export const ROLE_PERMISSIONS: Record<BusinessRole, Record<BusinessModule, Permi
     commissions: 'full',
     products: 'full',
     reports: 'full',
+    finance: 'full',
   },
   encargado: {
     dashboard: 'read',
@@ -65,6 +67,7 @@ export const ROLE_PERMISSIONS: Record<BusinessRole, Record<BusinessModule, Permi
     commissions: 'read',
     products: 'full',
     reports: 'read',
+    finance: 'full',
   },
   secretario: {
     dashboard: false,
@@ -80,6 +83,7 @@ export const ROLE_PERMISSIONS: Record<BusinessRole, Record<BusinessModule, Permi
     commissions: false,
     products: 'read',
     reports: false,
+    finance: false,
   },
   vendedor: {
     dashboard: false,
@@ -95,6 +99,7 @@ export const ROLE_PERMISSIONS: Record<BusinessRole, Record<BusinessModule, Permi
     commissions: 'own',
     products: 'read',
     reports: false,
+    finance: false,
   },
   cajero: {
     dashboard: false,
@@ -110,6 +115,7 @@ export const ROLE_PERMISSIONS: Record<BusinessRole, Record<BusinessModule, Permi
     commissions: false,
     products: 'read',
     reports: 'read',
+    finance: 'read',
   },
 };
 
@@ -436,6 +442,7 @@ export type Compra = {
   tasa_cambio: number;
   moneda_original?: 'usd' | 'bs';
   estado: 'pendiente' | 'pagada';
+  saldo_pendiente?: number; // Added to support partial payments and fiscal notes
   creado_por: string;
   created_at: Timestamp;
   // Retention fields (only present when proveedor is a retention agent and iva > 0)

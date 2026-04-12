@@ -46,6 +46,7 @@ function getSidebarItems(slug: string): SidebarItem[] {
     { module: 'sales', label: 'Ventas', icon: ShoppingCart, href: `/business/${slug}/sales` },
     { module: 'clients', label: 'Clientes', icon: Users, href: `/business/${slug}/clients` },
     { module: 'consignment', label: 'Consignación', icon: Handshake, href: `/business/${slug}/consignment` },
+    { module: 'finance', label: 'Finanzas', icon: Wallet, href: `/business/${slug}/finance` },
     { module: 'calendar', label: 'Calendario', icon: CalendarDays, href: `/business/${slug}/calendar` },
     { module: 'staff', label: 'Personal', icon: UserCog, href: `/business/${slug}/staff` },
     { module: 'commissions', label: 'Comisiones', icon: Award, href: `/business/${slug}/commissions` },
