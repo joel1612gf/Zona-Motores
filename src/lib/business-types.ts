@@ -26,7 +26,8 @@ export type BusinessModule =
   | 'calendar'
   | 'web_sync'
   | 'commissions'
-  | 'products';
+  | 'products'
+  | 'reports';
 
 /**
  * Permission matrix defining which modules each role can access.
@@ -48,6 +49,7 @@ export const ROLE_PERMISSIONS: Record<BusinessRole, Record<BusinessModule, Permi
     web_sync: 'full',
     commissions: 'full',
     products: 'full',
+    reports: 'full',
   },
   encargado: {
     dashboard: 'read',
@@ -62,6 +64,7 @@ export const ROLE_PERMISSIONS: Record<BusinessRole, Record<BusinessModule, Permi
     web_sync: 'full',
     commissions: 'read',
     products: 'full',
+    reports: 'read',
   },
   secretario: {
     dashboard: false,
@@ -76,6 +79,7 @@ export const ROLE_PERMISSIONS: Record<BusinessRole, Record<BusinessModule, Permi
     web_sync: 'full',
     commissions: false,
     products: 'read',
+    reports: false,
   },
   vendedor: {
     dashboard: false,
@@ -90,6 +94,7 @@ export const ROLE_PERMISSIONS: Record<BusinessRole, Record<BusinessModule, Permi
     web_sync: false,
     commissions: 'own',
     products: 'read',
+    reports: false,
   },
   cajero: {
     dashboard: false,
@@ -104,6 +109,7 @@ export const ROLE_PERMISSIONS: Record<BusinessRole, Record<BusinessModule, Permi
     web_sync: false,
     commissions: false,
     products: 'read',
+    reports: 'read',
   },
 };
 

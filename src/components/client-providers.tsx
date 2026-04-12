@@ -7,6 +7,7 @@ import { SubscriptionProvider } from '@/context/subscription-context';
 import { MakesProvider } from '@/context/makes-context';
 import { FavoritesProvider } from '@/context/favorites-context';
 import { NotificationProvider } from '@/context/notification-context';
+import { CurrencyProvider } from '@/context/currency-context';
 
 export function ClientProviders({ children }: { children: ReactNode }) {
   return (
@@ -17,13 +18,15 @@ export function ClientProviders({ children }: { children: ReactNode }) {
       disableTransitionOnChange
     >
       <FirebaseClientProvider>
-        <SubscriptionProvider>
-          <NotificationProvider>
-            <MakesProvider>
-              <FavoritesProvider>{children}</FavoritesProvider>
-            </MakesProvider>
-          </NotificationProvider>
-        </SubscriptionProvider>
+        <CurrencyProvider>
+          <SubscriptionProvider>
+            <NotificationProvider>
+              <MakesProvider>
+                <FavoritesProvider>{children}</FavoritesProvider>
+              </MakesProvider>
+            </NotificationProvider>
+          </SubscriptionProvider>
+        </CurrencyProvider>
       </FirebaseClientProvider>
     </ThemeProvider>
   );
