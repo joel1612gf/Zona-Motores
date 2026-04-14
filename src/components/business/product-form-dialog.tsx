@@ -244,7 +244,7 @@ export function ProductFormDialog({ open, onOpenChange, product, onSaved }: Prod
                  <div className="grid grid-cols-2 gap-2 pb-2 border-b">
                    <div>
                      <p className="text-xs text-muted-foreground">Fecha Compra</p>
-                     <p>{selectedCompra.created_at?.toDate ? selectedCompra.created_at.toDate().toLocaleDateString() : 'N/A'}</p>
+                     <p>{selectedCompra.created_at?.toDate ? selectedCompra.created_at.toDate().toLocaleDateString() : '—'}</p>
                    </div>
                    <div>
                      <p className="text-xs text-muted-foreground">Tipo Pago</p>
@@ -256,7 +256,7 @@ export function ProductFormDialog({ open, onOpenChange, product, onSaved }: Prod
                    </div>
                    <div>
                      <p className="text-xs text-muted-foreground">Tasa BCV</p>
-                     <p>{selectedCompra.tasa_cambio ? `Bs. ${selectedCompra.tasa_cambio}` : 'N/A'}</p>
+                     <p>{selectedCompra.tasa_cambio ? `Bs. ${selectedCompra.tasa_cambio}` : '—'}</p>
                    </div>
                  </div>
                  <div>
@@ -290,7 +290,7 @@ export function ProductFormDialog({ open, onOpenChange, product, onSaved }: Prod
                              <div>
                                 <p className="font-semibold">{comp.proveedor_nombre || 'Proveedor Desconocido'}</p>
                                 <p className="text-xs text-muted-foreground mt-0.5">
-                                   Factura: {comp.numero_factura || 'N/A'} • {comp.created_at?.toDate ? comp.created_at.toDate().toLocaleDateString() : ''}
+                                   Factura: {comp.numero_factura || '—'} • {comp.created_at?.toDate ? comp.created_at.toDate().toLocaleDateString() : ''}
                                 </p>
                              </div>
                              <div className="text-right">

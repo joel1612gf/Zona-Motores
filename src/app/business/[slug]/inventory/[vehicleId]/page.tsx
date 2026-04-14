@@ -159,7 +159,7 @@ export default function VehicleDetailPage() {
             mileage: vehicle.mileage,
             bodyType: vehicle.bodyType || 'Sedán',
             transmission: vehicle.transmission,
-            engine: vehicle.engine || 'N/A',
+            engine: vehicle.engine || '—',
             exteriorColor: vehicle.exteriorColor || 'Otro',
             ownerCount: 1,
             tireLife: 100,

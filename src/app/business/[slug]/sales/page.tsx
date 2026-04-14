@@ -131,7 +131,7 @@ export default function SalesPage() {
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex items-center">
                         <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
-                        {venta.fecha ? formatTime(venta.fecha) : 'N/A'}
+                        {venta.fecha ? formatTime(venta.fecha) : '—'}
                       </div>
                     </td>
                     <td className="px-4 py-3">

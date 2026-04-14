@@ -238,7 +238,7 @@ export function StaffCommissionModal({
                     const saleComm = commType === 'total_price' ? ((sale.precio_venta || 0) * commPercentage) / 100 : ((sale.ganancia_neta || 0) * commPercentage) / 100;
                     return (
                       <TableRow key={sale.id} className="border-slate-50 hover:bg-slate-50 transition-colors group">
-                        <TableCell className="px-6 py-4 text-sm font-bold text-slate-600">{sale.fecha?.toDate().toLocaleDateString() || 'N/A'}</TableCell>
+                        <TableCell className="px-6 py-4 text-sm font-bold text-slate-600">{sale.fecha?.toDate().toLocaleDateString() || '—'}</TableCell>
                         <TableCell className="px-6 py-4">
                           <div className="font-bold text-slate-900 leading-tight">{sale.vehiculo_nombre}</div>
                           <div className="text-[10px] text-muted-foreground font-mono mt-0.5 uppercase tracking-tighter">{sale.numero_factura_venta || 'SIN FACTURA'}</div>

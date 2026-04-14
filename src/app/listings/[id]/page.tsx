@@ -705,7 +705,7 @@ function ListingDetailContent() {
     mainFeatures.push({ icon: FourByFourIcon, label: 'Es 4x4' });
   }
   if (vehicle.isArmored) {
-    mainFeatures.push({ icon: Shield, label: `Blindado Nivel ${vehicle.armorLevel || 'N/A'}` });
+    mainFeatures.push({ icon: Shield, label: `Blindado Nivel ${vehicle.armorLevel || '—'}` });
   }
   if (vehicle.doorCount) mainFeatures.push({ icon: DoorOpen, label: `${vehicle.doorCount} puertas` });
   if (vehicle.isOperational) mainFeatures.push({ icon: CircleCheck, label: 'Rueda actualmente' });

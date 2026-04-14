@@ -32,7 +32,7 @@ import { useCurrency } from '@/context/currency-context';
 import { FiscalNotePrint } from './fiscal-note-print';
 
 export function FiscalNoteForm({ type, onSuccess }: { type: 'DEBIT' | 'CREDIT', onSuccess: () => void }) {
-  const { concesionario } = useBusinessAuth();
+  const { concesionario, staff } = useBusinessAuth();
   const { bcvRate } = useCurrency();
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -112,23 +112,20 @@ export function FiscalNoteForm({ type, onSuccess }: { type: 'DEBIT' | 'CREDIT', 
       let resultPayload: any = null;
 
       await runTransaction(firestore, async (transaction) => {
-        const settingsRef = doc(firestore, 'concesionarios', concesionario.id, 'configuracion', 'business_settings');
+        const counterRef = doc(firestore, 'concesionarios', concesionario.id, 'contadores', 'retencion_iva');
         const purchaseRef = doc(firestore, 'concesionarios', concesionario.id, 'compras', selectedInvoice.id);
         
-        const settingsSnap = await transaction.get(settingsRef);
+        const counterSnap = await transaction.get(counterRef);
         const purchaseSnap = await transaction.get(purchaseRef);
 
         if (!purchaseSnap.exists()) throw new Error('La factura ya no existe.');
 
         let ivaSeq = 1;
-        if (settingsSnap.exists()) {
-          const data = settingsSnap.data();
-          if (data.last_iva_retention_period === yearMonth) {
-            ivaSeq = (data.last_iva_retention_seq || 0) + 1;
-          }
+        if (counterSnap.exists()) {
+          ivaSeq = (counterSnap.data().ultimo_numero || 0) + 1;
         }
 
-        const ivaRetentionNumber = `${yearMonth}${String(ivaSeq).padStart(4, '0')}`;
+        const ivaRetentionNumber = `${yearMonth}${String(ivaSeq).padStart(8, '0')}`;
         const currentSaldo = purchaseSnap.data().saldo_pendiente ?? purchaseSnap.data().total_usd;
         
         // Balance Adjustment
@@ -152,7 +149,8 @@ export function FiscalNoteForm({ type, onSuccess }: { type: 'DEBIT' | 'CREDIT', 
           iva_retention_number: ivaRetentionNumber,
           status: 'COMPLETADO',
           created_at: serverTimestamp(),
-          created_by: concesionario.owner_uid,
+          created_by: staff?.id || concesionario.owner_uid,
+          creado_por: staff?.nombre || 'Administrador',
         };
 
         transaction.set(noteRef, resultPayload);
@@ -163,10 +161,8 @@ export function FiscalNoteForm({ type, onSuccess }: { type: 'DEBIT' | 'CREDIT', 
           updated_at: serverTimestamp(),
         });
 
-        transaction.set(settingsRef, {
-          last_iva_retention_period: yearMonth,
-          last_iva_retention_seq: ivaSeq,
-        }, { merge: true });
+        // Update unified counter
+        transaction.set(counterRef, { ultimo_numero: ivaSeq, ultimo_prefix: yearMonth, updated_at: serverTimestamp() }, { merge: true });
       });
 
       setSuccessData(resultPayload);
@@ -205,15 +201,22 @@ export function FiscalNoteForm({ type, onSuccess }: { type: 'DEBIT' | 'CREDIT', 
         const opt = {
           margin: 0,
           filename: mode === 'summary' 
-            ? `Nota_${type}_${successData?.invoice_number || 'N_A'}.pdf`
-            : `Retencion_IVA_Nota_${successData?.iva_retention_number || 'N_A'}.pdf`,
+            ? `Nota_Resumen_${successData?.invoice_number || 'N_A'}.pdf`
+            : `Retencion_IVA_${successData?.iva_retention_number || 'N_A'}.pdf`,
           image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true },
+          html2canvas: { 
+            scale: 2, 
+            useCORS: true,
+            logging: false,
+            width: 794, // Approx 210mm in pixels at 96dpi
+            windowWidth: 794
+          },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 
         const clone = element.cloneNode(true) as HTMLElement;
         clone.style.display = 'block';
+        clone.style.width = '210mm';
         await html2pdf().set(opt).from(clone).save();
       } catch (err) {
         console.error('Error generating PDF:', err);
@@ -237,18 +240,18 @@ export function FiscalNoteForm({ type, onSuccess }: { type: 'DEBIT' | 'CREDIT', 
 
         <div className="flex flex-col gap-4 w-full pt-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="flex bg-background border rounded-2xl shadow-sm overflow-hidden h-14">
+            <div className="flex bg-background border rounded-2xl shadow-sm overflow-hidden h-14 items-stretch ring-1 ring-border">
               <Button
                 variant="ghost"
-                className="flex-1 rounded-none border-r px-4 gap-2 h-full font-bold"
+                className="flex-1 rounded-none border-r px-4 gap-2 h-full font-bold text-primary"
                 onClick={() => handlePrint('summary')}
               >
-                <Printer className="w-4 h-4" />
+                <Printer className="w-4 h-4 text-primary" />
                 Imprimir Resumen
               </Button>
               <Button
                 variant="ghost"
-                className="rounded-none px-4 h-full"
+                className="rounded-none px-5 h-full"
                 onClick={() => handleDownload('summary')}
                 title="Descargar PDF"
               >
@@ -256,22 +259,22 @@ export function FiscalNoteForm({ type, onSuccess }: { type: 'DEBIT' | 'CREDIT', 
               </Button>
             </div>
 
-            <div className="flex bg-background border rounded-2xl shadow-sm overflow-hidden h-14">
+            <div className="flex bg-background border rounded-2xl shadow-sm overflow-hidden h-14 items-stretch ring-1 ring-border">
               <Button
                 variant="ghost"
-                className="flex-1 rounded-none border-r px-4 gap-2 h-full font-bold text-emerald-600 hover:text-emerald-700"
+                className="flex-1 rounded-none border-r px-4 gap-2 h-full font-bold text-primary"
                 onClick={() => handlePrint('retention')}
               >
-                <Printer className="w-4 h-4" />
-                Imprimir Retención
+                <Printer className="w-4 h-4 text-primary" />
+                Imprimir IVA
               </Button>
               <Button
                 variant="ghost"
-                className="rounded-none px-4 h-full"
+                className="rounded-none px-5 h-full"
                 onClick={() => handleDownload('retention')}
                 title="Descargar PDF"
               >
-                <Download className="w-4 h-4 text-emerald-600" />
+                <Download className="w-4 h-4 text-primary" />
               </Button>
             </div>
           </div>
@@ -279,7 +282,7 @@ export function FiscalNoteForm({ type, onSuccess }: { type: 'DEBIT' | 'CREDIT', 
           <Button
             size="lg"
             variant="outline"
-            className="w-full rounded-2xl h-12 font-bold"
+            className="w-full rounded-2xl h-14 font-bold shadow-sm"
             onClick={onSuccess}
           >
             Continuar

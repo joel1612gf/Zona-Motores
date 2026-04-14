@@ -439,24 +439,63 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
     if (!concesionario?.id) return;
     setIsCheckingDuplicate(true);
     try {
-      const qFac = query(
+      // Check in 'compras'
+      const qFacPurchase = query(
         collection(firestore, 'concesionarios', concesionario.id, 'compras'),
         where('proveedor_id', '==', selectedProveedor),
         where('numero_factura', '==', numeroFactura.trim())
       );
-      const qCtrl = query(
+      const qCtrlPurchase = query(
         collection(firestore, 'concesionarios', concesionario.id, 'compras'),
         where('proveedor_id', '==', selectedProveedor),
         where('numero_control', '==', numeroControl.trim())
       );
-      const [snapFac, snapCtrl] = await Promise.all([getDocs(qFac), getDocs(qCtrl)]);
+
+      // Check in 'gastos' (LEGALLY a provider cannot repeat invoice numbers even for different services/products)
+      const qFacExpense = query(
+        collection(firestore, 'concesionarios', concesionario.id, 'gastos'),
+        where('provider_id', '==', selectedProveedor),
+        where('invoice_number', '==', numeroFactura.trim())
+      );
+      const qCtrlExpense = query(
+        collection(firestore, 'concesionarios', concesionario.id, 'gastos'),
+        where('provider_id', '==', selectedProveedor),
+        where('control_number', '==', numeroControl.trim())
+      );
+
+      const [snapFacP, snapCtrlP, snapFacE, snapCtrlE] = await Promise.all([
+        getDocs(qFacPurchase),
+        getDocs(qCtrlPurchase),
+        getDocs(qFacExpense),
+        getDocs(qCtrlExpense)
+      ]);
       
-      if (!snapFac.empty) {
-        setDuplicateInvoice(snapFac.docs[0].data());
+      if (!snapFacP.empty) {
+        setDuplicateInvoice({ ...snapFacP.docs[0].data(), source: 'compras' });
         return;
       }
-      if (!snapCtrl.empty) {
-        setDuplicateInvoice(snapCtrl.docs[0].data());
+      if (!snapCtrlP.empty) {
+        setDuplicateInvoice({ ...snapCtrlP.docs[0].data(), source: 'compras' });
+        return;
+      }
+      if (!snapFacE.empty) {
+        const data = snapFacE.docs[0].data();
+        setDuplicateInvoice({ 
+          numero_factura: data.invoice_number, 
+          numero_control: data.control_number,
+          proveedor_nombre: data.provider_name,
+          source: 'gastos' 
+        });
+        return;
+      }
+      if (!snapCtrlE.empty) {
+        const data = snapCtrlE.docs[0].data();
+        setDuplicateInvoice({ 
+          numero_factura: data.invoice_number, 
+          numero_control: data.control_number,
+          proveedor_nombre: data.provider_name,
+          source: 'gastos' 
+        });
         return;
       }
       
@@ -1285,7 +1324,7 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <h1 style={{ fontSize: 18, fontWeight: 'bold', textTransform: 'uppercase', color: '#2563eb', margin: 0 }}>{concesionario?.nombre_empresa}</h1>
-                      <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>RIF: {concesionario?.rif || 'N/A'}</p>
+                      <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>RIF: {concesionario?.rif || '—'}</p>
                     </div>
                   </div>
                   <div style={{ textAlign: 'center', marginBottom: 28 }}>
@@ -1294,14 +1333,14 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24, background: '#f9fafb', border: '1px solid #e5e7eb', padding: 16, borderRadius: 6, fontSize: 13 }}>
                     <div>
-                      <p style={{ margin: '2px 0' }}><strong>N° Factura:</strong> {successData.numero_factura || 'N/A'}</p>
-                      <p style={{ margin: '2px 0' }}><strong>N° Control:</strong> {successData.numero_control || 'N/A'}</p>
+                      <p style={{ margin: '2px 0' }}><strong>N° Factura:</strong> {successData.numero_factura || '—'}</p>
+                      <p style={{ margin: '2px 0' }}><strong>N° Control:</strong> {successData.numero_control || '—'}</p>
                       <p style={{ margin: '2px 0' }}><strong>Proveedor:</strong> {successData.proveedor_nombre}</p>
                       {successData.fecha_factura && <p style={{ margin: '2px 0' }}><strong>Fecha Factura:</strong> {successData.fecha_factura}</p>}
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <p style={{ margin: '2px 0' }}><strong>Fecha Registro:</strong> {now.toLocaleDateString('es-VE')}</p>
-                      <p style={{ margin: '2px 0' }}><strong>Tasa BCV:</strong> {successData.tasa_cambio ? `Bs ${successData.tasa_cambio}` : 'N/A'}</p>
+                      <p style={{ margin: '2px 0' }}><strong>Tasa BCV:</strong> {successData.tasa_cambio ? `Bs ${successData.tasa_cambio}` : '—'}</p>
                       <p style={{ margin: '2px 0' }}><strong>Cargado por:</strong> {staff?.nombre || 'Administrador'}</p>
                       {hasRetention && <p style={{ margin: '2px 0' }}><strong>N° Retención IVA:</strong> {successData.numero_comprobante}</p>}
                     </div>
@@ -1358,7 +1397,7 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <h1 style={{ fontSize: 15, fontWeight: 'bold', textTransform: 'uppercase', color: '#2563eb', letterSpacing: 1, margin: 0 }}>{concesionario?.nombre_empresa}</h1>
-                      <p style={{ fontSize: 12, color: '#6b7280', margin: 0 }}>RIF: {concesionario?.rif || 'N/A'}</p>
+                      <p style={{ fontSize: 12, color: '#6b7280', margin: 0 }}>RIF: {concesionario?.rif || '—'}</p>
                     </div>
                   </div>
                   <div style={{ textAlign: 'center', marginBottom: 16 }}>
@@ -1370,13 +1409,13 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                     <div>
                       <p style={{ fontSize: 10, fontWeight: 'bold', color: '#2563eb', textTransform: 'uppercase', margin: '0 0 6px 0' }}>Datos del Agente de Retención (Comprador)</p>
                       <p style={{ fontSize: 12, margin: '2px 0' }}><strong>Razón Social:</strong> {concesionario?.nombre_empresa}</p>
-                      <p style={{ fontSize: 12, margin: '2px 0' }}><strong>R.I.F.:</strong> {concesionario?.rif || 'N/A'}</p>
-                      <p style={{ fontSize: 12, margin: '2px 0' }}><strong>Dirección:</strong> {concesionario?.direccion || 'N/A'}</p>
+                      <p style={{ fontSize: 12, margin: '2px 0' }}><strong>R.I.F.:</strong> {concesionario?.rif || '—'}</p>
+                      <p style={{ fontSize: 12, margin: '2px 0' }}><strong>Dirección:</strong> {concesionario?.direccion || '—'}</p>
                     </div>
                     <div>
                       <p style={{ fontSize: 10, fontWeight: 'bold', color: '#2563eb', textTransform: 'uppercase', margin: '0 0 6px 0' }}>Datos del Sujeto Retenido (Proveedor)</p>
                       <p style={{ fontSize: 12, margin: '2px 0' }}><strong>Razón Social:</strong> {successData.proveedor_nombre}</p>
-                      <p style={{ fontSize: 12, margin: '2px 0' }}><strong>R.I.F.:</strong> {successData.proveedor_rif || 'N/A'}</p>
+                      <p style={{ fontSize: 12, margin: '2px 0' }}><strong>R.I.F.:</strong> {successData.proveedor_rif || '—'}</p>
                       <p style={{ fontSize: 12, margin: '2px 0' }}><strong>Dirección:</strong> {successData.proveedor_direccion || '—'}</p>
                     </div>
                   </div>
@@ -1388,8 +1427,8 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                   <div style={{ marginBottom: 18 }}>
                     <h3 style={{ fontSize: 12, fontWeight: 'bold', color: '#2563eb', textTransform: 'uppercase', borderBottom: '1.5px solid #dbeafe', paddingBottom: 4, marginBottom: 7 }}>Documentos de Referencia</h3>
                     <p style={{ fontSize: 12, margin: 0 }}>
-                      <strong>Número de Factura Original:</strong> {successData.numero_factura || 'N/A'}&emsp;
-                      <strong>Número de Control Original:</strong> {successData.numero_control || 'N/A'}&emsp;
+                      <strong>Número de Factura Original:</strong> {successData.numero_factura || '—'}&emsp;
+                      <strong>Número de Control Original:</strong> {successData.numero_control || '—'}&emsp;
                       <strong>Fecha de Factura Original:</strong> {successData.fecha_factura || '—'}
                     </p>
                   </div>
@@ -1450,10 +1489,11 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
             <p>Ya existe una factura en el sistema para este proveedor con el mismo número de factura o control.</p>
             {duplicateInvoice && (
               <div className="bg-muted p-3 rounded-md text-left mt-2">
+                <p className="text-[10px] font-black uppercase text-primary mb-1">Registro detectado en: {duplicateInvoice.source === 'gastos' ? 'Módulo de Gastos' : 'Módulo de Compras'}</p>
                 <p><strong>N° Factura:</strong> {duplicateInvoice.numero_factura}</p>
                 <p><strong>N° Control:</strong> {duplicateInvoice.numero_control}</p>
-                <p><strong>Total:</strong> ${duplicateInvoice.total_usd.toFixed(2)}</p>
-                <p><strong>Cargado por:</strong> {duplicateInvoice.creado_por}</p>
+                {duplicateInvoice.total_usd && <p><strong>Total:</strong> ${duplicateInvoice.total_usd.toFixed(2)}</p>}
+                {duplicateInvoice.creado_por && <p><strong>Cargado por:</strong> {duplicateInvoice.creado_por}</p>}
               </div>
             )}
             <p className="font-semibold text-destructive mt-2">No se puede registrar de nuevo.</p>

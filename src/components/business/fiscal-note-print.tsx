@@ -1,8 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Concesionario } from '@/lib/business-types';
-import { formatCurrency } from '@/lib/utils';
+import { LegalRetentionVoucher } from './legal-retention-voucher';
 
 interface FiscalNotePrintProps {
   printMode: 'summary' | 'retention';
@@ -12,211 +13,160 @@ interface FiscalNotePrintProps {
 }
 
 export function FiscalNotePrint({ printMode, concesionario, noteData, rootId = 'fiscal-note-print-root' }: FiscalNotePrintProps) {
-  if (!noteData || !concesionario) return null;
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!noteData || !concesionario || !mounted) return null;
 
   const now = new Date();
   const isBs = noteData.currency === 'VES';
   const sym = isBs ? 'Bs.' : '$';
   const rate = noteData.exchange_rate || 1;
   
-  // Note number logic: invoice_number + "-1"
   const noteNumber = `${noteData.invoice_number}-1`;
+  const formatNoteCurrency = (amount: any) => (parseFloat(amount) || 0).toFixed(2);
 
-  const formatBs = (usd: number) => (usd * rate).toFixed(2);
-  const formatNoteCurrency = (amount: number) => amount.toFixed(2);
+  const formatDateYYYYMMDD = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}/${m}/${d}`;
+  };
 
-  return (
-    <div id={rootId} style={{ display: 'none', position: 'absolute', top: 0, left: 0, width: '210mm', background: 'white', color: 'black', zIndex: 9999 }}>
+  const content = (
+    <div 
+      id={rootId} 
+      style={{ 
+        display: 'none', 
+        width: '210mm',
+        background: 'white', 
+        color: 'black', 
+        margin: 0,
+        padding: 0,
+        boxSizing: 'border-box'
+      }}
+    >
       <style type="text/css">{`
         @media print {
-          body * { visibility: hidden !important; }
-          #${rootId}, #${rootId} * { visibility: visible !important; }
-          #${rootId} { position: absolute !important; left: 0 !important; top: 0 !important; display: block !important; width: 210mm !important; }
+          html, body { height: auto; margin: 0 !important; padding: 0 !important; overflow: visible !important; }
+          body > * { display: none !important; }
+          #${rootId} { 
+            display: block !important; 
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 210mm !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
         }
-        @page { size: A4; margin: 0mm; }
-        .print-root { width: 100%; background: white !important; font-family: sans-serif; }
+        @page { size: A4 portrait; margin: 0; }
+        .print-page { 
+          width: 210mm; 
+          min-height: 297mm; 
+          padding: 15mm; 
+          box-sizing: border-box;
+          background: white !important;
+          font-family: 'Helvetica', 'Arial', sans-serif;
+          position: relative;
+        }
       `}</style>
 
       <div className="print-root">
-        {/* SUMMARY PAGE */}
+        {/* SUMMARY */}
         {printMode === 'summary' && (
-          <div style={{ padding: '15mm', minHeight: '297mm', boxSizing: 'border-box' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #e5e7eb', paddingBottom: '10px', marginBottom: '20px' }}>
-              <div>
-                {concesionario.logo_url ? (
-                  <img src={concesionario.logo_url} alt="Logo" style={{ width: '70px', height: '70px', objectFit: 'contain' }} />
-                ) : (
-                  <div style={{ width: '70px', height: '70px', background: '#2563eb', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '24px', borderRadius: '8px' }}>ZM</div>
-                )}
+          <div style={{ padding: '8mm 15mm 5mm 15mm', height: '297mm', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', position: 'relative', background: 'white', color: 'black' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+              <div>{concesionario?.logo_url
+                ? <img src={concesionario.logo_url} alt="Logo" crossOrigin="anonymous" style={{ width: 65, height: 65, objectFit: 'contain' }} />
+                : <div style={{ width: 65, height: 65, background: '#2563eb', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: 22, borderRadius: 4 }}>ZM</div>}
               </div>
               <div style={{ textAlign: 'right' }}>
-                <h1 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0 }}>{concesionario.nombre_empresa}</h1>
-                <p style={{ fontSize: '12px', margin: '2px 0' }}>RIF: {concesionario.rif}</p>
-                <p style={{ fontSize: '10px', margin: '2px 0', color: '#666' }}>{concesionario.direccion}</p>
+                <h1 style={{ fontSize: 15, fontWeight: 'bold', textTransform: 'uppercase', color: '#2563eb', letterSpacing: 1, margin: 0 }}>{concesionario?.nombre_empresa}</h1>
+                <p style={{ fontSize: 12, color: '#6b7280', margin: 0 }}>RIF: {concesionario?.rif || '—'}</p>
               </div>
             </div>
-
-            <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-              <h2 style={{ fontSize: '22px', fontWeight: 'bold', margin: 0 }}>RESUMEN DE NOTA DE {noteData.type === 'DEBIT' ? 'DÉBITO' : 'CRÉDITO'}</h2>
-              <div style={{ width: '50px', height: '3px', background: '#2563eb', margin: '10px auto' }}></div>
+            <div style={{ textAlign: 'center', marginBottom: 16 }}>
+              <h2 style={{ fontSize: 20, fontWeight: 'bold', textTransform: 'uppercase', margin: 0 }}>Resumen de Nota de {noteData.type === 'DEBIT' ? 'Débito' : 'Crédito'}</h2>
             </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '30px', background: '#f9fafb', padding: '15px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14, background: '#f9fafb', border: '1px solid #dbeafe', padding: 14, borderRadius: 6, fontSize: 12 }}>
               <div>
-                <p style={{ margin: '4px 0', fontSize: '13px' }}><strong>N° de Nota:</strong> {noteNumber}</p>
-                <p style={{ margin: '4px 0', fontSize: '13px' }}><strong>Factura Afectada:</strong> {noteData.invoice_number}</p>
-                <p style={{ margin: '4px 0', fontSize: '13px' }}><strong>Proveedor:</strong> {noteData.provider_name}</p>
+                <p style={{ margin: '2px 0' }}><strong>Número de Nota:</strong> {noteData.id?.slice(-8).toUpperCase() || 'N/A'}</p>
+                <p style={{ margin: '2px 0' }}><strong>Factura Afectada:</strong> {noteData.invoice_number || 'N/A'}</p>
+                <p style={{ margin: '2px 0' }}><strong>Proveedor:</strong> {noteData.provider_name} {noteData.provider_rif ? `(${noteData.provider_rif})` : ''}</p>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <p style={{ margin: '4px 0', fontSize: '13px' }}><strong>Fecha:</strong> {now.toLocaleDateString('es-VE')}</p>
-                <p style={{ margin: '4px 0', fontSize: '13px' }}><strong>Moneda:</strong> {noteData.currency}</p>
-                <p style={{ margin: '4px 0', fontSize: '13px' }}><strong>Tasa:</strong> {rate.toFixed(2)} Bs.</p>
+                <p style={{ margin: '2px 0' }}><strong>Fecha Operación:</strong> {formatDateYYYYMMDD(now)}</p>
+                <p style={{ margin: '2px 0' }}><strong>Tasa BCV:</strong> {noteData.exchange_rate ? `Bs ${parseFloat(noteData.exchange_rate).toFixed(2)}` : 'N/A'}</p>
+                <p style={{ margin: '2px 0' }}><strong>Cargado por:</strong> {noteData.creado_por || 'Administrador'}</p>
+              </div>
+              {/* Disclaimer centered at the bottom of the grid box */}
+              <div style={{ gridColumn: '1 / span 2', textAlign: 'center', marginTop: 8, borderTop: '0.5px solid #ffffffff', paddingTop: 6 }}>
+                <p style={{ margin: 0, fontSize: 10, color: '#9ca3af', fontStyle: 'italic' }}>
+                  Este documento no tiene validez fiscal.
+                </p>
               </div>
             </div>
 
-            <div style={{ marginBottom: '30px' }}>
-              <h3 style={{ fontSize: '14px', fontWeight: 'bold', borderBottom: '1px solid #eee', paddingBottom: '5px', marginBottom: '10px' }}>MOTIVO DEL AJUSTE</h3>
-              <p style={{ fontSize: '13px', lineHeight: '1.5', color: '#374151' }}>{noteData.reason}</p>
+            <h3 style={{ fontWeight: 'bold', borderBottom: '1.5px solid #dbeafe', paddingBottom: 4, marginBottom: 7, fontSize: 12, color: '#2563eb', textTransform: 'uppercase' }}>Resumen de la operación:</h3>
+            <div style={{ padding: '10px 14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 12, lineHeight: 1.5, marginBottom: 18, minHeight: '60px' }}>
+              {noteData.reason || 'Sin descripción detallada.'}
             </div>
 
-            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '30px' }}>
-              <thead>
-                <tr style={{ background: '#f3f4f6' }}>
-                  <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #e5e7eb', fontSize: '12px' }}>DESCRIPCIÓN</th>
-                  <th style={{ padding: '10px', textAlign: 'right', border: '1px solid #e5e7eb', fontSize: '12px', width: '150px' }}>MONTO ({noteData.currency})</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td style={{ padding: '10px', border: '1px solid #e5e7eb', fontSize: '13px' }}>MONTO GRAVABLE</td>
-                  <td style={{ padding: '10px', border: '1px solid #e5e7eb', textAlign: 'right', fontSize: '13px' }}>{sym} {formatNoteCurrency(noteData.taxable_amount)}</td>
-                </tr>
-                <tr>
-                  <td style={{ padding: '10px', border: '1px solid #e5e7eb', fontSize: '13px' }}>MONTO EXENTO</td>
-                  <td style={{ padding: '10px', border: '1px solid #e5e7eb', textAlign: 'right', fontSize: '13px' }}>{sym} {formatNoteCurrency(noteData.exempt_amount)}</td>
-                </tr>
-                <tr>
-                  <td style={{ padding: '10px', border: '1px solid #e5e7eb', fontSize: '13px' }}>I.V.A. (16%)</td>
-                  <td style={{ padding: '10px', border: '1px solid #e5e7eb', textAlign: 'right', fontSize: '13px' }}>{sym} {formatNoteCurrency(noteData.iva_amount)}</td>
-                </tr>
-                {noteData.igtf_amount > 0 && (
-                  <tr>
-                    <td style={{ padding: '10px', border: '1px solid #e5e7eb', fontSize: '13px' }}>I.G.T.F. (3%)</td>
-                    <td style={{ padding: '10px', border: '1px solid #e5e7eb', textAlign: 'right', fontSize: '13px' }}>{sym} {formatNoteCurrency(noteData.igtf_amount)}</td>
-                  </tr>
+            <div style={{ marginLeft: 'auto', width: 260, fontSize: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #d1d5db', paddingTop: 6, marginBottom: 4 }}>
+                <span style={{ fontWeight: 600 }}>Monto Exento:</span><span>{sym}{formatNoteCurrency(noteData.exempt_amount)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ fontWeight: 600 }}>Monto Gravable:</span><span>{sym}{formatNoteCurrency(noteData.taxable_amount)}</span>
+              </div>
+              {parseFloat(noteData.iva_amount) > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span style={{ fontWeight: 600 }}>IVA (16%):</span><span>{sym}{formatNoteCurrency(noteData.iva_amount)}</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', marginBottom: 4 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                  <span style={{ fontWeight: 600 }}>IGTF (3%):</span>
+                  <span>{sym}{formatNoteCurrency(noteData.igtf_amount || 0)}</span>
+                </div>
+                {!isBs && noteData.exchange_rate && parseFloat(noteData.igtf_amount) > 0 && (
+                  <div style={{ fontSize: 9, color: '#6b7280', marginTop: 1 }}>
+                    Equiv: Bs {(parseFloat(noteData.igtf_amount) * noteData.exchange_rate).toFixed(2)}
+                  </div>
                 )}
-                <tr style={{ background: '#f9fafb', fontWeight: 'bold' }}>
-                  <td style={{ padding: '10px', border: '1px solid #e5e7eb', fontSize: '14px' }}>TOTAL NOTA</td>
-                  <td style={{ padding: '10px', border: '1px solid #e5e7eb', textAlign: 'right', fontSize: '14px', color: '#2563eb' }}>{sym} {formatNoteCurrency(noteData.total_amount)}</td>
-                </tr>
-              </tbody>
-            </table>
-
-            <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-around', paddingTop: '50px' }}>
-              <div style={{ textAlign: 'center', width: '200px', borderTop: '1px solid #000', paddingTop: '8px', fontSize: '11px' }}>
-                FIRMA AUTORIZADA
               </div>
-              <div style={{ textAlign: 'center', width: '200px', borderTop: '1px solid #000', paddingTop: '8px', fontSize: '11px' }}>
-                RECIBIDO POR
+              
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', borderTop: '2px solid #d1d5db', paddingTop: 6 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontWeight: 'bold', fontSize: 15 }}>
+                  <span>Total Nota:</span><span style={{ color: '#2563eb' }}>{sym}{formatNoteCurrency(noteData.total_amount)}</span>
+                </div>
+                {!isBs && noteData.exchange_rate && (
+                  <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>
+                    Equivalente: Bs {(parseFloat(noteData.total_amount) * noteData.exchange_rate).toFixed(2)}
+                  </div>
+                )}
               </div>
             </div>
           </div>
         )}
 
-        {/* RETENTION PAGE */}
+        {/* RETENTION (LEGAL) */}
         {printMode === 'retention' && (
-          <div style={{ padding: '15mm', minHeight: '297mm', boxSizing: 'border-box' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
-              <div>
-                {concesionario.logo_url ? (
-                  <img src={concesionario.logo_url} alt="Logo" style={{ width: '65px', height: '65px', objectFit: 'contain' }} />
-                ) : (
-                  <div style={{ width: '65px', height: '65px', background: '#2563eb', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '22px', borderRadius: '4px' }}>ZM</div>
-                )}
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <h1 style={{ fontSize: '15px', fontWeight: 'bold', textTransform: 'uppercase', color: '#2563eb', margin: 0 }}>{concesionario.nombre_empresa}</h1>
-                <p style={{ fontSize: '12px', color: '#6b7280', margin: 0 }}>RIF: {concesionario.rif}</p>
-              </div>
-            </div>
-
-            <div style={{ textAlign: 'center', marginBottom: '16px' }}>
-              <h2 style={{ fontSize: '20px', fontWeight: 'bold', textTransform: 'uppercase', margin: 0 }}>Comprobante de Retención de I.V.A.</h2>
-              <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>Providencia Administrativa N° SNAT/2015/0049 (Revisada 2026)</p>
-              <div style={{ width: '60px', height: '3px', background: '#2563eb', margin: '6px auto' }}></div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px', background: '#f9fafb', border: '1px solid #dbeafe', padding: '14px', borderRadius: '6px' }}>
-              <div>
-                <p style={{ fontSize: '10px', fontWeight: 'bold', color: '#2563eb', textTransform: 'uppercase', margin: '0 0 6px 0' }}>Datos del Agente de Retención (Comprador)</p>
-                <p style={{ fontSize: '12px', margin: '2px 0' }}><strong>Razón Social:</strong> {concesionario.nombre_empresa}</p>
-                <p style={{ fontSize: '12px', margin: '2px 0' }}><strong>R.I.F.:</strong> {concesionario.rif}</p>
-                <p style={{ fontSize: '12px', margin: '2px 0' }}><strong>Dirección:</strong> {concesionario.direccion}</p>
-              </div>
-              <div>
-                <p style={{ fontSize: '10px', fontWeight: 'bold', color: '#2563eb', textTransform: 'uppercase', margin: '0 0 6px 0' }}>Datos del Sujeto Retenido (Proveedor)</p>
-                <p style={{ fontSize: '12px', margin: '2px 0' }}><strong>Razón Social:</strong> {noteData.provider_name}</p>
-                <p style={{ fontSize: '12px', margin: '2px 0' }}><strong>R.I.F.:</strong> {noteData.provider_rif || 'N/A'}</p>
-                <p style={{ fontSize: '12px', margin: '2px 0' }}><strong>Dirección:</strong> {noteData.provider_direccion || '—'}</p>
-              </div>
-            </div>
-
-            <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', padding: '8px 14px', borderRadius: '6px', marginBottom: '14px', fontSize: '12px' }}>
-              <p style={{ margin: '2px 0' }}><strong>Número de Comprobante:</strong> {noteData.iva_retention_number}</p>
-              <p style={{ margin: '2px 0' }}><strong>Fecha de Emisión del Comprobante:</strong> {now.toLocaleDateString('es-VE')}</p>
-              <p style={{ margin: '2px 0' }}><strong>Período Fiscal:</strong> Año {now.getFullYear()} / Mes {String(now.getMonth() + 1).padStart(2, '0')}</p>
-            </div>
-
-            <div style={{ marginBottom: '18px' }}>
-              <h3 style={{ fontSize: '12px', fontWeight: 'bold', color: '#2563eb', textTransform: 'uppercase', borderBottom: '1.5px solid #dbeafe', paddingBottom: '4px', marginBottom: '7px' }}>Documentos de Referencia</h3>
-              <p style={{ fontSize: '12px', margin: 0 }}>
-                <strong>N° Nota correspondiente a esta retención:</strong> {noteNumber}&emsp;
-                <strong>N° Control correspondiente:</strong> {noteData.control_number || 'N/A'}&emsp;
-                <br />
-                <strong>Factura Original Afectada:</strong> {noteData.invoice_number}&emsp;
-                <strong>Fecha de Operación:</strong> {now.toLocaleDateString('es-VE')}
-              </p>
-            </div>
-
-            <table style={{ width: '60%', marginLeft: 'auto', borderCollapse: 'collapse', fontSize: '12px' }}>
-              <tbody>
-                {[
-                  ['Total Nota (Incluyendo IVA):', `Bs ${formatBs(noteData.total_usd || 0)}`],
-                  ['Monto Exento:', `Bs ${formatBs(noteData.exempt_amount / (isBs ? 1 : 1/rate))}`],
-                  ['Base Imponible (Monto Gravable):', `Bs ${formatBs(noteData.taxable_amount / (isBs ? 1 : 1/rate))}`],
-                  ['Alícuota %:', '16%'],
-                  ['Impuesto Causado (I.V.A. Total):', `Bs ${formatBs(noteData.iva_amount / (isBs ? 1 : 1/rate))}`],
-                  ['Porcentaje de Retención:', '75%'], // Hardcoded or from provider if available
-                ].map(([label, value], i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                    <td style={{ padding: '4px 8px', textAlign: 'right', color: '#374151' }}>{label}</td>
-                    <td style={{ padding: '4px 8px', textAlign: 'right', width: '120px' }}>{value}</td>
-                  </tr>
-                ))}
-                <tr style={{ background: '#dbeafe' }}>
-                  <td style={{ padding: '6px 8px', textAlign: 'right', color: '#1d4ed8', fontWeight: 'bold' }}>I.V.A. RETENIDO:</td>
-                  <td style={{ padding: '6px 8px', textAlign: 'right', color: '#1d4ed8', fontWeight: 'bold', fontSize: '14px', width: '120px' }}>Bs {formatBs((noteData.iva_amount * 0.75) / (isBs ? 1 : 1/rate))}</td>
-                </tr>
-              </tbody>
-            </table>
-
-            <p style={{ fontSize: '10px', color: '#6b7280', textAlign: 'center', fontStyle: 'italic', padding: '20px 0' }}>
-              Este comprobante se emite en función a lo establecido en la Providencia Administrativa N° SNAT/2015/0049.
-            </p>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '50px', marginTop: 'auto' }}>
-              <div style={{ borderTop: '1px solid #374151', paddingTop: '8px', textAlign: 'center', fontSize: '11px' }}>
-                <p style={{ margin: 0 }}>Firma y Sello Agente de Retención</p>
-                <p style={{ margin: 0, color: '#6b7280' }}>({concesionario.nombre_empresa})</p>
-              </div>
-              <div style={{ borderTop: '1px solid #374151', paddingTop: '8px', textAlign: 'center', fontSize: '11px' }}>
-                <p style={{ margin: 0 }}>Recibido por (Proveedor):</p>
-                <p style={{ margin: 0, color: '#6b7280' }}>Nombre/Firma/Cédula/Fecha</p>
-              </div>
-            </div>
-          </div>
+          <LegalRetentionVoucher 
+            concesionario={concesionario} 
+            data={{
+              ...noteData,
+              date: formatDateYYYYMMDD(now) // Current date for issuance
+            }} 
+          />
         )}
       </div>
     </div>
   );
+
+  return createPortal(content, document.body);
 }

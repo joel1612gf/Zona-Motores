@@ -33,21 +33,21 @@ export default function FinancePage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-          <Button 
+          <Button
             variant="outline"
             onClick={() => setFiscalNote({ open: true, type: 'DEBIT' })}
             className="flex-1 md:flex-none rounded-2xl h-12 px-6 border-primary/20 hover:bg-primary/5 gap-2 font-bold"
           >
             <ArrowUpCircle className="h-5 w-5 text-primary" /> Nota Débito
           </Button>
-          <Button 
+          <Button
             variant="outline"
             onClick={() => setFiscalNote({ open: true, type: 'CREDIT' })}
             className="flex-1 md:flex-none rounded-2xl h-12 px-6 border-emerald-500/20 hover:bg-emerald-500/5 gap-2 font-bold"
           >
             <ArrowDownCircle className="h-5 w-5 text-emerald-500" /> Nota Crédito
           </Button>
-          <Button 
+          <Button
             onClick={() => setShowExpenseWizard(true)}
             className="flex-1 md:flex-none rounded-2xl h-12 px-6 shadow-xl shadow-primary/20 gap-2 font-bold"
           >
@@ -72,7 +72,7 @@ export default function FinancePage() {
         <TabsContent value="expenses" className="space-y-6">
           <Card className="border-none shadow-2xl bg-card/60 backdrop-blur-md ring-1 ring-border rounded-[2.5rem] overflow-hidden">
             <CardHeader className="p-8 pb-4">
-              <CardTitle className="text-xl font-headline">Historial de Egresos</CardTitle>
+              <CardTitle className="text-xl font-headline">Historial de Gastos</CardTitle>
               <CardDescription>Visualice y gestione los gastos operativos del negocio</CardDescription>
             </CardHeader>
             <CardContent className="p-8 pt-0">
@@ -111,9 +111,9 @@ export default function FinancePage() {
       </Tabs>
 
       {showExpenseWizard && (
-        <ExpenseWizard 
-          open={showExpenseWizard} 
-          onOpenChange={setShowExpenseWizard} 
+        <ExpenseWizard
+          open={showExpenseWizard}
+          onOpenChange={setShowExpenseWizard}
         />
       )}
 

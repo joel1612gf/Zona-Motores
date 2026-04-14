@@ -222,7 +222,7 @@ export function VehicleInfoExtraDialog({ open, onOpenChange, vehicle, concesiona
                 <div key={key} className="space-y-1.5">
                   <Label className="text-sm">{label}</Label>
                   <Input
-                    placeholder={`Ej: ${label.split(' ')[1]?.toUpperCase() || 'N/A'}-XXXX`}
+                    placeholder={`Ej: ${label.split(' ')[1]?.toUpperCase() || '—'}-XXXX`}
                     value={(info as any)[key] || ''}
                     onChange={e => setField(key as keyof VehicleInfoExtra, e.target.value.toUpperCase())}
                     className="font-mono text-sm"

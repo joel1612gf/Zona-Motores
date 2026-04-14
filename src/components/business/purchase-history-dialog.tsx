@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Search, Loader2, Calendar, FileText, User, ChevronDown, ChevronUp, Printer, Download, Trash2 } from 'lucide-react';
 import type { Compra } from '@/lib/business-types';
 import { useToast } from '@/hooks/use-toast';
+import { LegalRetentionVoucher } from './legal-retention-voucher';
 
 export function PurchaseHistoryDialog({
   open,
@@ -158,7 +159,7 @@ export function PurchaseHistoryDialog({
         window.print();
         element.style.display = 'none';
       }
-    }, 250);
+    }, 600);
   };
 
   const handleDownload = async (e: React.MouseEvent, compra: Compra, mode: 'retention' | 'summary') => {
@@ -644,10 +645,16 @@ export function PurchaseHistoryDialog({
 
         const formatDateVE = (dateStr: string) => {
           if (!dateStr) return '—';
-          // If it's YYYY-MM-DD
+          // Unified format YYYY/MM/DD
           if (dateStr.includes('-')) {
             const [y, m, d] = dateStr.split('-');
-            return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+            return `${y}/${m.padStart(2, '0')}/${d.padStart(2, '0')}`;
+          }
+          if (dateStr.includes('/')) {
+            const parts = dateStr.split('/');
+            if (parts[0].length === 4) return dateStr; // already YYYY/MM/DD
+            const [d, m, y] = parts;
+            return `${y}/${m.padStart(2, '0')}/${d.padStart(2, '0')}`;
           }
           return dateStr;
         };
@@ -699,12 +706,12 @@ export function PurchaseHistoryDialog({
                 <div className={hasRetention && printMode === 'both' ? 'page-break-after' : ''} style={{ padding: '8mm 15mm 5mm 15mm', height: '297mm', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', position: 'relative' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
                     <div>{concesionario?.logo_url
-                      ? <img src={concesionario.logo_url} alt="Logo" style={{ width: 65, height: 65, objectFit: 'contain' }} />
+                      ? <img src={concesionario.logo_url} alt="Logo" crossOrigin="anonymous" style={{ width: 65, height: 65, objectFit: 'contain' }} />
                       : <div style={{ width: 65, height: 65, background: '#2563eb', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: 22, borderRadius: 4 }}>ZM</div>}
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <h1 style={{ fontSize: 15, fontWeight: 'bold', textTransform: 'uppercase', color: '#2563eb', letterSpacing: 1, margin: 0 }}>{concesionario?.nombre_empresa}</h1>
-                      <p style={{ fontSize: 12, color: '#6b7280', margin: 0 }}>RIF: {concesionario?.rif || 'N/A'}</p>
+                      <p style={{ fontSize: 12, color: '#6b7280', margin: 0 }}>RIF: {concesionario?.rif || '—'}</p>
                     </div>
                   </div>
                   <div style={{ textAlign: 'center', marginBottom: 16 }}>
@@ -714,14 +721,14 @@ export function PurchaseHistoryDialog({
                     <div>
                       <p style={{ margin: '2px 0' }}><strong>N° Factura:</strong> {printData.numero_factura || 'N/A'}</p>
                       <p style={{ margin: '2px 0' }}><strong>N° Control:</strong> {printData.numero_control || 'N/A'}</p>
-                      <p style={{ margin: '2px 0' }}><strong>Proveedor:</strong> {printData.proveedor_nombre} {(printData as any).proveedor_rif ? `(${(printData as any).proveedor_rif})` : ''}</p>
-                      {(printData as any).fecha_factura && <p style={{ margin: '2px 0' }}><strong>Fecha Factura:</strong> {formatDateVE((printData as any).fecha_factura)}</p>}
+                      <p style={{ margin: '2px 0' }}><strong>Proveedor:</strong> {printData.proveedor_nombre} {printData.proveedor_rif ? `(${printData.proveedor_rif})` : ''}</p>
+                      {printData.fecha_factura && <p style={{ margin: '2px 0' }}><strong>Fecha Factura:</strong> {formatDateVE(printData.fecha_factura)}</p>}
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <p style={{ margin: '2px 0' }}><strong>Fecha Registro:</strong> {registeredAt.toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric' })}</p>
+                      <p style={{ margin: '2px 0' }}><strong>Fecha Registro:</strong> {`${registeredAt.getFullYear()}/${String(registeredAt.getMonth() + 1).padStart(2, '0')}/${String(registeredAt.getDate()).padStart(2, '0')}`}</p>
                       <p style={{ margin: '2px 0' }}><strong>Tasa BCV:</strong> {printData.tasa_cambio ? `Bs ${printData.tasa_cambio.toFixed(2)}` : 'N/A'}</p>
                       <p style={{ margin: '2px 0' }}><strong>Cargado por:</strong> {printData.creado_por || 'Administrador'}</p>
-                      {hasRetention && <p style={{ margin: '2px 0' }}><strong>N° Retención IVA:</strong> {(printData as any).numero_comprobante}</p>}
+                      {hasRetention && <p style={{ margin: '2px 0' }}><strong>N° Retención IVA:</strong> {printData.numero_comprobante}</p>}
                     </div>
                     {/* Disclaimer centered at the bottom of the grid box */}
                     <div style={{ gridColumn: '1 / span 2', textAlign: 'center', marginTop: 8, borderTop: '0.5px solid #ffffffff', paddingTop: 6 }}>
@@ -791,99 +798,29 @@ export function PurchaseHistoryDialog({
                 </div>
               )}
 
-              {/* PAGE 2: COMPROBANTE DE RETENCIÓN (conditional) */}
+              {/* PAGE 2: COMPROBANTE DE RETENCIÓN */}
               {hasRetention && (printMode === 'both' || printMode === 'retention') && (
-                <div style={{ padding: '8mm 15mm 5mm 15mm', height: '284mm', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', position: 'relative' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
-                    <div>
-                      {concesionario?.logo_url ? (
-                        <img
-                          src={concesionario.logo_url}
-                          alt="Logo"
-                          style={{ width: 65, height: 65, objectFit: 'contain' }}
-                        />
-                      ) : (
-                        <div style={{ width: 65, height: 65, background: '#2563eb', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: 22, borderRadius: 4 }}>ZM</div>
-                      )}
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <h1 style={{ fontSize: 15, fontWeight: 'bold', textTransform: 'uppercase', color: '#2563eb', letterSpacing: 1, margin: 0 }}>{concesionario?.nombre_empresa}</h1>
-                      <p style={{ fontSize: 12, color: '#6b7280', margin: 0 }}>RIF: {concesionario?.rif || 'N/A'}</p>
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'center', marginBottom: 16 }}>
-                    <h2 style={{ fontSize: 20, fontWeight: 'bold', textTransform: 'uppercase', margin: 0 }}>Comprobante de Retención de I.V.A.</h2>
-                    <p style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>Providencia Administrativa N° SNAT/2025/000054 de fecha 02/07/2025</p>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14, background: '#f9fafb', border: '1px solid #dbeafe', padding: 14, borderRadius: 6 }}>
-                    <div>
-                      <p style={{ fontSize: 10, fontWeight: 'bold', color: '#2563eb', textTransform: 'uppercase', margin: '0 0 6px 0' }}>Datos del Agente de Retención (Comprador)</p>
-                      <p style={{ fontSize: 12, margin: '2px 0' }}><strong>Razón Social:</strong> {concesionario?.nombre_empresa}</p>
-                      <p style={{ fontSize: 12, margin: '2px 0' }}><strong>R.I.F.:</strong> {concesionario?.rif || 'N/A'}</p>
-                      <p style={{ fontSize: 12, margin: '2px 0' }}><strong>Dirección:</strong> {concesionario?.direccion || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p style={{ fontSize: 10, fontWeight: 'bold', color: '#2563eb', textTransform: 'uppercase', margin: '0 0 6px 0' }}>Datos del Sujeto Retenido (Proveedor)</p>
-                      <p style={{ fontSize: 12, margin: '2px 0' }}><strong>Razón Social:</strong> {printData.proveedor_nombre}</p>
-                      <p style={{ fontSize: 12, margin: '2px 0' }}><strong>R.I.F.:</strong> {(printData as any).proveedor_rif || 'N/A'}</p>
-                      <p style={{ fontSize: 12, margin: '2px 0' }}><strong>Dirección:</strong> {(printData as any).proveedor_direccion || '—'}</p>
-                    </div>
-                  </div>
-                  <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', padding: '8px 14px', borderRadius: 6, marginBottom: 14, fontSize: 12 }}>
-                    <p style={{ margin: '2px 0' }}><strong>Número de Comprobante:</strong> {(printData as any).numero_comprobante}</p>
-                    <p style={{ margin: '2px 0' }}><strong>Fecha de Emisión:</strong> {registeredAt.toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric' })}</p>
-                  </div>
-                  <div style={{ marginBottom: 18 }}>
-                    <h3 style={{ fontSize: 12, fontWeight: 'bold', color: '#2563eb', textTransform: 'uppercase', borderBottom: '1.5px solid #dbeafe', paddingBottom: 4, marginBottom: 7 }}>Documentos de Referencia</h3>
-                    <p style={{ fontSize: 12, margin: 0 }}>
-                      <strong>N° Factura:</strong> {printData.numero_factura || 'N/A'}&emsp;
-                      <strong>N° Control:</strong> {printData.numero_control || 'N/A'}&emsp;
-                      <strong>Fecha Factura:</strong> {formatDateVE((printData as any).fecha_factura)}
-                    </p>
-                  </div>
-                  <table style={{ width: '58%', marginLeft: 'auto', borderCollapse: 'collapse', fontSize: 12 }}>
-                    <tbody>
-                      {([
-                        [!isBs || igtfUsd > 0 ? 'Total Factura (Compras Incluyendo IVA e IGTF):' : 'Total Factura (Compras Incluyendo IVA):', `Bs ${formatBsVal(totalBsNum)}`],
-                        ['Base Imponible (Total Compras Gravadas):', `Bs ${formatBsVal(gravableBsNum)}`],
-                        ['Monto Exento (Sin Derecho a Crédito Fiscal):', `Bs ${formatBsVal(exentoBsNum)}`],
-                        ['Alícuota %:', '16%'],
-                        ['Impuesto Causado (I.V.A. Total):', `Bs ${formatBsVal(ivaBsNum)}`],
-                        ['Porcentaje de Retención (SENIAT):', `${pctRet}%`],
-                        ['I.G.T.F. (3%):', `Bs ${formatBsVal(igtfBsNum)}`],
-                      ] as [string, string][]).map(([label, value], i) => (
-                        <tr key={i} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                          <td style={{ padding: '4px 8px', textAlign: 'right' }}>{label}</td>
-                          <td style={{ padding: '4px 8px', textAlign: 'right', width: 120 }}>{value}</td>
-                        </tr>
-                      ))}
-                      <tr style={{ background: '#dbeafe' }}>
-                        <td style={{ padding: '6px 8px', textAlign: 'right', color: '#1d4ed8', fontWeight: 'bold' }}>I.V.A. RETENIDO (A ENTERAR AL SENIAT):</td>
-                        <td style={{ padding: '6px 8px', textAlign: 'right', width: 120 }}>Bs {formatBsVal(ivaRetBsNum)}</td>
-                      </tr>
-                      <tr style={{ borderTop: '2px solid #d1d5db' }}>
-                        <td style={{ padding: '6px 8px', textAlign: 'right' }}>Neto a Pagar a Proveedor:</td>
-                        <td style={{ padding: '6px 8px', textAlign: 'right', width: 120 }}>Bs {formatBsVal(netoAPagarBsNum)}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                  <p style={{ fontSize: 9, color: '#6b7280', textAlign: 'center', fontStyle: 'italic', padding: '4px 0' }}>
-                    Este comprobante se emite en función a lo establecido en la Providencia Administrativa N° SNAT/2025/000054 de fecha 02/07/2025 Publicada en Gaceta Oficial Nro. 43.171 de fecha 16 de Julio de 2025
-                  </p>
-                  <div style={{ marginTop: 'auto', paddingBottom: 0 }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 40, marginBottom: '2mm' }}>
-                      <div style={{ borderTop: '1px solid #374151', paddingTop: 8, textAlign: 'center', fontSize: 11 }}>
-                        <p style={{ margin: 0 }}>Firma y Sello Agente de Retención</p>
-                        <p style={{ margin: 0, color: '#6b7280' }}>({concesionario?.nombre_empresa})</p>
-                      </div>
-                      <div style={{ borderTop: '1px solid #374151', paddingTop: 8, textAlign: 'center', fontSize: 11 }}>
-                        <p style={{ margin: 0 }}>Recibido por (Proveedor):</p>
-                        <p style={{ margin: 0, color: '#6b7280' }}>Nombre/Firma/Cédula/Fecha</p>
-                      </div>
-                    </div>
-
-                  </div>
-                </div>
+                <LegalRetentionVoucher
+                  concesionario={concesionario}
+                  data={{
+                    currency: 'USD', // Internal amounts passed below are in USD base
+                    exchange_rate: printData.tasa_cambio,
+                    iva_retention_number: printData.numero_comprobante || '',
+                    invoice_number: printData.numero_factura || '',
+                    control_number: printData.numero_control,
+                    date: formatDateVE(printData.fecha_factura || ''),
+                    provider_name: printData.proveedor_nombre,
+                    provider_rif: printData.proveedor_rif || '',
+                    provider_direccion: printData.proveedor_direccion,
+                    taxable_amount: montoGravable,
+                    exempt_amount: montoExento,
+                    iva_amount: printData.iva_monto,
+                    total_amount: subtotalPlusIva,
+                    igtf_amount: igtfUsd,
+                    retention_iva_rate: printData.porcentaje_retencion_aplicado,
+                    type: 'EXPENSE'
+                  }}
+                />
               )}
             </div>
           </div>

@@ -10,7 +10,7 @@ export const ISLR_CONCEPTS = [
 
 export const expenseSchema = z.object({
   provider_id: z.string().min(1, 'Debe seleccionar un proveedor'),
-  provider_name: z.string(),
+  provider_name: z.string().optional(),
   invoice_number: z.string().min(1, 'Número de factura requerido'),
   control_number: z.string().min(1, 'Número de control requerido'),
   date: z.string().min(1, 'Fecha requerida'),

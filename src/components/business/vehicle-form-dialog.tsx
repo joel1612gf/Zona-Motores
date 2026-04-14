@@ -437,7 +437,7 @@ export function VehicleFormDialog({ open, onOpenChange, editingVehicle, concesio
               mileage,
               bodyType,
               transmission,
-              engine: engine || 'N/A',
+              engine: engine || '—',
               exteriorColor: exteriorColor || 'Otro',
               ownerCount,
               tireLife,
