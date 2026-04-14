@@ -57,14 +57,14 @@ export default function FinancePage() {
       </div>
 
       <Tabs defaultValue="expenses" className="w-full">
-        <TabsList className="bg-muted/50 p-1 gap-1 mb-8 rounded-2xl h-14 border backdrop-blur-sm">
-          <TabsTrigger value="expenses" className="rounded-xl h-full gap-2 px-6 data-[state=active]:bg-background data-[state=active]:shadow-sm font-bold">
+        <TabsList className="bg-muted/50 p-1 gap-1 mb-8 rounded-2xl h-auto md:h-14 border backdrop-blur-sm flex flex-col md:flex-row w-full overflow-hidden">
+          <TabsTrigger value="expenses" className="flex-1 rounded-xl h-12 md:h-full gap-2 px-6 data-[state=active]:bg-background data-[state=active]:shadow-sm font-bold w-full md:w-auto">
             <TrendingDown className="h-4 w-4" /> Gastos
           </TabsTrigger>
-          <TabsTrigger value="debit" className="rounded-xl h-full gap-2 px-6 data-[state=active]:bg-background data-[state=active]:shadow-sm font-bold">
+          <TabsTrigger value="debit" className="flex-1 rounded-xl h-12 md:h-full gap-2 px-6 data-[state=active]:bg-background data-[state=active]:shadow-sm font-bold w-full md:w-auto">
             <ArrowUpDown className="h-4 w-4" /> Notas de Débito
           </TabsTrigger>
-          <TabsTrigger value="credit" className="rounded-xl h-full gap-2 px-6 data-[state=active]:bg-background data-[state=active]:shadow-sm font-bold">
+          <TabsTrigger value="credit" className="flex-1 rounded-xl h-12 md:h-full gap-2 px-6 data-[state=active]:bg-background data-[state=active]:shadow-sm font-bold w-full md:w-auto">
             <Receipt className="h-4 w-4" /> Notas de Crédito
           </TabsTrigger>
         </TabsList>
