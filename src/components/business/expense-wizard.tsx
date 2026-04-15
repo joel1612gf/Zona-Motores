@@ -33,6 +33,7 @@ import { cn } from '@/lib/utils';
 import type { Proveedor } from '@/lib/business-types';
 import { useCurrency } from '@/context/currency-context';
 import { ExpensePrint } from './expense-print';
+import { downloadPdf } from '@/lib/download-pdf';
 
 interface ExpenseWizardProps {
   open: boolean;
@@ -265,38 +266,18 @@ export function ExpenseWizard({ open, onOpenChange }: ExpenseWizardProps) {
 
   const handleDownload = async (mode: 'summary' | 'iva' | 'islr') => {
     setPrintMode(mode);
-    setTimeout(async () => {
-      const element = document.getElementById('expense-print-root');
-      if (!element) return;
-      try {
-        const html2pdf = (await import('html2pdf.js')).default;
-        
-        let filename = `Gasto_Resumen_${successData?.invoice_number}.pdf`;
-        if (mode === 'iva') {
-          filename = `Retencion_IVA_${successData?.iva_retention_number || 'S_N'}.pdf`;
-        } else if (mode === 'islr') {
-          filename = `Retencion_ISLR_${successData?.islr_retention_number || 'S_N'}.pdf`;
-        }
 
-        const opt = {
-          margin: 0,
-          filename,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { 
-            scale: 2, 
-            useCORS: true, 
-            logging: false, 
-            width: 800,
-            windowWidth: 800 
-          },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
-        const clone = element.cloneNode(true) as HTMLElement;
-        clone.style.display = 'block';
-        clone.style.width = '800px';
-        await html2pdf().set(opt).from(clone).save();
-      } catch (err) { console.error(err); }
-    }, 300);
+    let filename = `Gasto_Resumen_${successData?.invoice_number}.pdf`;
+    if (mode === 'iva') {
+      filename = `Retencion_IVA_${successData?.iva_retention_number || 'S_N'}.pdf`;
+    } else if (mode === 'islr') {
+      filename = `Retencion_ISLR_${successData?.islr_retention_number || 'S_N'}.pdf`;
+    }
+
+    // Wait for React to commit the portal with new printMode
+    await new Promise(r => setTimeout(r, 400));
+
+    await downloadPdf({ elementId: 'expense-print-root', filename });
   };
 
   if (successData) {

@@ -17,6 +17,7 @@ import { useBusinessAuth } from '@/context/business-auth-context';
 import { Input } from '@/components/ui/input';
 import { FiscalNotePrint } from './fiscal-note-print';
 import { ExpensePrint } from './expense-print';
+import { downloadPdf } from '@/lib/download-pdf';
 
 interface FinanceHistoryTableProps {
   type: 'EXPENSE' | 'DEBIT' | 'CREDIT';
@@ -47,8 +48,17 @@ export function FinanceHistoryTable({ type }: FinanceHistoryTableProps) {
     r.invoice_number?.toLowerCase().includes(searchTerm.toLowerCase())
   ) || [];
 
-  const handlePrint = async (record: any, mode: string) => {
-    let loadedRecord = { ...record };
+  /** Enrich the record with missing data (dates, provider address) */
+  const enrichRecord = async (record: any) => {
+    const loadedRecord = { ...record };
+
+    if (!loadedRecord.date && record.created_at?.toDate) {
+      loadedRecord.date = record.created_at.toDate().toISOString().split('T')[0];
+    }
+    if (!loadedRecord.invoice_date && loadedRecord.date) {
+      loadedRecord.invoice_date = loadedRecord.date;
+    }
+
     if (!loadedRecord.provider_direccion && concesionario?.id && record.provider_id) {
       try {
         const { getDoc, doc } = await import('firebase/firestore');
@@ -61,6 +71,11 @@ export function FinanceHistoryTable({ type }: FinanceHistoryTableProps) {
       }
     }
 
+    return loadedRecord;
+  };
+
+  const handlePrint = async (record: any, mode: string) => {
+    const loadedRecord = await enrichRecord(record);
     setPrintData(loadedRecord);
     setPrintMode(mode);
     setTimeout(() => {
@@ -75,50 +90,26 @@ export function FinanceHistoryTable({ type }: FinanceHistoryTableProps) {
   };
 
   const handleDownload = async (record: any, mode: string) => {
-    let loadedRecord = { ...record };
-    if (!loadedRecord.provider_direccion && concesionario?.id && record.provider_id) {
-      try {
-        const { getDoc, doc } = await import('firebase/firestore');
-        const pSnap = await getDoc(doc(firestore, 'concesionarios', concesionario.id, 'proveedores', record.provider_id));
-        if (pSnap.exists() && pSnap.data().direccion) {
-          loadedRecord.provider_direccion = pSnap.data().direccion;
-        }
-      } catch (err) {
-        console.error('Error fetching provider address:', err);
-      }
-    }
-
+    const loadedRecord = await enrichRecord(record);
     setPrintData(loadedRecord);
     setPrintMode(mode);
-    setTimeout(async () => {
-      const elementId = type === 'EXPENSE' ? 'expense-print-root' : 'fiscal-note-print-root';
-      const element = document.getElementById(elementId);
-      if (!element) return;
-      try {
-        const html2pdf = (await import('html2pdf.js')).default;
-        
-        let filename = `${type}_${mode}_${record.invoice_number}.pdf`;
-        if (mode === 'iva' || mode === 'retention') {
-          filename = `Retencion_IVA_${record.iva_retention_number || 'S_N'}.pdf`;
-        } else if (mode === 'islr') {
-          filename = `Retencion_ISLR_${record.islr_retention_number || 'S_N'}.pdf`;
-        } else if (mode === 'summary') {
-          filename = `${type === 'EXPENSE' ? 'Gasto' : 'Nota'}_Resumen_${record.invoice_number}.pdf`;
-        }
 
-        const opt = {
-          margin: 0,
-          filename,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, width: 794, windowWidth: 794 },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
-        const clone = element.cloneNode(true) as HTMLElement;
-        clone.style.display = 'block';
-        clone.style.width = '210mm';
-        await html2pdf().set(opt).from(clone).save();
-      } catch (err) { console.error(err); }
-    }, 400);
+    // Build filename
+    let filename: string;
+    if (mode === 'iva' || mode === 'retention') {
+      filename = `Retencion_IVA_${loadedRecord.iva_retention_number || 'S_N'}.pdf`;
+    } else if (mode === 'islr') {
+      filename = `Retencion_ISLR_${loadedRecord.islr_retention_number || 'S_N'}.pdf`;
+    } else {
+      filename = `${type === 'EXPENSE' ? 'Gasto' : 'Nota'}_Resumen_${loadedRecord.invoice_number || 'S_N'}.pdf`;
+    }
+
+    const elementId = type === 'EXPENSE' ? 'expense-print-root' : 'fiscal-note-print-root';
+
+    // Wait for React to commit the portal
+    await new Promise(r => setTimeout(r, 400));
+
+    await downloadPdf({ elementId, filename });
   };
 
   if (isLoading) {
@@ -159,7 +150,7 @@ export function FinanceHistoryTable({ type }: FinanceHistoryTableProps) {
                   <TableHead className="text-[10px] font-black uppercase tracking-widest">Proveedor / RIF</TableHead>
                   <TableHead className="text-[10px] font-black uppercase tracking-widest">Referencia</TableHead>
                   <TableHead className="text-[10px] font-black uppercase tracking-widest text-right">Total Operación</TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-center px-6">Estado Fiscal</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-center px-6">Registrado por</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -202,10 +193,15 @@ export function FinanceHistoryTable({ type }: FinanceHistoryTableProps) {
                         )}
                       </TableCell>
                       <TableCell className="text-center px-6">
-                        <div className="flex justify-center gap-1.5">
-                          {record.iva_retention_number && <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[9px] font-black uppercase">IVA</Badge>}
-                          {record.islr_retention_number && <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20 text-[9px] font-black uppercase">ISLR</Badge>}
-                          {!record.iva_retention_number && !record.islr_retention_number && <span className="text-[10px] text-muted-foreground italic font-medium">No aplica</span>}
+                        <div className="flex flex-col items-center">
+                          <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 text-[9px] font-black uppercase px-2 py-0.5 rounded-lg">
+                            {record.creado_por || 'Sistema'}
+                          </Badge>
+                          {record.created_at?.toDate && (
+                            <span className="text-[9px] text-muted-foreground mt-1 font-medium italic">
+                              {record.created_at.toDate().toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                            </span>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -241,10 +237,10 @@ export function FinanceHistoryTable({ type }: FinanceHistoryTableProps) {
 
                                 {record.iva_retention_number && (
                                   <div className="group/btn flex flex-col bg-background border border-white/10 rounded-2xl overflow-hidden hover:shadow-lg transition-all ring-1 ring-black/5">
-                                    <Button variant="ghost" className="h-12 rounded-none border-b border-white/5 font-bold gap-2 text-xs text-primary" onClick={() => handlePrint(record, 'retention' in record ? 'retention' : 'iva')}>
+                                    <Button variant="ghost" className="h-12 rounded-none border-b border-white/5 font-bold gap-2 text-xs text-primary" onClick={() => handlePrint(record, 'iva')}>
                                       <ShieldCheck className="h-4 w-4" /> Imprimir IVA
                                     </Button>
-                                    <Button variant="ghost" className="h-10 rounded-none bg-primary/[0.03] hover:bg-primary/10 text-[10px] font-black uppercase text-primary gap-2" onClick={() => handleDownload(record, 'retention' in record ? 'retention' : 'iva')}>
+                                    <Button variant="ghost" className="h-10 rounded-none bg-primary/[0.03] hover:bg-primary/10 text-[10px] font-black uppercase text-primary gap-2" onClick={() => handleDownload(record, 'iva')}>
                                       <Download className="h-3.5 w-3.5" /> Descargar PDF
                                     </Button>
                                   </div>
@@ -358,14 +354,14 @@ export function FinanceHistoryTable({ type }: FinanceHistoryTableProps) {
                               <Button 
                                 variant="ghost" 
                                 className="flex-1 rounded-none border-r border-primary/10 gap-2 font-bold h-full text-xs text-primary justify-start px-4"
-                                onClick={(e) => { e.stopPropagation(); handlePrint(record, 'retention' in record ? 'retention' : 'iva'); }}
+                                onClick={(e) => { e.stopPropagation(); handlePrint(record, 'iva'); }}
                               >
                                 <ShieldCheck className="h-4 w-4" /> Retención IVA
                               </Button>
                               <Button 
                                 variant="ghost" 
                                 className="px-4 h-full hover:bg-primary/10 group/dl"
-                                onClick={(e) => { e.stopPropagation(); handleDownload(record, 'retention' in record ? 'retention' : 'iva'); }}
+                                onClick={(e) => { e.stopPropagation(); handleDownload(record, 'iva'); }}
                                 title="Descargar PDF"
                               >
                                 <Download className="h-4 w-4 text-primary transition-transform group-active/dl:scale-90" />

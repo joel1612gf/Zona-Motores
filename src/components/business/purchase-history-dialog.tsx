@@ -137,14 +137,18 @@ export function PurchaseHistoryDialog({
     e.stopPropagation();
 
     let loadedCompra = { ...compra } as any;
-    if (!loadedCompra.proveedor_direccion && concesionario?.id) {
+    // Always try to get the freshest and most complete provider data
+    if (concesionario?.id) {
       try {
         const pSnap = await getDoc(doc(firestore, 'concesionarios', concesionario.id, 'proveedores', compra.proveedor_id));
-        if (pSnap.exists() && pSnap.data().direccion) {
-          loadedCompra.proveedor_direccion = pSnap.data().direccion;
+        if (pSnap.exists()) {
+          const pData = pSnap.data();
+          loadedCompra.proveedor_nombre = pData.nombre || loadedCompra.proveedor_nombre;
+          loadedCompra.proveedor_rif = pData.rif || loadedCompra.proveedor_rif;
+          loadedCompra.proveedor_direccion = pData.direccion || loadedCompra.proveedor_direccion;
         }
       } catch (err) {
-        console.error('Error fetching provider address:', err);
+        console.error('Error fetching provider data for print:', err);
       }
     }
 
@@ -166,14 +170,18 @@ export function PurchaseHistoryDialog({
     e.stopPropagation();
 
     let loadedCompra = { ...compra } as any;
-    if (!loadedCompra.proveedor_direccion && concesionario?.id) {
+    // Always try to get the freshest and most complete provider data
+    if (concesionario?.id) {
       try {
         const pSnap = await getDoc(doc(firestore, 'concesionarios', concesionario.id, 'proveedores', compra.proveedor_id));
-        if (pSnap.exists() && pSnap.data().direccion) {
-          loadedCompra.proveedor_direccion = pSnap.data().direccion;
+        if (pSnap.exists()) {
+          const pData = pSnap.data();
+          loadedCompra.proveedor_nombre = pData.nombre || loadedCompra.proveedor_nombre;
+          loadedCompra.proveedor_rif = pData.rif || loadedCompra.proveedor_rif;
+          loadedCompra.proveedor_direccion = pData.direccion || loadedCompra.proveedor_direccion;
         }
       } catch (err) {
-        console.error('Error fetching provider address:', err);
+        console.error('Error fetching provider data for download:', err);
       }
     }
 
@@ -681,21 +689,25 @@ export function PurchaseHistoryDialog({
         const formatBsVal = (val: number) => val.toFixed(2);
 
         return (
-          <div id="history-print-root" style={{ display: 'none', position: 'absolute', top: 0, left: 0, width: '210mm', background: 'white', color: 'black', zIndex: 9999 }}>
+          <div id="history-print-root" style={{ display: 'none', position: 'absolute', top: 0, left: 0, width: '210mm', background: 'white', color: 'black' }}>
             <style type="text/css">
               {`
                 @media print {
+                  html, body { height: auto !important; margin: 0 !important; padding: 0 !important; overflow: visible !important; }
                   body * { visibility: hidden !important; }
                   #history-print-root, #history-print-root * { visibility: visible !important; }
                   #history-print-root { 
-                    position: absolute !important; 
+                    display: block !important; 
+                    position: fixed !important; 
                     left: 0 !important; 
                     top: 0 !important; 
-                    display: block !important; 
                     width: 210mm !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    z-index: 999999 !important;
                   }
                 }
-                @page { size: A4; margin: 0mm; }
+                @page { size: A4 portrait; margin: 0; }
                 .print-root { width: 100%; background: white !important; }
                 .page-break-after { page-break-after: always; break-after: page; }
               `}
@@ -809,6 +821,7 @@ export function PurchaseHistoryDialog({
                     invoice_number: printData.numero_factura || '',
                     control_number: printData.numero_control,
                     date: formatDateVE(printData.fecha_factura || ''),
+                    original_invoice_date: formatDateVE(printData.fecha_factura || ''),
                     provider_name: printData.proveedor_nombre,
                     provider_rif: printData.proveedor_rif || '',
                     provider_direccion: printData.proveedor_direccion,

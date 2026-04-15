@@ -29,6 +29,7 @@ export type ExpenseFormValues = z.infer<typeof expenseSchema>;
 export const fiscalNoteSchema = z.object({
   invoice_id: z.string().min(1, 'Debe vincular una factura'),
   invoice_number: z.string(),
+  note_number: z.string().min(1, 'Número de nota requerido'),
   type: z.enum(['DEBIT', 'CREDIT']),
   currency: z.enum(['USD', 'VES']).default('VES'),
   exchange_rate: z.number().min(1, 'La tasa debe ser mayor a 1'),

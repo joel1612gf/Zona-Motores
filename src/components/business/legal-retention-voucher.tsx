@@ -10,8 +10,10 @@ interface LegalRetentionVoucherProps {
     exchange_rate: number;
     iva_retention_number: string;
     invoice_number: string;
+    note_number?: string;
     control_number?: string;
-    date: string;
+    date: string; // Date of the current document (Note or Invoice)
+    original_invoice_date?: string; // Date of the affected invoice (for notes)
     provider_name: string;
     provider_rif: string;
     provider_direccion?: string;
@@ -31,14 +33,18 @@ export function LegalRetentionVoucher({ concesionario, data }: LegalRetentionVou
   const now = new Date();
   const isBs = data.currency === 'VES';
   const rate = parseFloat(data.exchange_rate as any) || 1;
+  const isCredit = data.type === 'CREDIT';
 
   const toVes = (val: any) => {
-    const num = parseFloat(val) || 0;
+    let num = parseFloat(val) || 0;
+    // Apply negative sign for Credit Notes in the voucher totals
+    if (isCredit && num !== 0) num = -num;
     return isBs ? num : num * rate;
   };
 
   const formatBsVal = (num: number) => {
-    return new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
+    const formatted = new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.abs(num));
+    return num < 0 ? `-${formatted}` : formatted;
   };
 
   // Technical values in Bs.
@@ -52,9 +58,12 @@ export function LegalRetentionVoucher({ concesionario, data }: LegalRetentionVou
   const ivaRetBsNum = (ivaBsNum * pctRet) / 100;
   const netoAPagarBsNum = totalBsNum - ivaRetBsNum;
 
-  // Note numbers logic
+  // Note logic
   const isNote = data.type === 'DEBIT' || data.type === 'CREDIT';
-  const noteNumber = isNote ? `${data.invoice_number}-1` : '';
+  const noteLabel = data.type === 'DEBIT' ? 'Débito' : 'Crédito';
+
+  // Use original_invoice_date for reference, fall back to document date
+  const referenceDate = data.original_invoice_date || data.date;
 
   const formatDate = (val: Date | string) => {
     if (!val) return '—';
@@ -67,18 +76,22 @@ export function LegalRetentionVoucher({ concesionario, data }: LegalRetentionVou
       return `${y}/${m}/${d}`;
     }
 
-    // If it's a string (ISO, YYYY-MM-DD or DD/MM/YYYY)
-    if (val.includes('-')) {
-      const [y, m, d] = val.split('T')[0].split('-');
-      return `${y}/${m.padStart(2, '0')}/${d.padStart(2, '0')}`;
+    // Normalize separators
+    const cleanVal = val.toString().replace(/-/g, '/').split('T')[0];
+    
+    if (cleanVal.includes('/')) {
+      const parts = cleanVal.split('/');
+      // If it's YYYY/MM/DD
+      if (parts[0].length === 4) {
+        return `${parts[0]}/${parts[1].padStart(2, '0')}/${parts[2].padStart(2, '0')}`;
+      }
+      // If it's DD/MM/YYYY
+      if (parts[2]?.length === 4) {
+        return `${parts[2]}/${parts[1].padStart(2, '0')}/${parts[0].padStart(2, '0')}`;
+      }
     }
-    if (val.includes('/')) {
-      const parts = val.split('/');
-      if (parts[0].length === 4) return val; // already YYYY/MM/DD
-      const [d, m, y] = parts;
-      return `${y}/${m.padStart(2, '0')}/${d.padStart(2, '0')}`;
-    }
-    return val;
+    
+    return cleanVal;
   };
 
   return (
@@ -96,7 +109,7 @@ export function LegalRetentionVoucher({ concesionario, data }: LegalRetentionVou
       WebkitPrintColorAdjust: 'exact',
       printColorAdjust: 'exact'
     } as any}>
-      {/* HEADER - IDENTICAL TO PURCHASES */}
+      {/* HEADER */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
         <div>
           {concesionario?.logo_url ? (
@@ -157,17 +170,16 @@ export function LegalRetentionVoucher({ concesionario, data }: LegalRetentionVou
         <p style={{ fontSize: 12, margin: 0 }}>
           {isNote ? (
             <>
-              <strong>N° Nota correspondiente a esta retención:</strong> {noteNumber}&emsp;
-              <strong>N° Control correspondiente:</strong> {data.control_number || '—'}&emsp;
-              <br />
-              <strong>Factura Original Afectada:</strong> {data.invoice_number}&emsp;
-              <strong>Fecha de Operación:</strong> {formatDate(data.date)}
+              <strong>N° Nota de {noteLabel}:</strong> {data.note_number || '—'}&emsp;
+              <strong>N° Factura Afectada:</strong> {data.invoice_number || '—'}&emsp;
+              <strong>N° Control:</strong> {data.control_number || '—'}&emsp;
+              <strong>Fecha Factura:</strong> {formatDate(referenceDate)}
             </>
           ) : (
             <>
               <strong>N° Factura:</strong> {data.invoice_number || '—'}&emsp;
               <strong>N° Control:</strong> {data.control_number || '—'}&emsp;
-              <strong>Fecha Factura:</strong> {formatDate(data.date)}
+              <strong>Fecha Factura:</strong> {formatDate(referenceDate)}
             </>
           )}
         </p>
@@ -176,7 +188,7 @@ export function LegalRetentionVoucher({ concesionario, data }: LegalRetentionVou
       <table style={{ width: '58%', marginLeft: 'auto', borderCollapse: 'collapse', fontSize: 12 }}>
         <tbody>
           {([
-            [igtfBsNum > 0 ? 'Total Factura (Compras Incluyendo IVA e IGTF):' : 'Total Factura (Compras Incluyendo IVA):', `Bs ${formatBsVal(totalBsNum)}`],
+            [igtfBsNum !== 0 ? 'Total Factura (Compras Incluyendo IVA e IGTF):' : 'Total Factura (Compras Incluyendo IVA):', `Bs ${formatBsVal(totalBsNum)}`],
             ['Base Imponible (Total Compras Gravadas):', `Bs ${formatBsVal(gravableBsNum)}`],
             ['Monto Exento (Sin Derecho a Crédito Fiscal):', `Bs ${formatBsVal(exentoBsNum)}`],
             ['Alícuota %:', '16%'],

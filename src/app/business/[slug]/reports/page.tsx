@@ -15,6 +15,7 @@ import { aggregateFinancialStats } from '@/lib/reports-utils';
 import { calculateFiscalBreakdown, formatVes } from '@/lib/fiscal-helpers';
 import { formatCurrency } from '@/lib/utils';
 import { ReportsFiscalPrint } from '@/components/business/reports-fiscal-print';
+import { downloadPdf } from '@/lib/download-pdf';
 import {
   BarChart3, Wallet, CarFront, FileText, Download, TrendingUp,
   ArrowUpRight, Calculator, Calendar, Layers, PieChart, ChevronRight,
@@ -163,19 +164,8 @@ export default function ReportsPage() {
   };
 
   const handlePrintPDF = async () => {
-    const element = document.getElementById('fiscal-print-root');
-    if (!element) return;
-    const html2pdf = (await import('html2pdf.js')).default;
-    const opt = {
-      margin: 0,
-      filename: `LIBRO_VENTAS_${format(selectedDate, 'MMMM_yyyy').toUpperCase()}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
-    };
-    element.style.display = 'block';
-    await html2pdf().set(opt).from(element).save();
-    element.style.display = 'none';
+    const filename = `LIBRO_VENTAS_${format(selectedDate, 'MMMM_yyyy').toUpperCase()}.pdf`;
+    await downloadPdf({ elementId: 'fiscal-print-root', filename });
   };
 
   const processedVehicles = useMemo(() => {

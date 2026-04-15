@@ -2,11 +2,13 @@
 
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Concesionario } from '@/lib/business-types';
+import { Concesionario, Proveedor } from '@/lib/business-types';
 import { LegalRetentionVoucher } from './legal-retention-voucher';
+import { useFirestore } from '@/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 interface FiscalNotePrintProps {
-  printMode: 'summary' | 'retention';
+  printMode: 'summary' | 'retention' | 'iva';
   concesionario: Concesionario | null;
   noteData: any;
   rootId?: string;
@@ -14,10 +16,26 @@ interface FiscalNotePrintProps {
 
 export function FiscalNotePrint({ printMode, concesionario, noteData, rootId = 'fiscal-note-print-root' }: FiscalNotePrintProps) {
   const [mounted, setMounted] = useState(false);
+  const [fullProvider, setFullProvider] = useState<Proveedor | null>(null);
+  const firestore = useFirestore();
 
   useEffect(() => {
     setMounted(true);
-  }, []);
+    
+    async function fetchProvider() {
+      if (noteData?.provider_id && concesionario?.id) {
+        try {
+          const provSnap = await getDoc(doc(firestore, 'concesionarios', concesionario.id, 'proveedores', noteData.provider_id));
+          if (provSnap.exists()) {
+            setFullProvider(provSnap.data() as Proveedor);
+          }
+        } catch (e) {
+          console.error("Error fetching provider for print:", e);
+        }
+      }
+    }
+    fetchProvider();
+  }, [noteData?.provider_id, concesionario?.id, firestore]);
 
   if (!noteData || !concesionario || !mounted) return null;
 
@@ -25,9 +43,13 @@ export function FiscalNotePrint({ printMode, concesionario, noteData, rootId = '
   const isBs = noteData.currency === 'VES';
   const sym = isBs ? 'Bs.' : '$';
   const rate = noteData.exchange_rate || 1;
+  const isCredit = noteData.type === 'CREDIT';
   
-  const noteNumber = `${noteData.invoice_number}-1`;
-  const formatNoteCurrency = (amount: any) => (parseFloat(amount) || 0).toFixed(2);
+  const formatNoteCurrency = (amount: any) => {
+    const val = parseFloat(amount) || 0;
+    if (val === 0) return '0.00';
+    return isCredit ? `-${val.toFixed(2)}` : val.toFixed(2);
+  };
 
   const formatDateYYYYMMDD = (date: Date) => {
     const y = date.getFullYear();
@@ -41,18 +63,19 @@ export function FiscalNotePrint({ printMode, concesionario, noteData, rootId = '
       id={rootId} 
       style={{ 
         display: 'none', 
+        position: 'absolute',
+        top: 0,
+        left: 0,
         width: '210mm',
         background: 'white', 
-        color: 'black', 
-        margin: 0,
-        padding: 0,
-        boxSizing: 'border-box'
+        color: 'black',
+        zIndex: 9999
       }}
     >
       <style type="text/css">{`
         @media print {
-          html, body { height: auto; margin: 0 !important; padding: 0 !important; overflow: visible !important; }
-          body > * { display: none !important; }
+          html, body { height: auto !important; margin: 0 !important; padding: 0 !important; overflow: visible !important; }
+          body > *:not(#${rootId}) { display: none !important; }
           #${rootId} { 
             display: block !important; 
             position: absolute !important;
@@ -94,12 +117,13 @@ export function FiscalNotePrint({ printMode, concesionario, noteData, rootId = '
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14, background: '#f9fafb', border: '1px solid #dbeafe', padding: 14, borderRadius: 6, fontSize: 12 }}>
               <div>
-                <p style={{ margin: '2px 0' }}><strong>Número de Nota:</strong> {noteData.id?.slice(-8).toUpperCase() || 'N/A'}</p>
+                <p style={{ margin: '2px 0' }}><strong>Número de Nota:</strong> {noteData.note_number || 'N/A'}</p>
                 <p style={{ margin: '2px 0' }}><strong>Factura Afectada:</strong> {noteData.invoice_number || 'N/A'}</p>
                 <p style={{ margin: '2px 0' }}><strong>Proveedor:</strong> {noteData.provider_name} {noteData.provider_rif ? `(${noteData.provider_rif})` : ''}</p>
+                {noteData.invoice_date && <p style={{ margin: '2px 0' }}><strong>Fecha Factura:</strong> {noteData.invoice_date}</p>}
               </div>
               <div style={{ textAlign: 'right' }}>
-                <p style={{ margin: '2px 0' }}><strong>Fecha Operación:</strong> {formatDateYYYYMMDD(now)}</p>
+                <p style={{ margin: '2px 0' }}><strong>Fecha Emisión:</strong> {formatDateYYYYMMDD(now)}</p>
                 <p style={{ margin: '2px 0' }}><strong>Tasa BCV:</strong> {noteData.exchange_rate ? `Bs ${parseFloat(noteData.exchange_rate).toFixed(2)}` : 'N/A'}</p>
                 <p style={{ margin: '2px 0' }}><strong>Cargado por:</strong> {noteData.creado_por || 'Administrador'}</p>
               </div>
@@ -135,7 +159,7 @@ export function FiscalNotePrint({ printMode, concesionario, noteData, rootId = '
                 </div>
                 {!isBs && noteData.exchange_rate && parseFloat(noteData.igtf_amount) > 0 && (
                   <div style={{ fontSize: 9, color: '#6b7280', marginTop: 1 }}>
-                    Equiv: Bs {(parseFloat(noteData.igtf_amount) * noteData.exchange_rate).toFixed(2)}
+                    Equiv: Bs {formatNoteCurrency(parseFloat(noteData.igtf_amount) * noteData.exchange_rate)}
                   </div>
                 )}
               </div>
@@ -146,7 +170,7 @@ export function FiscalNotePrint({ printMode, concesionario, noteData, rootId = '
                 </div>
                 {!isBs && noteData.exchange_rate && (
                   <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>
-                    Equivalente: Bs {(parseFloat(noteData.total_amount) * noteData.exchange_rate).toFixed(2)}
+                    Equivalente: Bs {formatNoteCurrency(parseFloat(noteData.total_amount) * noteData.exchange_rate)}
                   </div>
                 )}
               </div>
@@ -155,12 +179,20 @@ export function FiscalNotePrint({ printMode, concesionario, noteData, rootId = '
         )}
 
         {/* RETENTION (LEGAL) */}
-        {printMode === 'retention' && (
+        {(printMode === 'retention' || printMode === 'iva') && (
           <LegalRetentionVoucher 
             concesionario={concesionario} 
             data={{
               ...noteData,
-              date: formatDateYYYYMMDD(now) // Current date for issuance
+              note_number: noteData.note_number,
+              // Prioritize full provider data from real-time fetch
+              provider_name: fullProvider?.nombre || noteData.provider_name,
+              provider_rif: fullProvider?.rif || noteData.provider_rif,
+              provider_direccion: fullProvider?.direccion || noteData.provider_direccion,
+              date: noteData.date || '',
+              original_invoice_date: noteData.invoice_date || '',
+              retention_iva_rate: noteData.retention_iva_rate || 75,
+              type: noteData.type
             }} 
           />
         )}

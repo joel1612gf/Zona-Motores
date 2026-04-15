@@ -19,7 +19,7 @@ import {
 import { useBusinessAuth } from '@/context/business-auth-context';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { 
-  collection, query, where, doc, runTransaction, serverTimestamp, orderBy 
+  collection, query, where, doc, runTransaction, serverTimestamp, orderBy, getDocs, getDoc 
 } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
@@ -27,9 +27,10 @@ import {
   Loader2, Search, FileText, ArrowUpDown, AlertCircle, CheckCircle2, Printer, Download 
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { Compra } from '@/lib/business-types';
+import type { Compra, Proveedor } from '@/lib/business-types';
 import { useCurrency } from '@/context/currency-context';
 import { FiscalNotePrint } from './fiscal-note-print';
+import { downloadPdf } from '@/lib/download-pdf';
 
 export function FiscalNoteForm({ type, onSuccess }: { type: 'DEBIT' | 'CREDIT', onSuccess: () => void }) {
   const { concesionario, staff } = useBusinessAuth();
@@ -39,7 +40,8 @@ export function FiscalNoteForm({ type, onSuccess }: { type: 'DEBIT' | 'CREDIT', 
   const [isSaving, setIsSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [successData, setSuccessData] = useState<any>(null);
-  const [printMode, setPrintMode] = useState<'summary' | 'retention'>('summary');
+  const [printMode, setPrintMode] = useState<'summary' | 'retention' | 'iva'>('summary');
+
 
   // Default exchange rate logic
   const defaultRate = useMemo(() => {
@@ -78,10 +80,35 @@ export function FiscalNoteForm({ type, onSuccess }: { type: 'DEBIT' | 'CREDIT', 
       iva_amount: 0,
       igtf_amount: 0,
       reason: '',
+      note_number: '',
     },
   });
 
   const selectedInvoiceId = form.watch('invoice_id');
+
+  // Logic to auto-generate Note Number when invoice is selected
+  useEffect(() => {
+    async function fetchNextNoteNumber() {
+      if (selectedInvoiceId && concesionario?.id) {
+        const inv = purchases?.find(p => p.id === selectedInvoiceId);
+        if (!inv) return;
+
+        try {
+          const notesRef = collection(firestore, 'concesionarios', concesionario.id, 'notas_fiscales');
+          const q = query(notesRef, where('invoice_id', '==', selectedInvoiceId));
+          const snap = await getDocs(q);
+          
+          const nextSeq = snap.size + 1;
+          const suffix = String(nextSeq).padStart(2, '0');
+          form.setValue('note_number', `${inv.numero_factura}-${suffix}`, { shouldValidate: true });
+        } catch (e) {
+          console.error("Error fetching note sequence:", e);
+        }
+      }
+    }
+    fetchNextNoteNumber();
+  }, [selectedInvoiceId, concesionario?.id, firestore, purchases, form]);
+
   const selectedCurrency = form.watch('currency');
   const currentRate = form.watch('exchange_rate') || 1;
   
@@ -106,8 +133,45 @@ export function FiscalNoteForm({ type, onSuccess }: { type: 'DEBIT' | 'CREDIT', 
     if (!concesionario || !selectedInvoice) return;
     setIsSaving(true);
     try {
+      // 1. Uniqueness check per provider
+      const notesRef = collection(firestore, 'concesionarios', concesionario.id, 'notas_fiscales');
+      const qDup = query(
+        notesRef, 
+        where('provider_id', '==', selectedInvoice.proveedor_id),
+        where('note_number', '==', values.note_number.trim())
+      );
+      const snapDup = await getDocs(qDup);
+      if (!snapDup.empty) {
+        toast({ 
+          variant: 'destructive', 
+          title: 'Número de Nota Duplicado', 
+          description: `Este proveedor ya tiene una nota registrada con el número ${values.note_number}.` 
+        });
+        setIsSaving(false);
+        return;
+      }
+
+      // Fetch the actual provider to get full name and rif correctly
+      let fullProviderName = selectedInvoice.proveedor_nombre;
+      let fullProviderRif = (selectedInvoice as any).proveedor_rif || '';
+      let fullProviderAddress = (selectedInvoice as any).proveedor_direccion || '';
+
+      try {
+        const provSnap = await getDoc(doc(firestore, 'concesionarios', concesionario.id, 'proveedores', selectedInvoice.proveedor_id));
+        if (provSnap.exists()) {
+          const provData = provSnap.data() as Proveedor;
+          // Use full name and RIF from the provider document to avoid truncated data
+          fullProviderName = provData.nombre || fullProviderName;
+          fullProviderRif = provData.rif || fullProviderRif;
+          fullProviderAddress = provData.direccion || fullProviderAddress;
+        }
+      } catch (e) {
+        console.error("Error fetching full provider data:", e);
+      }
+
       const now = new Date();
       const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const formattedToday = now.toISOString().split('T')[0];
 
       let resultPayload: any = null;
 
@@ -126,13 +190,15 @@ export function FiscalNoteForm({ type, onSuccess }: { type: 'DEBIT' | 'CREDIT', 
         }
 
         const ivaRetentionNumber = `${yearMonth}${String(ivaSeq).padStart(8, '0')}`;
-        const currentSaldo = purchaseSnap.data().saldo_pendiente ?? purchaseSnap.data().total_usd;
+        const purchaseDocData = purchaseSnap.data() as any;
+        const currentSaldo = purchaseDocData.saldo_pendiente ?? purchaseDocData.total_usd;
         
         // Balance Adjustment
         const adjustment = values.type === 'DEBIT' ? totalInUsd : -totalInUsd;
         const newSaldo = Math.max(0, currentSaldo + adjustment);
 
         const noteRef = doc(collection(firestore, 'concesionarios', concesionario.id, 'notas_fiscales'));
+        
         resultPayload = {
           ...values,
           total_amount: totalInNoteCurrency,
@@ -140,13 +206,16 @@ export function FiscalNoteForm({ type, onSuccess }: { type: 'DEBIT' | 'CREDIT', 
           igtf_amount: igtf,
           total_usd: totalInUsd,
           invoice_id: selectedInvoice.id,
-          invoice_number: selectedInvoice.numero_factura || 'S/N',
-          control_number: selectedInvoice.numero_control || 'S/N',
-          provider_id: selectedInvoice.proveedor_id || '',
-          provider_name: selectedInvoice.proveedor_nombre || 'Proveedor Desconocido',
-          provider_rif: selectedInvoice.proveedor_rif || '',
-          provider_direccion: selectedInvoice.proveedor_direccion || '',
+          invoice_number: purchaseDocData.numero_factura || 'S/N',
+          control_number: purchaseDocData.numero_control || 'S/N',
+          provider_id: selectedInvoice.proveedor_id,
+          provider_name: fullProviderName,
+          provider_rif: fullProviderRif,
+          provider_direccion: fullProviderAddress,
+          invoice_date: purchaseDocData.fecha_factura || purchaseDocData.date || '',
+          date: formattedToday, // Note issuance date
           iva_retention_number: ivaRetentionNumber,
+          retention_iva_rate: purchaseDocData.porcentaje_retencion_aplicado || 75,
           status: 'COMPLETADO',
           created_at: serverTimestamp(),
           created_by: staff?.id || concesionario.owner_uid,
@@ -187,41 +256,20 @@ export function FiscalNoteForm({ type, onSuccess }: { type: 'DEBIT' | 'CREDIT', 
         window.print();
         element.style.display = 'none';
       }
-    }, 250);
+    }, 300);
   };
 
-  const handleDownload = async (mode: 'summary' | 'retention') => {
+  const handleDownload = async (mode: 'summary' | 'retention' | 'iva') => {
     setPrintMode(mode);
-    setTimeout(async () => {
-      const element = document.getElementById('fiscal-note-print-root');
-      if (!element) return;
-      
-      try {
-        const html2pdf = (await import('html2pdf.js')).default;
-        const opt = {
-          margin: 0,
-          filename: mode === 'summary' 
-            ? `Nota_Resumen_${successData?.invoice_number || 'N_A'}.pdf`
-            : `Retencion_IVA_${successData?.iva_retention_number || 'N_A'}.pdf`,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { 
-            scale: 2, 
-            useCORS: true,
-            logging: false,
-            width: 794, // Approx 210mm in pixels at 96dpi
-            windowWidth: 794
-          },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
 
-        const clone = element.cloneNode(true) as HTMLElement;
-        clone.style.display = 'block';
-        clone.style.width = '210mm';
-        await html2pdf().set(opt).from(clone).save();
-      } catch (err) {
-        console.error('Error generating PDF:', err);
-      }
-    }, 300);
+    const filename = mode === 'summary'
+      ? `Nota_Resumen_${successData?.invoice_number || 'N_A'}.pdf`
+      : `Retencion_IVA_${successData?.iva_retention_number || 'N_A'}.pdf`;
+
+    // Wait for React to commit the portal with new printMode
+    await new Promise(r => setTimeout(r, 400));
+
+    await downloadPdf({ elementId: 'fiscal-note-print-root', filename });
   };
 
   if (successData) {
@@ -363,6 +411,26 @@ export function FiscalNoteForm({ type, onSuccess }: { type: 'DEBIT' | 'CREDIT', 
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="note_number"
+                render={({ field }) => (
+                  <FormItem className="md:col-span-2">
+                    <FormLabel className="text-xs font-black uppercase text-primary tracking-widest flex items-center gap-2">
+                      <FileText className="h-3 w-3" /> Número de Nota de {type === 'DEBIT' ? 'Débito' : 'Crédito'}
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Ej: 00122-01" 
+                        {...field} 
+                        className="h-12 rounded-xl font-bold border-primary/30 focus:border-primary" 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <FormField
                 control={form.control}
                 name="currency"

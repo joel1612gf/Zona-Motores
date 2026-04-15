@@ -57,16 +57,13 @@ export function ExpensePrint({ printMode, concesionario, expenseData, rootId = '
         display: 'none', 
         width: '210mm',
         background: 'white', 
-        color: 'black', 
-        margin: 0,
-        padding: 0,
-        boxSizing: 'border-box'
+        color: 'black'
       }}
     >
       <style type="text/css">{`
         @media print {
-          html, body { height: auto; margin: 0 !important; padding: 0 !important; overflow: visible !important; }
-          body > * { display: none !important; }
+          html, body { height: auto !important; margin: 0 !important; padding: 0 !important; overflow: visible !important; }
+          body > *:not(#${rootId}) { display: none !important; }
           #${rootId} { 
             display: block !important; 
             position: absolute !important;
@@ -176,6 +173,7 @@ export function ExpensePrint({ printMode, concesionario, expenseData, rootId = '
             concesionario={concesionario} 
             data={{
               ...expenseData,
+              original_invoice_date: expenseData.date, // Same as date for expenses
               taxable_amount: expenseData.base_amount, // Map base_amount to taxable_amount
               type: 'EXPENSE'
             }} 

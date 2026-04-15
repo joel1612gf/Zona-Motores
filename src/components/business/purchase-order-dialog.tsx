@@ -66,6 +66,7 @@ import type { Proveedor, Producto, CompraItem } from '@/lib/business-types';
 import { cn } from '@/lib/utils';
 import { ProductFormDialog } from '@/components/business/product-form-dialog';
 import { SupplierFormDialog } from '@/components/business/supplier-form-dialog';
+import { downloadPdf } from '@/lib/download-pdf';
 
 interface PurchaseOrderDialogProps {
   open: boolean;
@@ -535,85 +536,15 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
 
   const handleDownload = async (mode: 'summary' | 'retention') => {
     setPrintMode(mode);
-    
-    // Wait for state update and potential re-render
-    setTimeout(async () => {
-      const element = document.getElementById('purchase-print-root');
-      if (!element) return;
-      
-      try {
-        // Create a hidden iframe
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'fixed';
-        iframe.style.top = '0';
-        iframe.style.left = '0';
-        iframe.style.width = '210mm';
-        iframe.style.height = '100%';
-        iframe.style.border = 'none';
-        iframe.style.zIndex = '-9999';
-        iframe.style.visibility = 'hidden';
-        document.body.appendChild(iframe);
 
-        const doc = iframe.contentDocument || iframe.contentWindow?.document;
-        if (!doc) throw new Error('Could not access iframe document');
+    const filename = mode === 'summary'
+      ? `Resumen_Compra_${successData?.numero_factura || 'N_A'}.pdf`
+      : `Retencion_IVA_${successData?.numero_comprobante || 'N_A'}.pdf`;
 
-        // Copy styles to iframe
-        const styles = document.querySelectorAll('style, link[rel="stylesheet"]');
-        styles.forEach(style => {
-          doc.head.appendChild(style.cloneNode(true));
-        });
+    // Wait for React to commit the portal with new printMode
+    await new Promise(r => setTimeout(r, 400));
 
-        const forceVisible = doc.createElement('style');
-        forceVisible.innerHTML = `
-          #purchase-print-root { display: block !important; position: static !important; }
-          .print-root { display: block !important; }
-        `;
-        doc.head.appendChild(forceVisible);
-
-        // Clone element to iframe
-        const clone = element.cloneNode(true) as HTMLElement;
-        clone.style.display = 'block';
-        clone.style.width = '210mm';
-        clone.style.margin = '0 auto';
-        doc.body.appendChild(clone);
-        doc.body.style.margin = '0';
-        doc.body.style.padding = '0';
-
-        // Wait for images to load in iframe
-        const images = doc.querySelectorAll('img');
-        await Promise.all(Array.from(images).map(img => {
-          if (img.complete) return Promise.resolve();
-          return new Promise(resolve => {
-            img.onload = resolve;
-            img.onerror = resolve;
-          });
-        }));
-
-        const html2pdf = (await import('html2pdf.js')).default;
-        const opt = {
-          margin: 0,
-          filename: mode === 'summary' 
-            ? `Resumen_Compra_${successData?.numero_factura || 'N_A'}.pdf`
-            : `Retencion_IVA_${successData?.numero_comprobante || 'N_A'}.pdf`,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { 
-            scale: 2, 
-            useCORS: true, 
-            allowTaint: true,
-            logging: true,
-            windowWidth: 794 // 210mm at 96dpi
-          },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
-
-        await html2pdf().set(opt).from(clone).save();
-        
-        // Cleanup
-        document.body.removeChild(iframe);
-      } catch (err) {
-        console.error('Error generating PDF:', err);
-      }
-    }, 300); // Give enough time for React to render the switch
+    await downloadPdf({ elementId: 'purchase-print-root', filename });
   };
 
   const handleDownloadSummary = () => handleDownload('summary');
