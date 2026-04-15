@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, where } from 'firebase/firestore';
+import { collection, query, orderBy, where, limit } from 'firebase/firestore';
 import { useBusinessAuth } from '@/context/business-auth-context';
 import { Input } from '@/components/ui/input';
 import { FiscalNotePrint } from './fiscal-note-print';
@@ -30,16 +30,25 @@ export function FinanceHistoryTable({ type }: FinanceHistoryTableProps) {
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [printData, setPrintData] = useState<any>(null);
   const [printMode, setPrintMode] = useState<any>('summary');
+  const [pageSize, setPageSize] = useState(50);
 
-  // Query logic
+  // Query logic with smart loading
   const historyQuery = useMemoFirebase(() => {
     if (!concesionario) return null;
+    
+    let baseRef = type === 'EXPENSE' 
+      ? collection(firestore, 'concesionarios', concesionario.id, 'gastos')
+      : collection(firestore, 'concesionarios', concesionario.id, 'notas_fiscales');
+
+    // If searching, we expand the limit to find matches across more records
+    const searchLimit = searchTerm.trim().length > 0 ? 500 : pageSize;
+
     if (type === 'EXPENSE') {
-      return query(collection(firestore, 'concesionarios', concesionario.id, 'gastos'), orderBy('created_at', 'desc'));
+      return query(baseRef, orderBy('created_at', 'desc'), limit(searchLimit));
     } else {
-      return query(collection(firestore, 'concesionarios', concesionario.id, 'notas_fiscales'), where('type', '==', type), orderBy('created_at', 'desc'));
+      return query(baseRef, where('type', '==', type), orderBy('created_at', 'desc'), limit(searchLimit));
     }
-  }, [concesionario, type, firestore]);
+  }, [concesionario, type, firestore, pageSize, searchTerm]);
 
   const { data: records, isLoading } = useCollection<any>(historyQuery);
 
@@ -174,7 +183,7 @@ export function FinanceHistoryTable({ type }: FinanceHistoryTableProps) {
                       </TableCell>
                       <TableCell>
                         <p className="font-bold text-sm leading-tight text-foreground/90">{record.provider_name}</p>
-                        <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter">{record.provider_rif}</p>
+                        <p className="text-[10px] text-muted-foreground/60 font-medium tracking-tight mt-0.5">RIF: {record.provider_rif || '—'}</p>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -296,7 +305,8 @@ export function FinanceHistoryTable({ type }: FinanceHistoryTableProps) {
 
                     <div>
                       <h4 className="font-bold text-base leading-tight truncate">{record.provider_name}</h4>
-                      <p className="text-[10px] font-black text-muted-foreground/80 uppercase tracking-tighter">#{record.invoice_number}</p>
+                      <p className="text-[10px] font-black text-muted-foreground/60 uppercase tracking-tighter">RIF: {record.provider_rif || '—'}</p>
+                      <p className="text-[10px] font-black text-primary uppercase tracking-tighter mt-0.5">#{record.invoice_number}</p>
                     </div>
 
                     <div className="flex justify-between items-end pt-1">
@@ -398,6 +408,19 @@ export function FinanceHistoryTable({ type }: FinanceHistoryTableProps) {
             })}
           </div>
         </>
+      )}
+
+      {filteredRecords.length >= pageSize && !searchTerm && (
+        <div className="py-8 flex justify-center">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => setPageSize(prev => prev + 50)}
+            className="text-[10px] font-black uppercase tracking-widest text-primary hover:bg-primary/10 gap-2"
+          >
+            <ChevronDown className="h-4 w-4" /> Cargar más registros
+          </Button>
+        </div>
       )}
 
       {printData && type === 'EXPENSE' && (
