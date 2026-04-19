@@ -47,6 +47,8 @@ import {
   Download,
   Hash,
   Calendar,
+  Percent,
+  Pencil,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -98,13 +100,22 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
   const [fechaFactura, setFechaFactura] = useState('');
   const [invoiceCurrency, setInvoiceCurrency] = useState<'usd' | 'bs'>('bs');
   const [items, setItems] = useState<(CompraItem & { _key: string })[]>([]);
-  const [tipoPago, setTipoPago] = useState<'contado' | 'credito'>('contado');
+  const [tipoPago, setTipoPago] = useState<'contado' | 'credito' | 'por_pagar'>('por_pagar');
   const [diasCredito, setDiasCredito] = useState('30');
   const [tasaCambio, setTasaCambio] = useState<number>(0);
   const [isTasaLoading, setIsTasaLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [printMode, setPrintMode] = useState<'both' | 'summary' | 'retention'>('both');
   const [editValues, setEditValues] = useState<Record<string, string>>({});
+
+  // Discount state
+  const [discountItemKey, setDiscountItemKey] = useState<string | null>(null);
+  const [discountValue, setDiscountValue] = useState('');
+
+  // Inline Editing state
+  const [editingItemKey, setEditingItemKey] = useState<string | null>(null);
+  const [editQty, setEditQty] = useState('');
+  const [editCost, setEditCost] = useState('');
 
   // Product search
   const [searchQuery, setSearchQuery] = useState('');
@@ -157,8 +168,8 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
     setNumeroFactura('');
     setNumeroControl('');
     setFechaFactura('');
-    setInvoiceCurrency('usd');
-    setTipoPago('contado');
+    setInvoiceCurrency('bs');
+    setTipoPago('por_pagar');
     setPendingInvoiceItems([]);
     setPendingNumeroFactura('');
     setSuccessData(null);
@@ -553,6 +564,69 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
   const handleDownloadSummary = () => handleDownload('summary');
   const handleDownloadRetention = () => handleDownload('retention');
 
+  const applyDiscount = () => {
+    const pct = parseFloat(discountValue) || 0;
+    if (pct < 0 || pct > 100) {
+      toast({ variant: 'destructive', title: 'Porcentaje inválido.' });
+      return;
+    }
+
+    setItems(prev => prev.map(item => {
+      if (item._key === discountItemKey) {
+        // Recuperamos el costo base (antes de cualquier descuento previo)
+        const baseCost = (item as any).costo_base_usd || item.costo_unitario_usd;
+        const newCost = baseCost * (1 - pct / 100);
+        return {
+          ...item,
+          costo_base_usd: baseCost,
+          descuento_porcentaje: pct,
+          costo_unitario_usd: parseFloat(newCost.toFixed(8)),
+          subtotal_usd: parseFloat((item.cantidad * newCost).toFixed(8)),
+        };
+      }
+      return item;
+    }));
+
+    setDiscountItemKey(null);
+    setDiscountValue('');
+    toast({ title: '✓ Descuento actualizado.' });
+  };
+
+  const startEditing = (item: any) => {
+    setEditingItemKey(item._key);
+    setEditQty(String(item.cantidad));
+    setEditCost(invoiceCurrency === 'bs' && tasaCambio > 0 ? (item.costo_unitario_usd * tasaCambio).toFixed(2) : String(item.costo_unitario_usd));
+  };
+
+  const saveEdit = () => {
+    const qty = parseInt(editQty);
+    const cost = parseFloat(editCost) || 0;
+    const isBs = invoiceCurrency === 'bs';
+    const costoUsd = isBs && tasaCambio > 0 ? cost / tasaCambio : cost;
+
+    if (qty <= 0 || cost < 0) {
+      toast({ variant: 'destructive', title: 'Valores inválidos.' });
+      return;
+    }
+
+    setItems(prev => prev.map(item => {
+      if (item._key === editingItemKey) {
+        // Al editar manualmente, el nuevo costo se convierte en el nuevo 'costo_base'
+        const pct = (item as any).descuento_porcentaje || 0;
+        const newCostWithDiscount = costoUsd * (1 - pct / 100);
+        return {
+          ...item,
+          cantidad: qty,
+          costo_base_usd: costoUsd,
+          costo_unitario_usd: parseFloat(newCostWithDiscount.toFixed(8)),
+          subtotal_usd: parseFloat((qty * newCostWithDiscount).toFixed(8)),
+        };
+      }
+      return item;
+    }));
+    setEditingItemKey(null);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-3xl max-h-[95vh] overflow-hidden flex flex-col bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl border-white/20 dark:border-white/10 shadow-2xl p-0 gap-0 transition-all duration-300">
@@ -703,11 +777,11 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-2">
                   <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                    <Hash className="h-4 w-4 text-primary" /> N° de Factura *
+                    <Hash className="h-4 w-4 text-primary" /> N° de Factura
                   </Label>
                   <div className="relative group">
                     <Input
-                      placeholder="ej: 0001-00012345"
+                      placeholder="00001612"
                       value={numeroFactura}
                       onChange={e => setNumeroFactura(e.target.value)}
                       className="h-11 bg-white/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 focus:border-primary/50 focus:ring-primary/20 transition-all rounded-xl pl-4"
@@ -716,10 +790,10 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                 </div>
                 <div className="space-y-2">
                   <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                    <ShieldCheck className="h-4 w-4 text-primary" /> N° de Control *
+                    <ShieldCheck className="h-4 w-4 text-primary" /> N° de Control
                   </Label>
                   <Input
-                    placeholder="ej: 00-000123"
+                    placeholder="00-00001612"
                     value={numeroControl}
                     onChange={e => setNumeroControl(e.target.value)}
                     className="h-11 bg-white/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 focus:border-primary/50 focus:ring-primary/20 transition-all rounded-xl pl-4"
@@ -758,7 +832,7 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                 </div>
               </div>
 
-              {/* Currency selector — chosen BEFORE scanning */}
+              {/* Currency selector */}
               <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-4">
                 <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                   <DollarSign className="h-4 w-4 text-primary" /> Moneda de la Factura
@@ -801,33 +875,6 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                     </p>
                   </div>
                 )}
-              </div>
-
-              {/* AI Invoice upload */}
-              <div className="relative overflow-hidden rounded-2xl border-2 border-dashed border-primary/20 bg-primary/5 p-8 transition-all hover:bg-primary/10 hover:border-primary/40 group">
-                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                  <Sparkles className="h-20 w-20 text-primary" />
-                </div>
-                <div className="relative space-y-4 text-center">
-                  <div className="w-16 h-16 bg-white dark:bg-slate-900 rounded-2xl shadow-sm flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
-                    <Sparkles className="h-8 w-8 text-primary animate-pulse" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">Carga Inteligente con IA</h3>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 max-w-[280px] mx-auto mt-1">
-                      Sube una foto o PDF de la factura y extraeremos los productos automáticamente.
-                    </p>
-                  </div>
-                  <Label htmlFor="invoice-upload" className="cursor-pointer block pt-2">
-                    <Button variant="default" size="lg" asChild disabled={isParsingInvoice} className="rounded-xl px-8 shadow-lg shadow-primary/20 hover:shadow-primary/30 active:scale-95 transition-all">
-                      <span>
-                        {isParsingInvoice ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Upload className="h-5 w-5 mr-2" />}
-                        {isParsingInvoice ? 'Procesando factura...' : 'Subir Factura Digital'}
-                      </span>
-                    </Button>
-                  </Label>
-                  <input id="invoice-upload" type="file" accept="image/*,application/pdf" className="hidden" onChange={handleInvoiceScan} />
-                </div>
               </div>
             </div>
           )}
@@ -973,14 +1020,36 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                                 </div>
                               </td>
                               <td className="p-4 text-center">
-                                <Badge variant="outline" className="rounded-md font-bold px-2.5 py-0.5 bg-slate-50 dark:bg-slate-900">
-                                  {item.cantidad}
-                                </Badge>
+                                {editingItemKey === item._key ? (
+                                  <Input
+                                    type="number"
+                                    className="w-16 h-8 text-center text-xs font-bold rounded-lg"
+                                    value={editQty}
+                                    onChange={e => setEditQty(e.target.value)}
+                                    autoFocus
+                                  />
+                                ) : (
+                                  <Badge variant="outline" className="rounded-md font-bold px-2.5 py-0.5 bg-slate-50 dark:bg-slate-900">
+                                    {item.cantidad}
+                                  </Badge>
+                                )}
                               </td>
                               <td className="p-4 text-right font-medium">
-                                {invoiceCurrency === 'bs' && tasaCambio > 0
-                                  ? (item.costo_unitario_usd * tasaCambio).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                                  : item.costo_unitario_usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                {editingItemKey === item._key ? (
+                                  <div className="relative">
+                                    <span className="absolute left-1 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">{invoiceCurrency === 'bs' ? 'Bs' : '$'}</span>
+                                    <Input
+                                      type="number"
+                                      className="w-24 h-8 text-right text-xs font-bold rounded-lg pl-5"
+                                      value={editCost}
+                                      onChange={e => setEditCost(e.target.value)}
+                                    />
+                                  </div>
+                                ) : (
+                                  invoiceCurrency === 'bs' && tasaCambio > 0
+                                    ? (item.costo_unitario_usd * tasaCambio).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                    : item.costo_unitario_usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                )}
                               </td>
                               <td className="p-4 text-right font-bold text-slate-900 dark:text-white">
                                 {invoiceCurrency === 'bs' && tasaCambio > 0
@@ -1002,27 +1071,71 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                                 </button>
                               </td>
                               <td className="p-4 text-center">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-9 w-9 text-slate-300 hover:text-destructive hover:bg-destructive/5 rounded-xl transition-all"
-                                  onClick={() => {
-                                    setItems(prev => prev.filter(i => i._key !== item._key));
-                                  }}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
+                                <div className="flex items-center justify-center gap-1">
+                                  {editingItemKey === item._key ? (
+                                    <>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-blue-500 hover:bg-blue-50 rounded-lg"
+                                        onClick={saveEdit}
+                                      >
+                                        <Check className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-slate-400 hover:bg-slate-50 rounded-lg"
+                                        onClick={() => setEditingItemKey(null)}
+                                      >
+                                        <Plus className="h-4 w-4 rotate-45" />
+                                      </Button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                                        onClick={() => startEditing(item)}
+                                      >
+                                        <Pencil className="h-3.5 w-3.5" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-all"
+                                        onClick={() => {
+                                          setDiscountItemKey(item._key);
+                                          setDiscountValue(String((item as any).descuento_porcentaje || ''));
+                                        }}
+                                      >
+                                        <Percent className="h-3.5 w-3.5" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-slate-300 hover:text-destructive hover:bg-destructive/5 rounded-lg transition-all"
+                                        onClick={() => {
+                                          setItems(prev => prev.filter(i => i._key !== item._key));
+                                        }}
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </>
+                                  )}
+                                </div>
                               </td>
                             </tr>
                           ))}
                         </tbody>
                         <tfoot className="bg-slate-50/50 dark:bg-slate-900/50 font-bold border-t border-slate-200 dark:border-slate-800">
                           <tr>
-                            <td colSpan={3} className="p-4 text-right text-slate-500 uppercase text-xs tracking-wider">Subtotal Estimado</td>
-                            <td className="p-4 text-right text-lg text-primary">
+                            <td colSpan={3} className="p-4 text-right text-slate-500 uppercase text-xs tracking-wider">Subtotal Estimado (+ IVA)</td>
+                            <td className="p-4 text-right text-lg text-primary whitespace-nowrap">
                               {invoiceCurrency === 'bs' && tasaCambio > 0
-                                ? `Bs ${(subtotal * tasaCambio).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
-                                : `$ ${subtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                                ? `Bs ${(total * tasaCambio).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                : `$ ${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                             </td>
                             <td colSpan={2}></td>
                           </tr>
@@ -1063,32 +1176,43 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
 
                   const handleMargenChange = (val: string) => {
                     const margen = parseFloat(val) || 0;
-                    const cost = isBs ? costoUnitarioBs : item.costo_unitario_usd;
-                    const newPrice = cost * (1 + margen / 100);
-                    const newPriceUsd = isBs ? newPrice / tasa : newPrice;
+                    const factor = (1 - margen / 100);
+                    const newPriceUsd = factor > 0 ? costWithIvaUsd / factor : 0;
 
                     const newItems = [...items];
                     newItems[idx] = { ...newItems[idx], nuevo_margen: margen, nuevo_precio_usd: newPriceUsd } as any;
                     setItems(newItems);
                   };
 
-                  const handlePrecioChange = (val: string) => {
-                    const price = parseFloat(val) || 0;
-                    const cost = isBs ? costoUnitarioBs : item.costo_unitario_usd;
-                    const margen = cost > 0 ? ((price / cost) - 1) * 100 : 0;
-                    const newPriceUsd = isBs ? price / tasa : price;
+                  const handlePrecioUsdChange = (val: string) => {
+                    const priceUsd = parseFloat(val) || 0;
+                    const margen = priceUsd > 0 ? (1 - (costWithIvaUsd / priceUsd)) * 100 : 0;
 
                     const newItems = [...items];
-                    newItems[idx] = { ...newItems[idx], nuevo_margen: margen, nuevo_precio_usd: newPriceUsd } as any;
+                    newItems[idx] = { ...newItems[idx], nuevo_margen: margen, nuevo_precio_usd: priceUsd } as any;
                     setItems(newItems);
                   };
 
-                  const currentMargen = itemConPrecio.nuevo_margen ?? (prod?.costo_usd && prod?.precio_venta_usd && prod.costo_usd > 0 ? ((prod.precio_venta_usd / prod.costo_usd) - 1) * 100 : 0);
-                  const currentPrice = isBs
-                    ? (itemConPrecio.nuevo_precio_usd !== undefined ? itemConPrecio.nuevo_precio_usd * tasa : (currentMargen > 0 ? costoUnitarioBs * (1 + currentMargen / 100) : precioAnteriorBs))
-                    : (itemConPrecio.nuevo_precio_usd !== undefined ? itemConPrecio.nuevo_precio_usd : (currentMargen > 0 ? item.costo_unitario_usd * (1 + currentMargen / 100) : precioAnteriorUsd));
+                  const handlePrecioBsChange = (val: string) => {
+                    const priceBs = parseFloat(val) || 0;
+                    const priceUsd = tasa > 0 ? priceBs / tasa : priceBs;
+                    const margen = priceUsd > 0 ? (1 - (costWithIvaUsd / priceUsd)) * 100 : 0;
 
-                  const otherPrice = isBs ? currentPrice / tasa : currentPrice * tasa;
+                    const newItems = [...items];
+                    newItems[idx] = { ...newItems[idx], nuevo_margen: margen, nuevo_precio_usd: priceUsd } as any;
+                    setItems(newItems);
+                  };
+
+                  const currentMargen = itemConPrecio.nuevo_margen ?? (prod?.costo_usd && prod?.precio_venta_usd && prod.costo_usd > 0 ? (1 - ((prod.aplica_iva ? prod.costo_usd * 1.16 : prod.costo_usd) / prod.precio_venta_usd)) * 100 : 0);
+
+                  const getPriceFromMargen = (m: number, baseUsd: number, aplicaIva: boolean) => {
+                    const cIva = aplicaIva ? baseUsd * 1.16 : baseUsd;
+                    const f = (1 - m / 100);
+                    return f > 0 ? cIva / f : 0;
+                  };
+
+                  const currentPriceUsd = itemConPrecio.nuevo_precio_usd !== undefined ? itemConPrecio.nuevo_precio_usd : (itemConPrecio.nuevo_margen !== undefined ? getPriceFromMargen(itemConPrecio.nuevo_margen, item.costo_unitario_usd, item.aplica_iva) : precioAnteriorUsd);
+                  const currentPriceBs = currentPriceUsd * tasa;
 
                   return (
                     <div key={item._key} className="relative group overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-5 shadow-sm hover:shadow-md hover:border-primary/30 transition-all duration-300">
@@ -1116,15 +1240,13 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                           </div>
                         </div>
 
-                        <div className="flex flex-wrap items-end gap-4 shrink-0 bg-slate-50/50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
-                          <div className="space-y-2 w-24">
-                            <Label className="text-[11px] font-bold text-slate-500 uppercase flex items-center gap-1.5">
-                              Margen
-                            </Label>
+                        <div className="flex flex-wrap items-end gap-3 shrink-0 bg-slate-50/50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
+                          <div className="space-y-1.5 w-20">
+                            <Label className="text-[10px] font-bold text-slate-500 uppercase">Margen</Label>
                             <div className="relative">
                               <Input
                                 type="text"
-                                className="h-10 text-center font-bold bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 rounded-lg focus:ring-primary/20"
+                                className="h-9 text-center font-bold bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 rounded-lg focus:ring-primary/20 px-1"
                                 value={editValues[`${item._key}-margen`] ?? currentMargen.toFixed(1)}
                                 onFocus={(e) => e.target.select()}
                                 onChange={(e) => {
@@ -1134,41 +1256,52 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                                 }}
                                 onBlur={() => setEditValues(prev => { const n = { ...prev }; delete n[`${item._key}-margen`]; return n; })}
                               />
-                              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">%</span>
+                              <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400">%</span>
                             </div>
                           </div>
 
-                          <div className="space-y-2 w-36">
-                            <Label className="text-[11px] font-bold text-slate-500 uppercase flex items-center gap-1.5">
-                              Nuevo Precio
-                            </Label>
+                          <div className="space-y-1.5 w-32">
+                            <Label className="text-[10px] font-bold text-slate-500 uppercase">Precio en Bs</Label>
                             <div className="relative">
-                              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">{isBs ? 'Bs' : '$'}</span>
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">Bs</span>
                               <Input
                                 type="text"
-                                className="h-10 text-right font-black text-primary bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 rounded-lg focus:ring-primary/20 text-base"
-                                value={editValues[`${item._key}-precio`] ?? currentPrice.toFixed(2)}
+                                className="h-9 text-right font-bold bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 rounded-lg focus:ring-primary/20 pr-2 pl-6"
+                                value={editValues[`${item._key}-precio-bs`] ?? currentPriceBs.toFixed(2)}
                                 onFocus={(e) => e.target.select()}
                                 onChange={(e) => {
                                   const val = e.target.value.replace(',', '.');
-                                  setEditValues(prev => ({ ...prev, [`${item._key}-precio`]: val }));
-                                  handlePrecioChange(val);
+                                  setEditValues(prev => ({ ...prev, [`${item._key}-precio-bs`]: val }));
+                                  handlePrecioBsChange(val);
                                 }}
-                                onBlur={() => setEditValues(prev => { const n = { ...prev }; delete n[`${item._key}-precio`]; return n; })}
+                                onBlur={() => setEditValues(prev => { const n = { ...prev }; delete n[`${item._key}-precio-bs`]; return n; })}
                               />
                             </div>
                           </div>
 
-                          <div className="flex flex-col items-end justify-center h-10 px-2">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Ref. {isBs ? 'USD' : 'VES'}</span>
-                            <p className="font-bold text-xs text-slate-600 dark:text-slate-400">
-                              {isBs ? `$${otherPrice.toFixed(2)}` : `${otherPrice.toFixed(2)} Bs`}
-                            </p>
+                          <div className="space-y-1.5 w-28">
+                            <Label className="text-[10px] font-bold text-slate-500 uppercase text-primary">Ref en $</Label>
+                            <div className="relative">
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-primary/60">$</span>
+                              <Input
+                                type="text"
+                                className="h-9 text-right font-black text-primary bg-white dark:bg-slate-950 border-primary/20 dark:border-primary/30 rounded-lg focus:ring-primary/20 pr-2 pl-5"
+                                value={editValues[`${item._key}-precio-usd`] ?? currentPriceUsd.toFixed(2)}
+                                onFocus={(e) => e.target.select()}
+                                onChange={(e) => {
+                                  const val = e.target.value.replace(',', '.');
+                                  setEditValues(prev => ({ ...prev, [`${item._key}-precio-usd`]: val }));
+                                  handlePrecioUsdChange(val);
+                                }}
+                                onBlur={() => setEditValues(prev => { const n = { ...prev }; delete n[`${item._key}-precio-usd`]; return n; })}
+                              />
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
                   );
+
                 })}
               </div>
             </div>
@@ -1179,7 +1312,15 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
             const selectedProveedorObj = proveedores.find(p => p.id === selectedProveedor);
             const willHaveRetention = selectedProveedorObj?.isRetentionAgent && ivaTotal > 0;
             const pct = selectedProveedorObj?.porcentaje_retencion_iva || 75;
-            const montoRetenidoPreview = parseFloat((ivaTotal * pct / 100).toFixed(2));
+
+            // Lógica exacta del comprobante:
+            const subtotalPlusIva = subtotal + ivaTotal;
+            const igtfUsd = invoiceCurrency === 'usd' ? subtotalPlusIva * 0.03 : 0;
+            const totalConIgtf = subtotalPlusIva + igtfUsd;
+
+            const montoRetenidoUsd = ivaTotal * (pct / 100);
+            const netoATransferirUsd = totalConIgtf - montoRetenidoUsd;
+
             return (
               <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
                 <div className="px-1">
@@ -1217,17 +1358,23 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                         <span className="text-slate-500 font-medium">IVA (16%)</span>
                         <span className="font-semibold text-slate-700 dark:text-slate-300">${ivaTotal.toFixed(2)}</span>
                       </div>
+                      {igtfUsd > 0 && (
+                        <div className="flex justify-between text-sm text-amber-600 dark:text-amber-400 font-medium">
+                          <span>IGTF (3%)</span>
+                          <span>${igtfUsd.toFixed(2)}</span>
+                        </div>
+                      )}
 
                       <div className="mt-4 p-4 rounded-xl bg-primary/5 border border-primary/10 space-y-3">
                         <div className="flex justify-between items-end">
                           <div className="flex flex-col">
-                            <span className="text-[10px] font-black uppercase tracking-widest text-primary/60">Total a Pagar</span>
-                            <span className="text-3xl font-black text-primary leading-none tracking-tight">${total.toFixed(2)}</span>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-primary/60">Total Factura</span>
+                            <span className="text-3xl font-black text-primary leading-none tracking-tight">${totalConIgtf.toFixed(2)}</span>
                           </div>
                           {tasaCambio > 0 && (
                             <div className="flex flex-col items-end">
                               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Equivalente en VES</span>
-                              <span className="text-lg font-bold text-slate-700 dark:text-slate-300">Bs {totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</span>
+                              <span className="text-lg font-bold text-slate-700 dark:text-slate-300">Bs {(totalConIgtf * tasaCambio).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</span>
                             </div>
                           )}
                         </div>
@@ -1250,18 +1397,17 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                     <div className="grid grid-cols-2 gap-4 pt-2">
                       <div className="p-3 bg-white/50 dark:bg-slate-900/50 rounded-xl border border-primary/10">
                         <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Monto Retenido</p>
-                        <p className="font-black text-primary">Bs {(montoRetenidoPreview * tasaCambio).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</p>
-                        <p className="text-[9px] text-slate-400">${montoRetenidoPreview.toFixed(2)} USD</p>
+                        <p className="font-black text-primary">Bs {(montoRetenidoUsd * tasaCambio).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</p>
+                        <p className="text-[9px] text-slate-400">${montoRetenidoUsd.toFixed(2)} USD</p>
                       </div>
                       <div className="p-3 bg-white/50 dark:bg-slate-900/50 rounded-xl border border-primary/10">
                         <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Neto a Transferir</p>
-                        <p className="font-black text-slate-900 dark:text-white">${(total - montoRetenidoPreview).toFixed(2)}</p>
-                        <p className="text-[9px] text-slate-400">Total menos retención</p>
+                        <p className="font-black text-slate-900 dark:text-white">Bs {(netoATransferirUsd * tasaCambio).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</p>
+                        <p className="text-[9px] text-slate-400">${netoATransferirUsd.toFixed(2)} USD</p>
                       </div>
                     </div>
                   </div>
                 )}
-
                 {selectedProveedorObj?.isRetentionAgent && ivaTotal === 0 && (
                   <div className="rounded-2xl border border-amber-200 bg-amber-50 dark:bg-amber-900/20 p-5 flex gap-4 animate-pulse">
                     <div className="p-2 bg-amber-100 dark:bg-amber-900/40 rounded-lg shrink-0">
@@ -1293,11 +1439,12 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-3">
                   <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Forma de Pago</Label>
-                  <Select value={tipoPago} onValueChange={v => setTipoPago(v as 'contado' | 'credito')}>
+                  <Select value={tipoPago} onValueChange={v => setTipoPago(v as 'contado' | 'credito' | 'por_pagar')}>
                     <SelectTrigger className="h-12 rounded-xl border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-950/50 backdrop-blur-sm shadow-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="rounded-xl shadow-xl">
+                      <SelectItem value="por_pagar" className="py-3 font-bold text-primary">Por pagar</SelectItem>
                       <SelectItem value="contado" className="py-3">Al Contado (Pago Inmediato)</SelectItem>
                       <SelectItem value="credito" className="py-3">A Crédito (Cuentas por Pagar)</SelectItem>
                     </SelectContent>
@@ -1358,10 +1505,14 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                   <div className="flex justify-between items-center">
                     <span className="text-slate-500 font-medium">Estado de Operación</span>
                     <Badge className={cn(
-                      "font-black uppercase tracking-tighter shadow-sm",
-                      tipoPago === 'contado' ? "bg-green-500 hover:bg-green-600" : "bg-amber-500 hover:bg-amber-600"
+                      "font-black uppercase tracking-tighter shadow-sm px-3",
+                      tipoPago === 'contado' ? "bg-green-500 hover:bg-green-600" :
+                        tipoPago === 'por_pagar' ? "bg-primary hover:bg-primary/90" :
+                          "bg-amber-500 hover:bg-amber-600"
                     )}>
-                      {tipoPago === 'contado' ? 'Pagada' : `Crédito ${diasCredito}d`}
+                      {tipoPago === 'contado' ? 'Pagada' :
+                        tipoPago === 'por_pagar' ? 'Por pagar' :
+                          `Crédito ${diasCredito}d`}
                     </Badge>
                   </div>
 
@@ -1417,34 +1568,34 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
 
         {/* Success View */}
         {step === STEPS.length && successData && (
-          <div className="flex flex-col items-center justify-center p-12 space-y-8 text-center animate-in zoom-in-95 duration-500 bg-white dark:bg-slate-950 min-h-[450px]">
+          <div className="flex flex-col items-center justify-center p-8 sm:p-10 space-y-6 text-center animate-in zoom-in-95 duration-500 bg-white dark:bg-slate-950 min-h-[400px]">
             <div className="relative">
-              <div className="w-24 h-24 bg-primary/10 text-primary rounded-3xl flex items-center justify-center relative overflow-hidden shadow-inner">
-                <CheckCircle2 className="w-14 h-14 animate-[bounce_1s_ease-out_1]" />
+              <div className="w-20 h-20 bg-primary/10 text-primary rounded-2xl flex items-center justify-center relative overflow-hidden shadow-inner">
+                <CheckCircle2 className="w-12 h-12 animate-[bounce_1s_ease-out_1]" />
               </div>
             </div>
 
-            <div className="space-y-3">
-              <h2 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">¡Registro Exitoso!</h2>
-              <p className="text-slate-500 text-sm max-w-[320px] mx-auto leading-relaxed">
-                La compra se ha procesado correctamente. El inventario y los costos han sido actualizados en tiempo real.
+            <div className="space-y-1.5">
+              <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">¡Registro Exitoso!</h2>
+              <p className="text-slate-500 text-sm max-w-[300px] mx-auto leading-relaxed">
+                La compra se ha procesado correctamente. El inventario y los costos han sido actualizados.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-md pt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-sm pt-2">
               {successData.numero_comprobante && (
-                <div className="group relative overflow-hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300">
-                  <div className="p-4 flex flex-col items-center gap-3">
+                <div className="group relative overflow-hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                  <div className="p-3 flex flex-col items-center gap-2">
                     <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-lg group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                      <ShieldCheck className="w-6 h-6" />
+                      <ShieldCheck className="w-5 h-5" />
                     </div>
-                    <span className="text-xs font-bold text-slate-600 dark:text-slate-400">Retención IVA</span>
-                    <div className="flex w-full gap-1 border-t border-slate-100 dark:border-slate-800 pt-3 mt-1">
-                      <Button variant="ghost" size="sm" className="flex-1 h-9 gap-2 rounded-lg" onClick={handlePrintRetention}>
-                        <Printer className="w-3.5 h-3.5" /> <span className="text-[10px] font-bold uppercase">Imprimir</span>
+                    <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Retención IVA</span>
+                    <div className="flex w-full gap-1 border-t border-slate-100 dark:border-slate-800 pt-2 mt-1">
+                      <Button variant="ghost" size="sm" className="flex-1 h-8 gap-2 rounded-lg" onClick={handlePrintRetention}>
+                        <Printer className="w-3 h-3" /> <span className="text-[9px] font-bold uppercase">Imprimir</span>
                       </Button>
-                      <Button variant="ghost" size="sm" className="w-9 h-9 rounded-lg" onClick={handleDownloadRetention}>
-                        <Download className="w-3.5 h-3.5" />
+                      <Button variant="ghost" size="sm" className="w-8 h-8 rounded-lg" onClick={handleDownloadRetention}>
+                        <Download className="w-3 h-3" />
                       </Button>
                     </div>
                   </div>
@@ -1452,30 +1603,30 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
               )}
 
               <div className={cn(
-                "group relative overflow-hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300",
-                !successData.numero_comprobante && "sm:col-span-2 sm:max-w-[220px] mx-auto w-full"
+                "group relative overflow-hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm hover:shadow-md transition-all duration-300",
+                !successData.numero_comprobante && "sm:col-span-2 sm:max-w-[180px] mx-auto w-full"
               )}>
-                <div className="p-4 flex flex-col items-center gap-3">
+                <div className="p-3 flex flex-col items-center gap-2">
                   <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-lg group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                    <Printer className="w-6 h-6" />
+                    <Printer className="w-5 h-5" />
                   </div>
-                  <span className="text-xs font-bold text-slate-600 dark:text-slate-400">Resumen Compra</span>
-                  <div className="flex w-full gap-1 border-t border-slate-100 dark:border-slate-800 pt-3 mt-1">
-                    <Button variant="ghost" size="sm" className="flex-1 h-9 gap-2 rounded-lg" onClick={handlePrintSummary}>
-                      <Printer className="w-3.5 h-3.5" /> <span className="text-[10px] font-bold uppercase">Imprimir</span>
+                  <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Resumen Compra</span>
+                  <div className="flex w-full gap-1 border-t border-slate-100 dark:border-slate-800 pt-2 mt-1">
+                    <Button variant="ghost" size="sm" className="flex-1 h-8 gap-2 rounded-lg" onClick={handlePrintSummary}>
+                      <Printer className="w-3 h-3" /> <span className="text-[9px] font-bold uppercase">Imprimir</span>
                     </Button>
-                    <Button variant="ghost" size="sm" className="w-9 h-9 rounded-lg" onClick={handleDownloadSummary}>
-                      <Download className="w-3.5 h-3.5" />
+                    <Button variant="ghost" size="sm" className="w-8 h-8 rounded-lg" onClick={handleDownloadSummary}>
+                      <Download className="w-3 h-3" />
                     </Button>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="pt-6 w-full max-w-xs">
+            <div className="pt-2 w-full max-w-[240px]">
               <Button
                 size="lg"
-                className="w-full h-12 rounded-xl shadow-xl shadow-primary/20 hover:shadow-primary/30 font-black uppercase tracking-widest transition-all active:scale-95"
+                className="w-full h-11 rounded-xl shadow-lg shadow-primary/20 hover:shadow-primary/30 font-black uppercase tracking-widest text-xs transition-all active:scale-95"
                 onClick={() => {
                   onSaved();
                   onOpenChange(false);
@@ -1485,8 +1636,7 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
               </Button>
             </div>
           </div>
-        )}
-      </DialogContent>
+        )}      </DialogContent>
 
       <Dialog open={!!duplicateInvoice} onOpenChange={(open) => !open && setDuplicateInvoice(null)}>
         <DialogContent className="max-w-md p-0 overflow-hidden bg-white/90 dark:bg-slate-950/90 backdrop-blur-xl border-white/20 shadow-2xl rounded-3xl">
@@ -1739,6 +1889,41 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
           </div>
         );
       })()}
+
+      <Dialog open={!!discountItemKey} onOpenChange={(open) => !open && setDiscountItemKey(null)}>
+        <DialogContent className="max-w-[300px] p-0 overflow-hidden bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border-white/20 shadow-2xl rounded-2xl">
+          <div className="p-6 text-center space-y-4">
+            <div className="mx-auto w-12 h-12 bg-primary/10 text-primary rounded-xl flex items-center justify-center">
+              <Percent className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <DialogTitle className="text-lg font-bold">Aplicar Descuento</DialogTitle>
+              <p className="text-xs text-slate-500">Ingresa el % a descontar del costo unitario.</p>
+            </div>
+            <div className="relative">
+              <Input
+                type="number"
+                min="0"
+                max="100"
+                placeholder="0"
+                value={discountValue}
+                onChange={e => setDiscountValue(e.target.value)}
+                className="h-10 text-center font-bold text-lg pr-8 rounded-xl"
+                onKeyDown={(e) => e.key === 'Enter' && applyDiscount()}
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 font-bold text-slate-400">%</span>
+            </div>
+            <div className="flex flex-col gap-2 pt-2">
+              <Button onClick={applyDiscount} className="w-full h-10 rounded-xl font-bold">
+                Aplicar
+              </Button>
+              <Button variant="ghost" onClick={() => setDiscountItemKey(null)} className="w-full h-10 rounded-xl text-slate-500 font-semibold text-xs">
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
