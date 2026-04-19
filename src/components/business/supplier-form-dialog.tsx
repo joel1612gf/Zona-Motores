@@ -10,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Building2, ShieldCheck } from 'lucide-react';
+import { Loader2, Building2, ShieldCheck, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   collection,
@@ -22,6 +22,7 @@ import {
 import { useFirestore } from '@/firebase';
 import { useBusinessAuth } from '@/context/business-auth-context';
 import type { Proveedor } from '@/lib/business-types';
+import { cn } from '@/lib/utils';
 
 interface SupplierFormDialogProps {
   open: boolean;
@@ -109,44 +110,57 @@ export function SupplierFormDialog({ open, onOpenChange, supplier, onSaved }: Su
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Building2 className="h-5 w-5" />
-            {supplier ? 'Editar Proveedor' : 'Nuevo Proveedor'}
+      <DialogContent className="sm:max-w-xl p-0 overflow-hidden bg-white/90 backdrop-blur-3xl border-white/40 shadow-2xl rounded-[2.5rem] max-h-[95vh] flex flex-col">
+        <DialogHeader className="p-8 pb-4 border-b border-black/5 bg-white/5 shrink-0 relative">
+          <DialogTitle className="text-2xl font-bold font-headline text-slate-900 flex items-center gap-3">
+             <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                <Building2 className="w-5 h-5 text-primary" />
+             </div>
+             {supplier ? 'Editar Proveedor' : 'Nuevo Proveedor'}
           </DialogTitle>
+          <p className="text-muted-foreground text-sm mt-1 ml-13">{supplier ? 'Actualiza los datos fiscales' : 'Registra un nuevo proveedor en el sistema'}</p>
         </DialogHeader>
 
-        <div className="grid gap-4 py-4">
-          <div className="grid gap-2">
-            <Label>Razón Social / Nombre <span className="text-red-500">*</span></Label>
-            <Input placeholder="Ej: Importadora VZLA C.A." value={form.nombre} onChange={set('nombre')} />
+        <div className="p-8 overflow-y-auto flex-1 custom-scrollbar space-y-6">
+          <div className="space-y-2">
+            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Razón Social / Nombre Comercial *</Label>
+            <Input placeholder="Ej: Importadora VZLA C.A." value={form.nombre} onChange={set('nombre')} className="h-14 rounded-2xl bg-white border-black/5 focus:border-primary/50 text-base font-medium transition-all" />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="grid gap-2">
-              <Label>RIF <span className="text-red-500">*</span></Label>
-              <Input placeholder="J-12345678-9" value={form.rif} onChange={set('rif')} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">RIF Fiscal *</Label>
+              <Input placeholder="J-12345678-9" value={form.rif} onChange={set('rif')} className="h-14 rounded-2xl bg-white border-black/5 focus:border-primary/50 text-base font-medium font-mono transition-all" />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Teléfono de Contacto</Label>
+              <Input placeholder="0412-0000000" value={form.contacto_telefono} onChange={set('contacto_telefono')} className="h-14 rounded-2xl bg-white border-black/5 focus:border-primary/50 text-base font-medium transition-all" />
             </div>
           </div>
 
-          <div className="grid gap-2">
-            <Label>Dirección Fiscal {form.isRetentionAgent && <span className="text-red-500">*</span>}</Label>
+          <div className="space-y-2">
+            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Dirección Fiscal {form.isRetentionAgent && '*'}</Label>
             <Input 
-              placeholder="Ej: Sabana Grande, Centro Comercial El Recreo, Torre Norte, Piso 12..." 
+              placeholder="Indica la dirección completa para facturación..." 
               value={form.direccion} 
               onChange={set('direccion')} 
+              className="h-14 rounded-2xl bg-white border-black/5 focus:border-primary/50 text-base font-medium transition-all"
             />
           </div>
 
           {/* Retention Agent Toggle */}
-          <div className="rounded-lg border p-3 bg-muted/30 space-y-3">
+          <div className="rounded-[2rem] border border-black/5 p-6 bg-slate-50/50 space-y-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4 text-primary" />
-                <Label className="text-sm font-semibold cursor-pointer" htmlFor="retention-toggle">
-                  ¿Es Agente de Retención de IVA?
-                </Label>
+              <div className="flex items-center gap-3">
+                <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center transition-colors", form.isRetentionAgent ? "bg-primary/10 text-primary" : "bg-slate-200 text-slate-400")}>
+                   <ShieldCheck className="h-5 w-5" />
+                </div>
+                <div>
+                   <Label className="text-sm font-bold cursor-pointer block" htmlFor="retention-toggle">
+                     Agente de Retención de IVA
+                   </Label>
+                   <p className="text-[10px] text-muted-foreground uppercase font-black tracking-tighter">Sujeto a normativa SENIAT</p>
+                </div>
               </div>
               <button
                 id="retention-toggle"
@@ -154,69 +168,63 @@ export function SupplierFormDialog({ open, onOpenChange, supplier, onSaved }: Su
                 role="switch"
                 aria-checked={form.isRetentionAgent}
                 onClick={() => setForm(prev => ({ ...prev, isRetentionAgent: !prev.isRetentionAgent }))}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                  form.isRetentionAgent ? 'bg-primary' : 'bg-muted-foreground/30'
-                }`}
+                className={cn(
+                  "relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary shadow-inner",
+                  form.isRetentionAgent ? 'bg-primary' : 'bg-slate-300'
+                )}
               >
                 <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  className={cn(
+                    "inline-block h-5 w-5 transform rounded-full bg-white shadow-lg transition-transform duration-300",
                     form.isRetentionAgent ? 'translate-x-6' : 'translate-x-1'
-                  }`}
+                  )}
                 />
               </button>
             </div>
 
             {form.isRetentionAgent && (
-              <div className="grid gap-2">
-                <Label className="text-xs text-muted-foreground">Porcentaje de Retención (SENIAT)</Label>
-                <div className="flex gap-2">
+              <div className="space-y-3 pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Porcentaje de Retención Aplicado</Label>
+                <div className="flex gap-3">
                   <button
                     type="button"
                     onClick={() => setForm(prev => ({ ...prev, porcentaje_retencion_iva: '75' }))}
-                    className={`flex-1 rounded-md border-2 py-2 text-sm font-semibold transition-colors ${
-                      form.porcentaje_retencion_iva === '75'
-                        ? 'border-primary bg-primary/5 text-primary'
-                        : 'border-border text-muted-foreground hover:bg-muted/40'
-                    }`}
+                    className={cn(
+                      'flex-1 h-12 rounded-xl border-2 font-bold transition-all flex items-center justify-center gap-2',
+                      form.porcentaje_retencion_iva === '75' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-200 text-slate-400 hover:bg-slate-100'
+                    )}
                   >
-                    75% <span className="text-xs font-normal">(Estándar)</span>
+                    75% <span className="text-[10px] font-normal opacity-60">ESTÁNDAR</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setForm(prev => ({ ...prev, porcentaje_retencion_iva: '100' }))}
-                    className={`flex-1 rounded-md border-2 py-2 text-sm font-semibold transition-colors ${
-                      form.porcentaje_retencion_iva === '100'
-                        ? 'border-primary bg-primary/5 text-primary'
-                        : 'border-border text-muted-foreground hover:bg-muted/40'
-                    }`}
+                    className={cn(
+                      'flex-1 h-12 rounded-xl border-2 font-bold transition-all flex items-center justify-center gap-2',
+                      form.porcentaje_retencion_iva === '100' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-200 text-slate-400 hover:bg-slate-100'
+                    )}
                   >
-                    100% <span className="text-xs font-normal">(Especial)</span>
+                    100% <span className="text-[10px] font-normal opacity-60">ESPECIAL</span>
                   </button>
                 </div>
-                <p className="text-[10px] text-muted-foreground">
-                  75% aplica al 90% de las empresas. 100% para proveedores sin RIF actualizado.
+                <p className="text-[9px] text-slate-400 text-center uppercase font-black tracking-tighter">
+                  Nota: 100% aplica a proveedores sin RIF actualizado o contribuyentes especiales.
                 </p>
               </div>
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="grid gap-2">
-              <Label>Nombre Contacto</Label>
-              <Input placeholder="Opcional" value={form.contacto_nombre} onChange={set('contacto_nombre')} />
-            </div>
-            <div className="grid gap-2">
-              <Label>Teléfono</Label>
-              <Input placeholder="Opcional" value={form.contacto_telefono} onChange={set('contacto_telefono')} />
-            </div>
+          <div className="space-y-2">
+            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Nombre de la Persona de Contacto</Label>
+            <Input placeholder="Opcional" value={form.contacto_nombre} onChange={set('contacto_nombre')} className="h-14 rounded-2xl bg-white border-black/5 focus:border-primary/50 text-base font-medium transition-all" />
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 pt-2 border-t">
-          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isSaving}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-            Guardar
+        <div className="p-8 bg-slate-50/50 border-t border-black/5 flex items-center justify-end gap-3 shrink-0">
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isSaving} className="h-12 rounded-2xl px-6 hover:bg-black/5 font-bold uppercase text-xs tracking-widest text-slate-600">Cancelar</Button>
+          <Button onClick={handleSave} disabled={isSaving} className="h-12 rounded-2xl px-10 bg-primary shadow-lg shadow-primary/20 font-bold text-white hover:bg-primary/90 transition-all hover:translate-y-[-1px]">
+            {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+            {supplier ? 'Actualizar Datos' : 'Guardar Proveedor'}
           </Button>
         </div>
       </DialogContent>

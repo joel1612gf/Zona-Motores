@@ -55,6 +55,23 @@ export function PurchaseHistoryDialog({
   // Print data state
   const [printData, setPrintData] = useState<Compra | null>(null);
   const [printMode, setPrintMode] = useState<'both' | 'summary' | 'retention'>('both');
+  const [isPrinting, setIsPrinting] = useState(false);
+
+  // Trigger print after state updates
+  useEffect(() => {
+    if (isPrinting && printData) {
+      const timer = setTimeout(() => {
+        const element = document.getElementById('history-print-root');
+        if (element) {
+          element.style.display = 'block';
+          window.print();
+          element.style.display = 'none';
+          setIsPrinting(false);
+        }
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isPrinting, printData, printMode]);
 
   useEffect(() => {
     if (open && concesionario?.id) {
@@ -154,16 +171,7 @@ export function PurchaseHistoryDialog({
 
     setPrintData(loadedCompra as Compra);
     setPrintMode(mode);
-
-    // For printing, use simple display toggle + window.print
-    setTimeout(() => {
-      const element = document.getElementById('history-print-root');
-      if (element) {
-        element.style.display = 'block';
-        window.print();
-        element.style.display = 'none';
-      }
-    }, 600);
+    setIsPrinting(true);
   };
 
   const handleDownload = async (e: React.MouseEvent, compra: Compra, mode: 'retention' | 'summary') => {
@@ -188,107 +196,38 @@ export function PurchaseHistoryDialog({
     setPrintData(loadedCompra as Compra);
     setPrintMode(mode);
 
-    if (mode === 'print') {
-      setTimeout(() => {
-        const element = document.getElementById('history-print-root');
-        if (element) {
-          element.style.display = 'block';
-          window.print();
-          element.style.display = 'none';
-        }
-      }, 150);
-      return;
-    }
+    // Wait for React to render the printData into the hidden root
+    await new Promise(r => setTimeout(r, 200));
 
-    setTimeout(async () => {
-      const element = document.getElementById('history-print-root');
-      if (!element) return;
+    const filename = mode === 'summary'
+      ? `Resumen_Compra_${compra.numero_factura || 'N_A'}.pdf`
+      : `Retencion_IVA_${(compra as any).numero_comprobante || 'N_A'}.pdf`;
 
-      // Make the element visible but positioned far off-screen so it has
-      // full computed styles. Cloning from display:none causes layout issues.
-      element.style.display = 'block';
-      element.style.position = 'fixed';
-      element.style.top = '0px';
-      element.style.left = '-99999px';
-      element.style.zIndex = '-9999';
+    const element = document.getElementById('history-print-root');
+    if (!element) return;
 
-      try {
-        const printRoot = element.querySelector('.print-root');
-        if (!printRoot) return;
+    // Use a temporary style change to filter pages for download capture
+    const originalStyle = element.getAttribute('style') || '';
+    
+    try {
+      const summaryPage = element.querySelector('[data-print-page="summary"]') as HTMLElement;
+      const retentionPage = element.querySelector('[data-print-page="retention"]') as HTMLElement;
 
-        // Determine which page div to capture: first child = summary, second child = retention.
-        const pageDivs = Array.from(printRoot.children) as HTMLElement[];
-        let targetEl: HTMLElement | null = null;
-        if (mode === 'summary') {
-          targetEl = pageDivs[0] ?? null;
-        } else if (mode === 'retention') {
-          targetEl = pageDivs.length > 1 ? pageDivs[1] : pageDivs[0] ?? null;
-        }
-        if (!targetEl) return;
-
-        // Wait for images inside the target element to load
-        const images = targetEl.querySelectorAll('img');
-        await Promise.all(Array.from(images).map(img => {
-          if (img.complete) return Promise.resolve();
-          return new Promise(resolve => {
-            img.onload = resolve;
-            img.onerror = resolve;
-          });
-        }));
-
-        // A4 at 96 dpi: 210mm × 297mm → 794px × 1123px
-        const A4_W = Math.round(210 * 96 / 25.4); // 794
-        const A4_H = Math.round(297 * 96 / 25.4); // 1123
-
-        const SCALE = 2;
-        const html2canvasLib = (await import('html2canvas')).default;
-        const canvas = await html2canvasLib(targetEl, {
-          scale: SCALE,
-          useCORS: true,
-          allowTaint: true,
-          logging: false,
-          scrollX: 0,
-          scrollY: 0,
-          width: A4_W,
-          height: A4_H,
-          windowWidth: A4_W,
-          windowHeight: A4_H,
-        });
-
-        // Crop canvas at full 2x resolution to preserve sharpness.
-        const croppedCanvas = document.createElement('canvas');
-        croppedCanvas.width = A4_W * SCALE;
-        croppedCanvas.height = A4_H * SCALE;
-        const ctx = croppedCanvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, A4_W * SCALE, A4_H * SCALE);
-        }
-
-        const { jsPDF } = await import('jspdf');
-        const filename = mode === 'summary'
-          ? `Resumen_Compra_${compra.numero_factura || 'N_A'}.pdf`
-          : `Retencion_IVA_${(compra as any).numero_comprobante || 'N_A'}.pdf`;
-
-        const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-        const imgData = croppedCanvas.toDataURL('image/jpeg', 0.85);
-        pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
-        if (pdf.getNumberOfPages && pdf.getNumberOfPages() > 1) {
-          while (pdf.getNumberOfPages() > 1) {
-            pdf.deletePage(pdf.getNumberOfPages());
-          }
-        }
-        pdf.save(filename);
-      } catch (err) {
-        console.error('Error generating PDF:', err);
-      } finally {
-        // Always restore the element to its hidden state
-        element.style.display = 'none';
-        element.style.position = 'absolute';
-        element.style.top = '0';
-        element.style.left = '0';
-        element.style.zIndex = '9999';
+      if (mode === 'summary') {
+        if (summaryPage) summaryPage.style.display = 'flex';
+        if (retentionPage) retentionPage.style.display = 'none';
+      } else {
+        if (summaryPage) summaryPage.style.display = 'none';
+        if (retentionPage) retentionPage.style.display = 'flex';
       }
-    }, 400);
+
+      const { downloadPdf } = await import('@/lib/download-pdf');
+      await downloadPdf({ elementId: 'history-print-root', filename });
+    } catch (err) {
+      console.error('Error generating PDF:', err);
+    } finally {
+      element.setAttribute('style', originalStyle);
+    }
   };
 
   const filteredCompras = useMemo(() => {
@@ -689,33 +628,31 @@ export function PurchaseHistoryDialog({
         const formatBsVal = (val: number) => val.toFixed(2);
 
         return (
-          <div id="history-print-root" style={{ display: 'none', position: 'absolute', top: 0, left: 0, width: '210mm', background: 'white', color: 'black' }}>
-            <style type="text/css">
-              {`
+          <div id="history-print-root" style={{ display: 'none' }}>
+            <style dangerouslySetInnerHTML={{ __html: `
                 @media print {
-                  html, body { height: auto !important; margin: 0 !important; padding: 0 !important; overflow: visible !important; }
                   body * { visibility: hidden !important; }
                   #history-print-root, #history-print-root * { visibility: visible !important; }
                   #history-print-root { 
-                    display: block !important; 
-                    position: fixed !important; 
-                    left: 0 !important; 
-                    top: 0 !important; 
+                    display: block !important;
+                    position: absolute !important;
+                    left: 0 !important;
+                    top: 0 !important;
                     width: 210mm !important;
-                    margin: 0 !important;
-                    padding: 0 !important;
-                    z-index: 999999 !important;
                   }
                 }
                 @page { size: A4 portrait; margin: 0; }
                 .print-root { width: 100%; background: white !important; }
                 .page-break-after { page-break-after: always; break-after: page; }
-              `}
-            </style>
-            <div className="print-root text-black font-sans bg-white w-[210mm]">
+            `}} />
+            <div key={`history-print-${printData.id}-${printMode}`} className="print-root text-black font-sans bg-white w-[210mm]">
               {/* PAGE 1: PURCHASE SUMMARY */}
               {(printMode === 'both' || printMode === 'summary') && (
-                <div className={hasRetention && printMode === 'both' ? 'page-break-after' : ''} style={{ padding: '8mm 15mm 5mm 15mm', height: '297mm', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', position: 'relative' }}>
+                <div 
+                  data-print-page="summary"
+                  className={hasRetention && printMode === 'both' ? 'page-break-after' : ''} 
+                  style={{ padding: '8mm 15mm 5mm 15mm', height: '297mm', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', position: 'relative' }}
+                >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
                     <div>{concesionario?.logo_url
                       ? <img src={concesionario.logo_url} alt="Logo" crossOrigin="anonymous" style={{ width: 65, height: 65, objectFit: 'contain' }} />
@@ -812,28 +749,30 @@ export function PurchaseHistoryDialog({
 
               {/* PAGE 2: COMPROBANTE DE RETENCIÓN */}
               {hasRetention && (printMode === 'both' || printMode === 'retention') && (
-                <LegalRetentionVoucher
-                  concesionario={concesionario}
-                  data={{
-                    currency: 'USD', // Internal amounts passed below are in USD base
-                    exchange_rate: printData.tasa_cambio,
-                    iva_retention_number: printData.numero_comprobante || '',
-                    invoice_number: printData.numero_factura || '',
-                    control_number: printData.numero_control,
-                    date: formatDateVE(printData.fecha_factura || ''),
-                    original_invoice_date: formatDateVE(printData.fecha_factura || ''),
-                    provider_name: printData.proveedor_nombre,
-                    provider_rif: printData.proveedor_rif || '',
-                    provider_direccion: printData.proveedor_direccion,
-                    taxable_amount: montoGravable,
-                    exempt_amount: montoExento,
-                    iva_amount: printData.iva_monto,
-                    total_amount: subtotalPlusIva,
-                    igtf_amount: igtfUsd,
-                    retention_iva_rate: printData.porcentaje_retencion_aplicado,
-                    type: 'EXPENSE'
-                  }}
-                />
+                <div data-print-page="retention" style={{ display: 'flex', flexDirection: 'column' }}>
+                  <LegalRetentionVoucher
+                    concesionario={concesionario}
+                    data={{
+                      currency: 'USD',
+                      exchange_rate: printData.tasa_cambio,
+                      iva_retention_number: (printData as any).numero_comprobante || '',
+                      invoice_number: printData.numero_factura || '',
+                      control_number: printData.numero_control,
+                      date: formatDateVE(printData.fecha_factura || ''),
+                      original_invoice_date: formatDateVE(printData.fecha_factura || ''),
+                      provider_name: printData.proveedor_nombre,
+                      provider_rif: printData.proveedor_rif || '',
+                      provider_direccion: printData.proveedor_direccion,
+                      taxable_amount: montoGravable,
+                      exempt_amount: montoExento,
+                      iva_amount: printData.iva_monto,
+                      total_amount: subtotalPlusIva,
+                      igtf_amount: igtfUsd,
+                      retention_iva_rate: (printData as any).porcentaje_retencion_aplicado,
+                      type: 'EXPENSE'
+                    }}
+                  />
+                </div>
               )}
             </div>
           </div>

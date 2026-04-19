@@ -67,6 +67,7 @@ import { cn } from '@/lib/utils';
 import { ProductFormDialog } from '@/components/business/product-form-dialog';
 import { SupplierFormDialog } from '@/components/business/supplier-form-dialog';
 import { downloadPdf } from '@/lib/download-pdf';
+import { LegalRetentionVoucher } from '@/components/business/legal-retention-voucher';
 
 interface PurchaseOrderDialogProps {
   open: boolean;
@@ -1205,206 +1206,163 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
         }}
       />
 
-      {/* Printable Sheets (hidden by default, only shown when printing) */}
+      {/* Printable Sheets --- same logic as purchase-history-dialog.tsx */}
       {successData && (() => {
         const isBs = successData.moneda_original === 'bs';
         const sym = isBs ? 'Bs' : '$';
         const formatAmt = (usd: number) => (isBs && successData.tasa_cambio ? usd * successData.tasa_cambio : usd).toFixed(2);
-        const formatBs = (usd: number) => (usd * (successData.tasa_cambio || 1)).toFixed(2);
         const hasIva = successData.iva_monto > 0;
         const hasRetention = !!successData.numero_comprobante;
+
+        const formatDateVE = (dateStr: string) => {
+          if (!dateStr) return 'N/A';
+          if (dateStr.includes('-')) {
+            const [y, m, d] = dateStr.split('-');
+            return y + '/' + m.padStart(2, '0') + '/' + d.padStart(2, '0');
+          }
+          if (dateStr.includes('/')) {
+            const parts = dateStr.split('/');
+            if (parts[0].length === 4) return dateStr;
+            const [d2, m2, y2] = parts;
+            return y2 + '/' + m2.padStart(2, '0') + '/' + d2.padStart(2, '0');
+          }
+          return dateStr;
+        };
+
+        const montoExento = (successData.items || []).reduce((acc: number, item: any) => !item.aplica_iva ? acc + (item.subtotal_usd || 0) : acc, 0);
+        const montoGravable = (successData.items || []).reduce((acc: number, item: any) => item.aplica_iva ? acc + (item.subtotal_usd || 0) : acc, 0);
+        const getBsEquiv = (usd: number) => (usd * (successData.tasa_cambio || 1));
+        const subtotalPlusIva = montoExento + montoGravable + (successData.iva_monto || 0);
+        const igtfUsd = !isBs ? subtotalPlusIva * 0.03 : 0;
+        const finalTotalUsd = subtotalPlusIva + igtfUsd;
         const now = new Date();
-        const proveedor = successData.proveedor_obj;
+        const registeredAt = successData.created_at?.toDate ? successData.created_at.toDate() : now;
 
         return (
           <div id="purchase-print-root" style={{ display: 'none', position: 'absolute', top: 0, left: 0, width: '210mm', background: 'white', color: 'black', zIndex: 9999 }}>
-            <style type="text/css">
-              {`
-                @media print {
-                  body * { visibility: hidden !important; }
-                  #purchase-print-root, #purchase-print-root * { visibility: visible !important; }
-                  #purchase-print-root { 
-                    position: absolute !important; 
-                    left: 0 !important; 
-                    top: 0 !important; 
-                    display: block !important; 
-                    width: 210mm !important;
-                  }
-                }
-                @page { size: A4; margin: 0mm; }
-                .print-root { width: 100%; background: white !important; }
-                .page-break-after { page-break-after: always; break-after: page; }
-              `}
-            </style>
+            <style dangerouslySetInnerHTML={{ __html: '@media print { body * { visibility: hidden !important; } #purchase-print-root, #purchase-print-root * { visibility: visible !important; } #purchase-print-root { display: block !important; position: absolute !important; left: 0 !important; top: 0 !important; width: 210mm !important; } } @page { size: A4 portrait; margin: 0; } .print-root { width: 100%; background: white !important; } .page-break-after { page-break-after: always; break-after: page; }' }} />
             <div className="print-root text-black font-sans bg-white w-[210mm]">
 
               {/* PAGE 1: PURCHASE SUMMARY */}
               {(printMode === 'both' || printMode === 'summary') && (
-                <div className={hasRetention && printMode === 'both' ? 'page-break-after' : ''} style={{ padding: '10mm 15mm', minHeight: '29.7cm', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28, borderBottom: '2px solid #e5e7eb', paddingBottom: 16 }}>
-                    <div>
-                      {concesionario?.logo_url ? (
-                        <img
-                          src={concesionario.logo_url}
-                          alt="Logo"
-                          style={{ width: 80, height: 80, objectFit: 'contain' }}
-                        />
-                      ) : (
-                        <div style={{ width: 80, height: 80, background: '#2563eb', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: 28, borderRadius: 4 }}>ZM</div>
-                      )}
+                <div
+                  data-print-page="summary"
+                  className={hasRetention && printMode === 'both' ? 'page-break-after' : ''}
+                  style={{ padding: '8mm 15mm 5mm 15mm', height: '297mm', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+                    <div>{concesionario?.logo_url
+                      ? <img src={concesionario.logo_url} alt="Logo" crossOrigin="anonymous" style={{ width: 65, height: 65, objectFit: 'contain' }} />
+                      : <div style={{ width: 65, height: 65, background: '#2563eb', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: 22, borderRadius: 4 }}>ZM</div>}
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <h1 style={{ fontSize: 18, fontWeight: 'bold', textTransform: 'uppercase', color: '#2563eb', margin: 0 }}>{concesionario?.nombre_empresa}</h1>
-                      <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>RIF: {concesionario?.rif || '—'}</p>
+                      <h1 style={{ fontSize: 15, fontWeight: 'bold', textTransform: 'uppercase', color: '#2563eb', letterSpacing: 1, margin: 0 }}>{concesionario?.nombre_empresa}</h1>
+                      <p style={{ fontSize: 12, color: '#6b7280', margin: 0 }}>RIF: {concesionario?.rif || 'N/A'}</p>
                     </div>
                   </div>
-                  <div style={{ textAlign: 'center', marginBottom: 28 }}>
-                    <h2 style={{ fontSize: 26, fontWeight: 'bold', letterSpacing: 2, margin: 0 }}>RESUMEN DE COMPRA</h2>
-                    <div style={{ width: 60, height: 4, background: '#2563eb', margin: '8px auto', borderRadius: 2 }} />
+                  <div style={{ textAlign: 'center', marginBottom: 16 }}>
+                    <h2 style={{ fontSize: 20, fontWeight: 'bold', textTransform: 'uppercase', margin: 0 }}>Resumen de Compra</h2>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24, background: '#f9fafb', border: '1px solid #e5e7eb', padding: 16, borderRadius: 6, fontSize: 13 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14, background: '#f9fafb', border: '1px solid #dbeafe', padding: 14, borderRadius: 6, fontSize: 12 }}>
                     <div>
-                      <p style={{ margin: '2px 0' }}><strong>N° Factura:</strong> {successData.numero_factura || '—'}</p>
-                      <p style={{ margin: '2px 0' }}><strong>N° Control:</strong> {successData.numero_control || '—'}</p>
-                      <p style={{ margin: '2px 0' }}><strong>Proveedor:</strong> {successData.proveedor_nombre}</p>
-                      {successData.fecha_factura && <p style={{ margin: '2px 0' }}><strong>Fecha Factura:</strong> {successData.fecha_factura}</p>}
+                      <p style={{ margin: '2px 0' }}><strong>N Factura:</strong> {successData.numero_factura || 'N/A'}</p>
+                      <p style={{ margin: '2px 0' }}><strong>N Control:</strong> {successData.numero_control || 'N/A'}</p>
+                      <p style={{ margin: '2px 0' }}><strong>Proveedor:</strong> {successData.proveedor_nombre} {successData.proveedor_rif ? '(' + successData.proveedor_rif + ')' : ''}</p>
+                      {successData.fecha_factura && <p style={{ margin: '2px 0' }}><strong>Fecha Factura:</strong> {formatDateVE(successData.fecha_factura)}</p>}
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <p style={{ margin: '2px 0' }}><strong>Fecha Registro:</strong> {now.toLocaleDateString('es-VE')}</p>
-                      <p style={{ margin: '2px 0' }}><strong>Tasa BCV:</strong> {successData.tasa_cambio ? `Bs ${successData.tasa_cambio}` : '—'}</p>
-                      <p style={{ margin: '2px 0' }}><strong>Cargado por:</strong> {staff?.nombre || 'Administrador'}</p>
-                      {hasRetention && <p style={{ margin: '2px 0' }}><strong>N° Retención IVA:</strong> {successData.numero_comprobante}</p>}
+                      <p style={{ margin: '2px 0' }}><strong>Fecha Registro:</strong> {registeredAt.getFullYear() + '/' + String(registeredAt.getMonth() + 1).padStart(2, '0') + '/' + String(registeredAt.getDate()).padStart(2, '0')}</p>
+                      <p style={{ margin: '2px 0' }}><strong>Tasa BCV:</strong> {successData.tasa_cambio ? 'Bs ' + successData.tasa_cambio.toFixed(2) : 'N/A'}</p>
+                      <p style={{ margin: '2px 0' }}><strong>Cargado por:</strong> {successData.creado_por || 'Administrador'}</p>
+                      {hasRetention && <p style={{ margin: '2px 0' }}><strong>N Retencion IVA:</strong> {successData.numero_comprobante}</p>}
+                    </div>
+                    <div style={{ gridColumn: '1 / span 2', textAlign: 'center', marginTop: 8, paddingTop: 6, borderTop: '0.5px solid #e5e7eb' }}>
+                      <p style={{ margin: 0, fontSize: 10, color: '#9ca3af', fontStyle: 'italic' }}>Este documento no tiene validez fiscal.</p>
                     </div>
                   </div>
-                  <h3 style={{ fontWeight: 'bold', borderBottom: '2px solid #dbeafe', paddingBottom: 6, marginBottom: 8, fontSize: 15, color: '#2563eb', textTransform: 'uppercase' }}>Lista de Productos</h3>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 24 }}>
+                  <h3 style={{ fontWeight: 'bold', borderBottom: '1.5px solid #dbeafe', paddingBottom: 4, marginBottom: 7, fontSize: 12, color: '#2563eb', textTransform: 'uppercase' }}>Lista de Productos</h3>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 18 }}>
                     <thead>
                       <tr style={{ background: '#f3f4f6', borderTop: '1px solid #d1d5db', borderBottom: '1px solid #d1d5db' }}>
-                        <th style={{ padding: '6px 8px', textAlign: 'left', width: 80 }}>Código</th>
-                        <th style={{ padding: '6px 8px', textAlign: 'left' }}>Descripción</th>
-                        <th style={{ padding: '6px 8px', textAlign: 'center', width: 60 }}>Cant.</th>
-                        <th style={{ padding: '6px 8px', textAlign: 'right', width: 110 }}>P. Unit. {sym}</th>
-                        <th style={{ padding: '6px 8px', textAlign: 'right', width: 110 }}>Total {sym}</th>
+                        <th style={{ padding: '4px 8px', textAlign: 'left', width: 80 }}>Codigo</th>
+                        <th style={{ padding: '4px 8px', textAlign: 'left' }}>Descripcion</th>
+                        <th style={{ padding: '4px 8px', textAlign: 'center', width: 60 }}>Cant.</th>
+                        <th style={{ padding: '4px 8px', textAlign: 'right', width: 110 }}>P. Unit. {sym}</th>
+                        <th style={{ padding: '4px 8px', textAlign: 'right', width: 110 }}>Total {sym}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {(successData.items || []).map((item: any, i: number) => (
                         <tr key={i} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                          <td style={{ padding: '7px 8px', fontFamily: 'monospace', fontSize: 11 }}>{item.codigo || '—'}</td>
-                          <td style={{ padding: '7px 8px' }}>{item.nombre}</td>
-                          <td style={{ padding: '7px 8px', textAlign: 'center' }}>{item.cantidad}</td>
-                          <td style={{ padding: '7px 8px', textAlign: 'right' }}>{sym}{formatAmt(item.costo_unitario_usd || 0)}</td>
-                          <td style={{ padding: '7px 8px', textAlign: 'right', fontWeight: 600 }}>{sym}{formatAmt(item.subtotal_usd || 0)}</td>
+                          <td style={{ padding: '6px 8px', fontFamily: 'monospace', fontSize: 11 }}>{item.codigo || 'N/A'}</td>
+                          <td style={{ padding: '6px 8px' }}>{item.nombre}</td>
+                          <td style={{ padding: '6px 8px', textAlign: 'center' }}>{item.cantidad}</td>
+                          <td style={{ padding: '6px 8px', textAlign: 'right' }}>{sym}{formatAmt(item.costo_unitario_usd || 0)}</td>
+                          <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 600 }}>{sym}{formatAmt(item.subtotal_usd || 0)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                  <div style={{ marginLeft: 'auto', width: 260, fontSize: 13 }}>
+                  <div style={{ marginLeft: 'auto', width: 260, fontSize: 12 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #d1d5db', paddingTop: 6, marginBottom: 4 }}>
-                      <span style={{ fontWeight: 600 }}>Subtotal:</span><span>{sym}{formatAmt(successData.subtotal_usd || 0)}</span>
+                      <span style={{ fontWeight: 600 }}>Monto Exento:</span><span>{sym}{formatAmt(montoExento)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <span style={{ fontWeight: 600 }}>Monto Gravable:</span><span>{sym}{formatAmt(montoGravable)}</span>
                     </div>
                     {hasIva && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                         <span style={{ fontWeight: 600 }}>IVA (16%):</span><span>{sym}{formatAmt(successData.iva_monto || 0)}</span>
                       </div>
                     )}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2px solid #d1d5db', paddingTop: 6, fontWeight: 'bold', fontSize: 15 }}>
-                      <span>Total:</span><span style={{ color: '#2563eb' }}>{sym}{formatAmt(successData.total_usd || 0)}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', marginBottom: 4 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                        <span style={{ fontWeight: 600 }}>IGTF (3%):</span>
+                        <span>{sym}{formatAmt(igtfUsd)}</span>
+                      </div>
+                      {!isBs && successData.tasa_cambio && (
+                        <div style={{ fontSize: 9, color: '#6b7280', marginTop: 1 }}>Equiv: Bs {getBsEquiv(igtfUsd).toFixed(2)}</div>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', borderTop: '2px solid #d1d5db', paddingTop: 6 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontWeight: 'bold', fontSize: 15 }}>
+                        <span>Total:</span><span style={{ color: '#2563eb' }}>{sym}{formatAmt(finalTotalUsd)}</span>
+                      </div>
+                      {!isBs && successData.tasa_cambio && (
+                        <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>Equivalente: Bs {getBsEquiv(finalTotalUsd).toFixed(2)}</div>
+                      )}
                     </div>
                   </div>
-                  <p style={{ textAlign: 'center', fontSize: 10, color: '#9ca3af', marginTop: 'auto', marginBottom: 0 }}>www.zonamotores.com</p>
                 </div>
               )}
 
-              {/* PAGE 2: COMPROBANTE DE RETENCIÓN DE IVA (conditional) */}
+              {/* PAGE 2: COMPROBANTE DE RETENCION --- identical to history dialog */}
               {hasRetention && (printMode === 'both' || printMode === 'retention') && (
-                <div style={{ padding: '10mm 15mm', minHeight: '29.7cm', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
-                    <div>
-                      {concesionario?.logo_url
-                        ? <img src={concesionario.logo_url} alt="Logo" style={{ width: 65, height: 65, objectFit: 'contain' }} />
-                        : <div style={{ width: 65, height: 65, background: '#2563eb', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: 22, borderRadius: 4 }}>ZM</div>
-                      }
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <h1 style={{ fontSize: 15, fontWeight: 'bold', textTransform: 'uppercase', color: '#2563eb', letterSpacing: 1, margin: 0 }}>{concesionario?.nombre_empresa}</h1>
-                      <p style={{ fontSize: 12, color: '#6b7280', margin: 0 }}>RIF: {concesionario?.rif || '—'}</p>
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'center', marginBottom: 16 }}>
-                    <h2 style={{ fontSize: 20, fontWeight: 'bold', textTransform: 'uppercase', margin: 0 }}>Comprobante de Retención de I.V.A.</h2>
-                    <p style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>Providencia Administrativa N° SNAT/2015/0049 (Revisada 2026)</p>
-                    <div style={{ width: 60, height: 3, background: '#2563eb', margin: '6px auto', borderRadius: 2 }} />
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14, background: '#f9fafb', border: '1px solid #dbeafe', padding: 14, borderRadius: 6 }}>
-                    <div>
-                      <p style={{ fontSize: 10, fontWeight: 'bold', color: '#2563eb', textTransform: 'uppercase', margin: '0 0 6px 0' }}>Datos del Agente de Retención (Comprador)</p>
-                      <p style={{ fontSize: 12, margin: '2px 0' }}><strong>Razón Social:</strong> {concesionario?.nombre_empresa}</p>
-                      <p style={{ fontSize: 12, margin: '2px 0' }}><strong>R.I.F.:</strong> {concesionario?.rif || '—'}</p>
-                      <p style={{ fontSize: 12, margin: '2px 0' }}><strong>Dirección:</strong> {concesionario?.direccion || '—'}</p>
-                    </div>
-                    <div>
-                      <p style={{ fontSize: 10, fontWeight: 'bold', color: '#2563eb', textTransform: 'uppercase', margin: '0 0 6px 0' }}>Datos del Sujeto Retenido (Proveedor)</p>
-                      <p style={{ fontSize: 12, margin: '2px 0' }}><strong>Razón Social:</strong> {successData.proveedor_nombre}</p>
-                      <p style={{ fontSize: 12, margin: '2px 0' }}><strong>R.I.F.:</strong> {successData.proveedor_rif || '—'}</p>
-                      <p style={{ fontSize: 12, margin: '2px 0' }}><strong>Dirección:</strong> {successData.proveedor_direccion || '—'}</p>
-                    </div>
-                  </div>
-                  <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', padding: '8px 14px', borderRadius: 6, marginBottom: 14, fontSize: 12 }}>
-                    <p style={{ margin: '2px 0' }}><strong>Número de Comprobante:</strong> {successData.numero_comprobante}</p>
-                    <p style={{ margin: '2px 0' }}><strong>Fecha de Emisión del Comprobante:</strong> {now.toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric' })}</p>
-                    <p style={{ margin: '2px 0' }}><strong>Período Fiscal:</strong> Año {now.getFullYear()} / Mes {String(now.getMonth() + 1).padStart(2, '0')}</p>
-                  </div>
-                  <div style={{ marginBottom: 18 }}>
-                    <h3 style={{ fontSize: 12, fontWeight: 'bold', color: '#2563eb', textTransform: 'uppercase', borderBottom: '1.5px solid #dbeafe', paddingBottom: 4, marginBottom: 7 }}>Documentos de Referencia</h3>
-                    <p style={{ fontSize: 12, margin: 0 }}>
-                      <strong>Número de Factura Original:</strong> {successData.numero_factura || '—'}&emsp;
-                      <strong>Número de Control Original:</strong> {successData.numero_control || '—'}&emsp;
-                      <strong>Fecha de Factura Original:</strong> {successData.fecha_factura || '—'}
-                    </p>
-                  </div>
-                  <table style={{ width: '58%', marginLeft: 'auto', borderCollapse: 'collapse', fontSize: 12 }}>
-                    <tbody>
-                      {([
-                        ['Total Factura (Compras Incluyendo IVA):', `Bs ${formatBs(successData.total_usd || 0)}`],
-                        ['Monto Exento (Sin Derecho a Crédito Fiscal):', `Bs ${formatBs(successData.monto_exento_usd || 0)}`],
-                        ['Base Imponible (Total Compras Gravadas):', `Bs ${formatBs(successData.base_imponible_usd || 0)}`],
-                        ['Alícuota %:', '16%'],
-                        ['Impuesto Causado (I.V.A. Total):', `Bs ${formatBs(successData.iva_monto || 0)}`],
-                        ['Porcentaje de Retención (SENIAT):', `${successData.porcentaje_retencion_aplicado}%`],
-                      ] as [string, string][]).map(([label, value], i) => (
-                        <tr key={i} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                          <td style={{ padding: '4px 8px', textAlign: 'right', color: '#374151' }}>{label}</td>
-                          <td style={{ padding: '4px 8px', textAlign: 'right', width: 120 }}>{value}</td>
-                        </tr>
-                      ))}
-                      <tr style={{ background: '#dbeafe' }}>
-                        <td style={{ padding: '6px 8px', textAlign: 'right', color: '#1d4ed8', fontWeight: 'bold' }}>I.V.A. RETENIDO:</td>
-                        <td style={{ padding: '6px 8px', textAlign: 'right', color: '#1d4ed8', fontWeight: 'bold', fontSize: 14, width: 120 }}>Bs {formatBs(successData.monto_retenido || 0)}</td>
-                      </tr>
-                      <tr style={{ borderTop: '2px solid #d1d5db' }}>
-                        <td style={{ padding: '6px 8px', textAlign: 'right' }}>Neto a Pagar a Proveedor:</td>
-                        <td style={{ padding: '6px 8px', textAlign: 'right', width: 120 }}>Bs {formatBs(successData.neto_a_pagar || 0)}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                  <p style={{ fontSize: 10, color: '#6b7280', textAlign: 'center', fontStyle: 'italic', padding: '10px 0' }}>
-                    Este comprobante se emite en función a lo establecido en la Providencia Administrativa N° SNAT/2015/0049.
-                  </p>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 50, marginTop: 'auto' }}>
-                    <div style={{ borderTop: '1px solid #374151', paddingTop: 8, textAlign: 'center', fontSize: 11 }}>
-                      <p style={{ margin: 0 }}>Firma y Sello Agente de Retención</p>
-                      <p style={{ margin: 0, color: '#6b7280' }}>({concesionario?.nombre_empresa})</p>
-                    </div>
-                    <div style={{ borderTop: '1px solid #374151', paddingTop: 8, textAlign: 'center', fontSize: 11 }}>
-                      <p style={{ margin: 0 }}>Recibido por (Proveedor):</p>
-                      <p style={{ margin: 0, color: '#6b7280' }}>Nombre/Firma/Cédula/Fecha</p>
-                    </div>
-                  </div>
-                  <p style={{ textAlign: 'center', fontSize: 10, color: '#9ca3af', marginTop: 15, marginBottom: 0 }}>www.zonamotores.com</p>
+                <div data-print-page="retention" style={{ display: 'flex', flexDirection: 'column' }}>
+                  <LegalRetentionVoucher
+                    concesionario={concesionario}
+                    data={{
+                      currency: 'USD',
+                      exchange_rate: successData.tasa_cambio,
+                      iva_retention_number: successData.numero_comprobante || '',
+                      invoice_number: successData.numero_factura || '',
+                      control_number: successData.numero_control,
+                      date: formatDateVE(successData.fecha_factura || ''),
+                      original_invoice_date: formatDateVE(successData.fecha_factura || ''),
+                      provider_name: successData.proveedor_nombre,
+                      provider_rif: successData.proveedor_rif || '',
+                      provider_direccion: successData.proveedor_direccion,
+                      taxable_amount: montoGravable,
+                      exempt_amount: montoExento,
+                      iva_amount: successData.iva_monto,
+                      total_amount: subtotalPlusIva,
+                      igtf_amount: igtfUsd,
+                      retention_iva_rate: successData.porcentaje_retencion_aplicado,
+                      type: 'EXPENSE'
+                    }}
+                  />
                 </div>
               )}
-
             </div>
           </div>
         );

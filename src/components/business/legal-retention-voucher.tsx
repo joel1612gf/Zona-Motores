@@ -95,9 +95,9 @@ export function LegalRetentionVoucher({ concesionario, data }: LegalRetentionVou
   };
 
   return (
-    <div className="print-page" style={{
+    <div style={{
       padding: '8mm 15mm 5mm 15mm',
-      height: '284mm',
+      height: '280mm',
       overflow: 'hidden',
       display: 'flex',
       flexDirection: 'column',
