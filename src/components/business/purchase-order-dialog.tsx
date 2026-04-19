@@ -473,7 +473,7 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
         getDocs(qFacExpense),
         getDocs(qCtrlExpense)
       ]);
-      
+
       if (!snapFacP.empty) {
         setDuplicateInvoice({ ...snapFacP.docs[0].data(), source: 'compras' });
         return;
@@ -484,25 +484,25 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
       }
       if (!snapFacE.empty) {
         const data = snapFacE.docs[0].data();
-        setDuplicateInvoice({ 
-          numero_factura: data.invoice_number, 
+        setDuplicateInvoice({
+          numero_factura: data.invoice_number,
           numero_control: data.control_number,
           proveedor_nombre: data.provider_name,
-          source: 'gastos' 
+          source: 'gastos'
         });
         return;
       }
       if (!snapCtrlE.empty) {
         const data = snapCtrlE.docs[0].data();
-        setDuplicateInvoice({ 
-          numero_factura: data.invoice_number, 
+        setDuplicateInvoice({
+          numero_factura: data.invoice_number,
           numero_control: data.control_number,
           proveedor_nombre: data.provider_name,
-          source: 'gastos' 
+          source: 'gastos'
         });
         return;
       }
-      
+
       setStep(s => s + 1);
     } catch (e) {
       console.error(e);
@@ -566,7 +566,7 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                 Cargar Compra
               </DialogTitle>
             </div>
-            
+
             {/* Step indicator */}
             <div className="relative flex items-center justify-between px-2 pt-2">
               <div className="absolute top-1/2 left-0 w-full h-0.5 bg-slate-100 dark:bg-slate-800 -translate-y-1/2 -z-10 rounded-full" />
@@ -688,11 +688,11 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                       </div>
                     )}
                   </div>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="icon" 
-                    className="shrink-0 h-12 w-12 rounded-xl border-slate-200 dark:border-slate-800 hover:bg-primary/5 hover:text-primary transition-all shadow-sm" 
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="shrink-0 h-12 w-12 rounded-xl border-slate-200 dark:border-slate-800 hover:bg-primary/5 hover:text-primary transition-all shadow-sm"
                     onClick={() => setNewSupplierDialogOpen(true)}
                   >
                     <Plus className="h-5 w-5" />
@@ -706,10 +706,10 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                     <Hash className="h-4 w-4 text-primary" /> N° de Factura *
                   </Label>
                   <div className="relative group">
-                    <Input 
-                      placeholder="ej: 0001-00012345" 
-                      value={numeroFactura} 
-                      onChange={e => setNumeroFactura(e.target.value)} 
+                    <Input
+                      placeholder="ej: 0001-00012345"
+                      value={numeroFactura}
+                      onChange={e => setNumeroFactura(e.target.value)}
                       className="h-11 bg-white/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 focus:border-primary/50 focus:ring-primary/20 transition-all rounded-xl pl-4"
                     />
                   </div>
@@ -718,10 +718,10 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                   <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                     <ShieldCheck className="h-4 w-4 text-primary" /> N° de Control *
                   </Label>
-                  <Input 
-                    placeholder="ej: 00-000123" 
-                    value={numeroControl} 
-                    onChange={e => setNumeroControl(e.target.value)} 
+                  <Input
+                    placeholder="ej: 00-000123"
+                    value={numeroControl}
+                    onChange={e => setNumeroControl(e.target.value)}
                     className="h-11 bg-white/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 focus:border-primary/50 focus:ring-primary/20 transition-all rounded-xl pl-4"
                   />
                 </div>
@@ -732,10 +732,10 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                   <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-primary" /> Fecha de la Factura
                   </Label>
-                  <Input 
-                    type="date" 
-                    value={fechaFactura} 
-                    onChange={e => setFechaFactura(e.target.value)} 
+                  <Input
+                    type="date"
+                    value={fechaFactura}
+                    onChange={e => setFechaFactura(e.target.value)}
                     className="h-11 bg-white/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 focus:border-primary/50 focus:ring-primary/20 transition-all rounded-xl"
                   />
                 </div>
@@ -745,13 +745,13 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                   </Label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Bs</span>
-                    <Input 
-                      type="number" 
-                      min={0} 
-                      step={0.01} 
-                      placeholder="ej: 50.50" 
-                      value={tasaCambio || ''} 
-                      onChange={e => setTasaCambio(parseFloat(e.target.value) || 0)} 
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      placeholder="ej: 50.50"
+                      value={tasaCambio || ''}
+                      onChange={e => setTasaCambio(parseFloat(e.target.value) || 0)}
                       className="h-11 pl-9 bg-white/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 focus:border-primary/50 focus:ring-primary/20 transition-all rounded-xl"
                     />
                   </div>
@@ -769,8 +769,8 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                     onClick={() => setInvoiceCurrency('bs')}
                     className={cn(
                       'flex-1 flex items-center justify-center gap-2 rounded-xl border-2 py-3 text-sm font-semibold transition-all duration-300 shadow-sm',
-                      invoiceCurrency === 'bs' 
-                        ? 'border-primary bg-primary/5 text-primary scale-[1.02] shadow-primary/10' 
+                      invoiceCurrency === 'bs'
+                        ? 'border-primary bg-primary/5 text-primary scale-[1.02] shadow-primary/10'
                         : 'border-slate-200 dark:border-slate-800 text-slate-500 bg-white dark:bg-slate-950 hover:border-slate-300 dark:hover:border-slate-700'
                     )}
                   >
@@ -782,8 +782,8 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                     onClick={() => setInvoiceCurrency('usd')}
                     className={cn(
                       'flex-1 flex items-center justify-center gap-2 rounded-xl border-2 py-3 text-sm font-semibold transition-all duration-300 shadow-sm',
-                      invoiceCurrency === 'usd' 
-                        ? 'border-primary bg-primary/5 text-primary scale-[1.02] shadow-primary/10' 
+                      invoiceCurrency === 'usd'
+                        ? 'border-primary bg-primary/5 text-primary scale-[1.02] shadow-primary/10'
                         : 'border-slate-200 dark:border-slate-800 text-slate-500 bg-white dark:bg-slate-950 hover:border-slate-300 dark:hover:border-slate-700'
                     )}
                   >
@@ -795,8 +795,8 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                   <div className="flex items-start gap-2 text-[11px] p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/30">
                     <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                     <p>
-                      {tasaCambio > 0 
-                        ? `Los precios se convertirán a tasa de ${tasaCambio.toFixed(2)} Bs/$ automáticamente.` 
+                      {tasaCambio > 0
+                        ? `Los precios se convertirán a tasa de ${tasaCambio.toFixed(2)} Bs/$ automáticamente.`
                         : "¡Atención! Sin tasa configurada los precios no se convertirán."}
                     </p>
                   </div>
@@ -845,7 +845,7 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                     {items.length} {items.length === 1 ? 'Item' : 'Items'}
                   </Badge>
                 </div>
-                
+
                 <div className="space-y-2">
                   <div className="flex gap-2">
                     <div className="relative flex-1">
@@ -869,13 +869,13 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                   {searchQuery && filteredProductos.length > 0 && !selectedProductId && (
                     <div className="absolute z-50 w-full mt-1 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900 max-h-56 overflow-y-auto shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200 backdrop-blur-xl">
                       {filteredProductos.slice(0, 10).map(p => (
-                        <button 
-                          key={p.id} 
-                          className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors flex items-center justify-between group" 
-                          onClick={() => { 
-                            setSelectedProductId(p.id); 
-                            setSearchQuery(p.nombre); 
-                            setItemCosto(invoiceCurrency === 'bs' && tasaCambio > 0 ? (p.costo_usd * tasaCambio).toFixed(2) : String(p.costo_usd)); 
+                        <button
+                          key={p.id}
+                          className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors flex items-center justify-between group"
+                          onClick={() => {
+                            setSelectedProductId(p.id);
+                            setSearchQuery(p.nombre);
+                            setItemCosto(invoiceCurrency === 'bs' && tasaCambio > 0 ? (p.costo_usd * tasaCambio).toFixed(2) : String(p.costo_usd));
                           }}
                         >
                           <div className="flex items-center gap-3">
@@ -902,12 +902,12 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                     <Label className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
                       <Hash className="h-3 w-3" /> Cantidad
                     </Label>
-                    <Input 
-                      type="number" 
-                      min={1} 
-                      placeholder="1" 
-                      value={itemQty} 
-                      onChange={e => setItemQty(e.target.value)} 
+                    <Input
+                      type="number"
+                      min={1}
+                      placeholder="1"
+                      value={itemQty}
+                      onChange={e => setItemQty(e.target.value)}
                       className="h-11 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 rounded-xl focus:ring-primary/20 text-center font-bold"
                     />
                   </div>
@@ -919,13 +919,13 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
                         {invoiceCurrency === 'bs' ? 'Bs' : '$'}
                       </span>
-                      <Input 
-                        type="number" 
-                        min={0} 
-                        step={0.01} 
-                        placeholder="0.00" 
-                        value={itemCosto} 
-                        onChange={e => setItemCosto(e.target.value)} 
+                      <Input
+                        type="number"
+                        min={0}
+                        step={0.01}
+                        placeholder="0.00"
+                        value={itemCosto}
+                        onChange={e => setItemCosto(e.target.value)}
                         className="h-11 pl-9 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 rounded-xl focus:ring-primary/20 text-right font-bold"
                       />
                     </div>
@@ -941,7 +941,7 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                 <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2 px-1">
                   <Package className="h-3.5 w-3.5" /> Detalle de Items
                 </h4>
-                
+
                 {items.length === 0 ? (
                   <div className="text-center py-16 bg-slate-50/50 dark:bg-slate-900/30 rounded-2xl border-2 border-dashed border-slate-100 dark:border-slate-800 space-y-3">
                     <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto text-slate-300">
@@ -978,13 +978,13 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                                 </Badge>
                               </td>
                               <td className="p-4 text-right font-medium">
-                                {invoiceCurrency === 'bs' && tasaCambio > 0 
-                                  ? (item.costo_unitario_usd * tasaCambio).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) 
+                                {invoiceCurrency === 'bs' && tasaCambio > 0
+                                  ? (item.costo_unitario_usd * tasaCambio).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                                   : item.costo_unitario_usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
                               <td className="p-4 text-right font-bold text-slate-900 dark:text-white">
-                                {invoiceCurrency === 'bs' && tasaCambio > 0 
-                                  ? `Bs ${(item.subtotal_usd * tasaCambio).toLocaleString('es-VE', { minimumFractionDigits: 2 })}` 
+                                {invoiceCurrency === 'bs' && tasaCambio > 0
+                                  ? `Bs ${(item.subtotal_usd * tasaCambio).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
                                   : `$ ${item.subtotal_usd.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
                               </td>
                               <td className="p-4 text-center">
@@ -1002,10 +1002,10 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                                 </button>
                               </td>
                               <td className="p-4 text-center">
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="h-9 w-9 text-slate-300 hover:text-destructive hover:bg-destructive/5 rounded-xl transition-all" 
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-9 w-9 text-slate-300 hover:text-destructive hover:bg-destructive/5 rounded-xl transition-all"
                                   onClick={() => {
                                     setItems(prev => prev.filter(i => i._key !== item._key));
                                   }}
@@ -1020,8 +1020,8 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                           <tr>
                             <td colSpan={3} className="p-4 text-right text-slate-500 uppercase text-xs tracking-wider">Subtotal Estimado</td>
                             <td className="p-4 text-right text-lg text-primary">
-                              {invoiceCurrency === 'bs' && tasaCambio > 0 
-                                ? `Bs ${(subtotal * tasaCambio).toLocaleString('es-VE', { minimumFractionDigits: 2 })}` 
+                              {invoiceCurrency === 'bs' && tasaCambio > 0
+                                ? `Bs ${(subtotal * tasaCambio).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
                                 : `$ ${subtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
                             </td>
                             <td colSpan={2}></td>
@@ -1151,7 +1151,7 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                                 onFocus={(e) => e.target.select()}
                                 onChange={(e) => {
                                   const val = e.target.value.replace(',', '.');
-                                  setEditValues(prev => ({ ...prev, [`${item._key}-precio`] : val }));
+                                  setEditValues(prev => ({ ...prev, [`${item._key}-precio`]: val }));
                                   handlePrecioChange(val);
                                 }}
                                 onBlur={() => setEditValues(prev => { const n = { ...prev }; delete n[`${item._key}-precio`]; return n; })}
@@ -1205,9 +1205,9 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                         </div>
                       ))}
                     </div>
-                    
+
                     <Separator className="bg-slate-100 dark:bg-slate-800" />
-                    
+
                     <div className="space-y-2.5">
                       <div className="flex justify-between text-sm">
                         <span className="text-slate-500 font-medium">Subtotal</span>
@@ -1217,7 +1217,7 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                         <span className="text-slate-500 font-medium">IVA (16%)</span>
                         <span className="font-semibold text-slate-700 dark:text-slate-300">${ivaTotal.toFixed(2)}</span>
                       </div>
-                      
+
                       <div className="mt-4 p-4 rounded-xl bg-primary/5 border border-primary/10 space-y-3">
                         <div className="flex justify-between items-end">
                           <div className="flex flex-col">
@@ -1261,7 +1261,7 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                     </div>
                   </div>
                 )}
-                
+
                 {selectedProveedorObj?.isRetentionAgent && ivaTotal === 0 && (
                   <div className="rounded-2xl border border-amber-200 bg-amber-50 dark:bg-amber-900/20 p-5 flex gap-4 animate-pulse">
                     <div className="p-2 bg-amber-100 dark:bg-amber-900/40 rounded-lg shrink-0">
@@ -1270,7 +1270,7 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                     <div className="space-y-1">
                       <p className="font-bold text-amber-800 dark:text-amber-300 text-sm">Advertencia de Retención</p>
                       <p className="text-xs text-amber-700/80 dark:text-amber-400/80 leading-relaxed">
-                        El proveedor es agente de retención pero no hay ítems con IVA. 
+                        El proveedor es agente de retención pero no hay ítems con IVA.
                         <strong> Regresa al paso anterior</strong> si esto es un error.
                       </p>
                     </div>
@@ -1308,13 +1308,13 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                   <div className="space-y-3 animate-in fade-in slide-in-from-left-4">
                     <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Días de Crédito</Label>
                     <div className="relative">
-                      <Input 
-                        type="number" 
-                        min={1} 
-                        max={365} 
-                        placeholder="30" 
-                        value={diasCredito} 
-                        onChange={e => setDiasCredito(e.target.value)} 
+                      <Input
+                        type="number"
+                        min={1}
+                        max={365}
+                        placeholder="30"
+                        value={diasCredito}
+                        onChange={e => setDiasCredito(e.target.value)}
                         className="h-12 rounded-xl border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-950/50 backdrop-blur-sm shadow-sm pr-12 font-bold text-center"
                       />
                       <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 uppercase">Días</span>
@@ -1337,11 +1337,11 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                 <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
                   <CheckCircle2 className="h-32 w-32 text-primary" />
                 </div>
-                
+
                 <h4 className="text-sm font-black uppercase tracking-widest text-slate-400 mb-6 flex items-center gap-2">
                   <Package className="h-4 w-4" /> Resumen Final del Registro
                 </h4>
-                
+
                 <div className="space-y-4 relative z-10">
                   <div className="flex justify-between items-center">
                     <span className="text-slate-500 font-medium">Proveedor</span>
@@ -1364,9 +1364,9 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                       {tipoPago === 'contado' ? 'Pagada' : `Crédito ${diasCredito}d`}
                     </Badge>
                   </div>
-                  
+
                   <Separator className="bg-slate-200 dark:bg-slate-800" />
-                  
+
                   <div className="flex justify-between items-center pt-2">
                     <span className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">Compromiso Total</span>
                     <div className="text-right">
@@ -1382,19 +1382,19 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
 
         {step < STEPS.length && (
           <DialogFooter className="p-6 bg-slate-50/50 dark:bg-slate-900/50 backdrop-blur-md border-t border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between gap-4">
-            <Button 
-              variant="ghost" 
-              onClick={() => step > 0 ? setStep(s => s - 1) : onOpenChange(false)} 
+            <Button
+              variant="ghost"
+              onClick={() => step > 0 ? setStep(s => s - 1) : onOpenChange(false)}
               disabled={isSaving}
               className="h-11 px-6 rounded-xl text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-slate-800 transition-all font-semibold"
             >
               <ChevronLeft className="h-5 w-5 mr-1" /> {step > 0 ? 'Regresar' : 'Cancelar'}
             </Button>
-            
+
             <div className="flex items-center gap-3">
               {step < STEPS.length - 1 ? (
-                <Button 
-                  onClick={() => step === 0 ? handleNextStepZero() : setStep(s => s + 1)} 
+                <Button
+                  onClick={() => step === 0 ? handleNextStepZero() : setStep(s => s + 1)}
                   disabled={!canNext() || isCheckingDuplicate}
                   className="h-11 px-8 rounded-xl shadow-lg shadow-primary/20 hover:shadow-primary/30 active:scale-95 transition-all font-bold gap-2"
                 >
@@ -1402,8 +1402,8 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                   Continuar <ChevronRight className="h-5 w-5" />
                 </Button>
               ) : (
-                <Button 
-                  onClick={handleSave} 
+                <Button
+                  onClick={handleSave}
                   disabled={isSaving || items.length === 0}
                   className="h-11 px-10 rounded-xl shadow-lg shadow-primary/20 hover:shadow-primary/30 active:scale-95 transition-all font-bold gap-2"
                 >
@@ -1450,7 +1450,7 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                   </div>
                 </div>
               )}
-              
+
               <div className={cn(
                 "group relative overflow-hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300",
                 !successData.numero_comprobante && "sm:col-span-2 sm:max-w-[220px] mx-auto w-full"
@@ -1471,7 +1471,7 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                 </div>
               </div>
             </div>
-            
+
             <div className="pt-6 w-full max-w-xs">
               <Button
                 size="lg"
@@ -1494,7 +1494,7 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
             <div className="mx-auto w-20 h-20 bg-destructive/10 text-destructive rounded-3xl flex items-center justify-center shadow-inner animate-pulse">
               <AlertCircle className="w-10 h-10" />
             </div>
-            
+
             <div className="space-y-2">
               <DialogTitle className="text-2xl font-black tracking-tight text-slate-900 dark:text-white uppercase">Factura Duplicada</DialogTitle>
               <p className="text-sm text-slate-500 leading-relaxed">
@@ -1529,7 +1529,7 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                 </div>
               </div>
             )}
-            
+
             <div className="flex flex-col gap-3 pt-2">
               <Button variant="default" onClick={() => { setDuplicateInvoice(null); onOpenChange(false); }} className="h-12 rounded-xl font-bold uppercase tracking-wider shadow-lg">
                 Revisar Historial
@@ -1638,8 +1638,8 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14, background: '#f9fafb', border: '1px solid #dbeafe', padding: 14, borderRadius: 6, fontSize: 12 }}>
                     <div>
-                      <p style={{ margin: '2px 0' }}><strong>N Factura:</strong> {successData.numero_factura || 'N/A'}</p>
-                      <p style={{ margin: '2px 0' }}><strong>N Control:</strong> {successData.numero_control || 'N/A'}</p>
+                      <p style={{ margin: '2px 0' }}><strong>N° Factura:</strong> {successData.numero_factura || 'N/A'}</p>
+                      <p style={{ margin: '2px 0' }}><strong>N° Control:</strong> {successData.numero_control || 'N/A'}</p>
                       <p style={{ margin: '2px 0' }}><strong>Proveedor:</strong> {successData.proveedor_nombre} {successData.proveedor_rif ? '(' + successData.proveedor_rif + ')' : ''}</p>
                       {successData.fecha_factura && <p style={{ margin: '2px 0' }}><strong>Fecha Factura:</strong> {formatDateVE(successData.fecha_factura)}</p>}
                     </div>
@@ -1647,7 +1647,7 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                       <p style={{ margin: '2px 0' }}><strong>Fecha Registro:</strong> {registeredAt.getFullYear() + '/' + String(registeredAt.getMonth() + 1).padStart(2, '0') + '/' + String(registeredAt.getDate()).padStart(2, '0')}</p>
                       <p style={{ margin: '2px 0' }}><strong>Tasa BCV:</strong> {successData.tasa_cambio ? 'Bs ' + successData.tasa_cambio.toFixed(2) : 'N/A'}</p>
                       <p style={{ margin: '2px 0' }}><strong>Cargado por:</strong> {successData.creado_por || 'Administrador'}</p>
-                      {hasRetention && <p style={{ margin: '2px 0' }}><strong>N Retencion IVA:</strong> {successData.numero_comprobante}</p>}
+                      {hasRetention && <p style={{ margin: '2px 0' }}><strong>N° Retención IVA:</strong> {successData.numero_comprobante}</p>}
                     </div>
                     <div style={{ gridColumn: '1 / span 2', textAlign: 'center', marginTop: 8, paddingTop: 6, borderTop: '0.5px solid #e5e7eb' }}>
                       <p style={{ margin: 0, fontSize: 10, color: '#9ca3af', fontStyle: 'italic' }}>Este documento no tiene validez fiscal.</p>
@@ -1657,8 +1657,8 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 18 }}>
                     <thead>
                       <tr style={{ background: '#f3f4f6', borderTop: '1px solid #d1d5db', borderBottom: '1px solid #d1d5db' }}>
-                        <th style={{ padding: '4px 8px', textAlign: 'left', width: 80 }}>Codigo</th>
-                        <th style={{ padding: '4px 8px', textAlign: 'left' }}>Descripcion</th>
+                        <th style={{ padding: '4px 8px', textAlign: 'left', width: 80 }}>Código</th>
+                        <th style={{ padding: '4px 8px', textAlign: 'left' }}>Descripción</th>
                         <th style={{ padding: '4px 8px', textAlign: 'center', width: 60 }}>Cant.</th>
                         <th style={{ padding: '4px 8px', textAlign: 'right', width: 110 }}>P. Unit. {sym}</th>
                         <th style={{ padding: '4px 8px', textAlign: 'right', width: 110 }}>Total {sym}</th>
