@@ -110,7 +110,7 @@ export function SupplierFormDialog({ open, onOpenChange, supplier, onSaved }: Su
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl p-0 overflow-hidden bg-white/90 backdrop-blur-3xl border-white/40 shadow-2xl rounded-[2.5rem] max-h-[95vh] flex flex-col">
+      <DialogContent className="w-[95vw] sm:max-w-xl p-0 overflow-hidden bg-white/90 backdrop-blur-3xl border-white/40 shadow-2xl rounded-[2.5rem] max-h-[90vh] flex flex-col">
         <DialogHeader className="p-8 pb-4 border-b border-black/5 bg-white/5 shrink-0 relative">
           <DialogTitle className="text-2xl font-bold font-headline text-slate-900 flex items-center gap-3">
              <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">

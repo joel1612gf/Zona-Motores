@@ -185,7 +185,7 @@ export function ClientFormDialog({ open, onOpenChange, client, onSave }: ClientF
   return (
     <Dialog open={open} onOpenChange={onOpenChange} key={client?.id || 'new'}>
       <DialogContent 
-        className="sm:max-w-3xl max-h-[90vh] overflow-hidden flex flex-col p-0"
+        className="w-[95vw] sm:max-w-3xl max-h-[90vh] overflow-hidden flex flex-col p-0 rounded-[2rem]"
         onCloseAutoFocus={(e) => e.preventDefault()}
       >
         <DialogHeader className="p-6 pb-2">

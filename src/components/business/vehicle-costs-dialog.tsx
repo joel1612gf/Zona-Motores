@@ -108,7 +108,7 @@ export function VehicleCostsDialog({ open, onOpenChange, vehicle, concesionarioI
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto rounded-[2rem]">
         <DialogHeader>
           <DialogTitle className="text-xl font-headline">
             Agregar Costos — {vehicle.year} {vehicle.make} {vehicle.model}

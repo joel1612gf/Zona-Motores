@@ -245,7 +245,7 @@ export function ProductFormDialog({ open, onOpenChange, product, onSaved }: Prod
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl p-0 overflow-hidden bg-white/95 backdrop-blur-3xl border-white/40 shadow-2xl max-h-[95vh] flex flex-col">
+      <DialogContent className="w-[95vw] sm:max-w-3xl p-0 overflow-hidden bg-white/95 backdrop-blur-3xl border-white/40 shadow-2xl max-h-[90vh] flex flex-col rounded-[2rem]">
         <DialogHeader className="p-8 pb-4 border-b border-black/5 bg-white/5 shrink-0">
           <div className="flex items-center justify-between">
             <div>

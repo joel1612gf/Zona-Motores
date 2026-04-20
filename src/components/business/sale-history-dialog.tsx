@@ -161,7 +161,7 @@ export function SaleHistoryDialog({ open, onOpenChange }: { open: boolean; onOpe
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-6xl max-h-[92vh] flex flex-col p-0 border-none shadow-2xl">
+        <DialogContent className="w-[95vw] md:w-full max-w-6xl max-h-[90vh] flex flex-col p-0 border-none shadow-2xl rounded-[2rem]">
           {/* Header */}
           <div className="bg-gradient-to-r from-primary/5 via-background to-background p-5 border-b flex-shrink-0">
             <DialogHeader>

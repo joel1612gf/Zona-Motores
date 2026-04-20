@@ -98,10 +98,10 @@ export function PurchaseHistoryDialog({
     if (!compraToDelete || !concesionario) return;
     try {
       setIsDeleting(true);
-      
-      const itemsToDeduct = (compraToDelete.items || []).filter(i => 
-        i.producto_id && 
-        !i.producto_id.startsWith('new-') && 
+
+      const itemsToDeduct = (compraToDelete.items || []).filter(i =>
+        i.producto_id &&
+        !i.producto_id.startsWith('new-') &&
         !i.producto_id.startsWith('manual-')
       );
 
@@ -111,7 +111,7 @@ export function PurchaseHistoryDialog({
         for (const item of itemsToDeduct) {
           const qty = Number(item.cantidad);
           if (isNaN(qty) || qty === 0) continue;
-          
+
           const productRef = doc(firestore, 'concesionarios', concesionario.id, 'productos', item.producto_id);
           await updateDoc(productRef, {
             stock_actual: increment(-qty),
@@ -122,16 +122,16 @@ export function PurchaseHistoryDialog({
       }
 
       await deleteDoc(doc(firestore, 'concesionarios', concesionario.id, 'compras', compraToDelete.id));
-      
+
       setCompras(prev => prev.filter(c => c.id !== compraToDelete.id));
       setExpandedRow(null);
       setDeleteModalOpen(false);
-      
-      toast({ 
-        title: 'Factura anulada con éxito', 
-        description: deductInventory 
-          ? `La factura se borró y se descontó el stock de ${itemsToDeduct.length} ítems.` 
-          : 'La factura ha sido borrada.' 
+
+      toast({
+        title: 'Factura anulada con éxito',
+        description: deductInventory
+          ? `La factura se borró y se descontó el stock de ${itemsToDeduct.length} ítems.`
+          : 'La factura ha sido borrada.'
       });
 
       if (onPurchaseDeleted) {
@@ -139,10 +139,10 @@ export function PurchaseHistoryDialog({
       }
     } catch (e) {
       console.error('Error al eliminar factura:', e);
-      toast({ 
-        variant: 'destructive', 
-        title: 'Error', 
-        description: 'No se pudo completar la anulación. Revisa tu conexión.' 
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'No se pudo completar la anulación. Revisa tu conexión.'
       });
     } finally {
       setIsDeleting(false);
@@ -208,7 +208,7 @@ export function PurchaseHistoryDialog({
 
     // Use a temporary style change to filter pages for download capture
     const originalStyle = element.getAttribute('style') || '';
-    
+
     try {
       const summaryPage = element.querySelector('[data-print-page="summary"]') as HTMLElement;
       const retentionPage = element.querySelector('[data-print-page="retention"]') as HTMLElement;
@@ -268,267 +268,328 @@ export function PurchaseHistoryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col p-6">
-        <DialogHeader className="mb-2">
-          <DialogTitle className="text-2xl font-bold flex items-center">
-            Historial de Compras (Gestión de Inventario)
-          </DialogTitle>
-        </DialogHeader>
+      <DialogContent className="w-[95vw] md:w-full max-w-6xl max-h-[90vh] flex flex-col p-0 overflow-hidden bg-white/70 backdrop-blur-2xl border-slate-200/60 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] rounded-[2rem]">
+        <div className="p-6 pb-4 border-b border-slate-100 bg-gradient-to-b from-blue-50/50 to-transparent">
+          <DialogHeader className="mb-4">
+            <DialogTitle className="text-2xl font-black flex items-center gap-3 text-slate-900 tracking-tight">
+              <div className="p-2.5 rounded-xl bg-blue-600/10 text-blue-600 ring-1 ring-blue-600/20">
+                <FileText className="h-6 w-6" />
+              </div>
+              Historial de Compras
+            </DialogTitle>
+          </DialogHeader>
 
-        {/* Filters */}
-        <div className="flex flex-col gap-3 py-4 border-b">
-          <div className="flex flex-col md:flex-row gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          {/* Filters Grid - Light Premium Design */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="relative group">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
               <Input
-                placeholder="Buscar proveedor o factura..."
+                placeholder="Proveedor o factura..."
                 value={searchGeneral}
                 onChange={e => setSearchGeneral(e.target.value)}
-                className="pl-9"
+                className="pl-10 bg-white/50 border-slate-200 focus:border-blue-500/50 focus:ring-blue-500/10 text-slate-900 placeholder:text-slate-400 transition-all h-12 rounded-xl"
               />
             </div>
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <div className="relative group">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
               <Input
-                placeholder="Buscar producto en items..."
+                placeholder="Buscar por producto..."
                 value={searchProduct}
                 onChange={e => setSearchProduct(e.target.value)}
-                className="pl-9"
+                className="pl-10 bg-white/50 border-slate-200 focus:border-blue-500/50 focus:ring-blue-500/10 text-slate-900 placeholder:text-slate-400 transition-all h-12 rounded-xl"
               />
             </div>
-            <div className="relative flex-1">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Registrado por (usuario)..."
-                value={searchCreator}
-                onChange={e => setSearchCreator(e.target.value)}
-                className="pl-9"
-              />
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="relative flex-1 group">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-600 transition-colors pointer-events-none" />
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={e => setStartDate(e.target.value)}
+                  className="pl-10 bg-white/50 border-slate-200 focus:border-blue-500/50 text-slate-900 transition-all h-12 rounded-xl"
+                />
+              </div>
+              <div className="relative flex-1 group">
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={e => setEndDate(e.target.value)}
+                  className="bg-white/50 border-slate-200 focus:border-blue-500/50 text-slate-900 transition-all h-12 rounded-xl"
+                />
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 pt-1 border-t md:border-t-0 md:pt-0">
-            <div className="flex items-center gap-1.5 min-w-[100px]">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium text-muted-foreground">Fecha:</span>
+          {(startDate || endDate || searchGeneral || searchProduct || searchCreator) && (
+            <div className="flex justify-end mt-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setStartDate(''); setEndDate('');
+                  setSearchGeneral(''); setSearchProduct(''); setSearchCreator('');
+                }}
+                className="text-slate-500 hover:text-blue-600 hover:bg-blue-50 text-xs font-bold uppercase tracking-widest"
+              >
+                Limpiar filtros
+              </Button>
             </div>
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <Input
-                type="date"
-                value={startDate}
-                onChange={e => setStartDate(e.target.value)}
-                className="w-full sm:w-[150px] text-sm"
-              />
-              <span className="text-muted-foreground text-sm">-</span>
-              <Input
-                type="date"
-                value={endDate}
-                onChange={e => setEndDate(e.target.value)}
-                className="w-full sm:w-[150px] text-sm"
-              />
-              {(startDate || endDate) && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => { setStartDate(''); setEndDate(''); }}
-                  className="h-9 px-2 text-muted-foreground hover:text-foreground"
-                >
-                  Limpiar
-                </Button>
-              )}
-            </div>
-          </div>
+          )}
         </div>
 
-        {/* Table Area */}
-        <div className="flex-1 overflow-y-auto mt-4 pr-2">
+        {/* List Area - Light Responsive Grid */}
+        <div className="flex-1 overflow-y-auto p-6 pt-2 custom-scrollbar space-y-4">
           {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <div className="flex flex-col items-center justify-center py-24 gap-4">
+              <div className="relative h-16 w-16">
+                <div className="absolute inset-0 rounded-full border-4 border-blue-100 border-t-blue-600 animate-spin" />
+              </div>
+              <span className="text-slate-500 font-bold uppercase tracking-widest text-xs">Sincronizando registros...</span>
             </div>
           ) : filteredCompras.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              No hay registros de compra activos que coincidan con la búsqueda.
+            <div className="flex flex-col items-center justify-center py-24 text-center bg-slate-50/50 rounded-3xl border border-dashed border-slate-200">
+              <Search className="h-12 w-12 text-slate-300 mb-4" />
+              <h3 className="text-xl font-bold text-slate-900">Sin resultados</h3>
+              <p className="text-slate-500 mt-2 max-w-xs">No encontramos facturas que coincidan con tu búsqueda actual.</p>
             </div>
           ) : (
-            <div className="rounded-md border">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50 sticky top-0 z-10 hidden md:table-header-group">
-                  <tr>
-                    <th className="text-left p-3 font-semibold w-10"></th>
-                    <th className="text-left p-3 font-semibold">Fecha / Creador</th>
-                    <th className="text-left p-3 font-semibold">Proveedor</th>
-                    <th className="text-left p-3 font-semibold">Factura</th>
-                    <th className="text-left p-3 font-semibold">Condición</th>
-                    <th className="text-right p-3 font-semibold">Total ($)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {filteredCompras.map((compra) => {
-                    const isExpanded = expandedRow === compra.id;
-                    const dateObj = compra.created_at?.toDate ? compra.created_at.toDate() : new Date();
+            <div className="grid grid-cols-1 gap-4">
+              {filteredCompras.map((compra) => {
+                const isExpanded = expandedRow === compra.id;
+                const dateObj = compra.created_at?.toDate ? compra.created_at.toDate() : new Date();
 
-                    return (
-                      <React.Fragment key={compra.id}>
-                        {/* Main Row */}
-                        <tr
-                          className="hover:bg-muted/30 transition-colors cursor-pointer"
-                          onClick={() => setExpandedRow(isExpanded ? null : compra.id)}
-                        >
-                          <td className="p-3 text-center align-middle">
-                            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                          </td>
-                          <td className="p-3 align-top md:align-middle">
-                            <div className="flex flex-col gap-1">
-                              <span className="font-medium whitespace-nowrap">
-                                {dateObj.toLocaleDateString('es-VE', {
-                                  day: '2-digit', month: '2-digit', year: 'numeric',
-                                  hour: '2-digit', minute: '2-digit'
-                                })}
-                              </span>
-                              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                <User className="h-3 w-3" /> {compra.creado_por || 'Desconocido'}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="p-3 font-medium align-top md:align-middle">
-                            {compra.proveedor_nombre}
-                          </td>
-                          <td className="p-3 align-top md:align-middle">
-                            {compra.numero_factura ? (
-                              <div className="flex items-center gap-1">
-                                <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                                {compra.numero_factura}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
-                          </td>
-                          <td className="p-3 align-top md:align-middle">
-                            <Badge variant={compra.tipo_pago === 'credito' ? 'outline' : 'secondary'} className={
-                              compra.tipo_pago === 'credito' ? 'border-amber-500/50 text-amber-700' : ''
-                            }>
-                              {compra.tipo_pago === 'credito' ? `Crédito (${compra.dias_credito} días)` : 'Contado'}
+                return (
+                  <div
+                    key={compra.id}
+                    className={`group relative overflow-hidden transition-all duration-500 rounded-3xl border ${isExpanded
+                        ? 'bg-white border-blue-200 shadow-[0_15px_30px_-10px_rgba(36,99,235,0.1)] ring-1 ring-blue-50'
+                        : 'bg-white/40 border-slate-100 hover:border-slate-200 hover:bg-white/80 hover:shadow-md'
+                      }`}
+                  >
+                    {/* Header Card Row */}
+                    <div
+                      className="p-5 cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-5"
+                      onClick={() => setExpandedRow(isExpanded ? null : compra.id)}
+                    >
+                      <div className="flex items-start gap-5 flex-1">
+                        <div className={`p-4 rounded-2xl transition-all duration-500 ${isExpanded ? 'bg-blue-600 shadow-lg shadow-blue-200 scale-105' : 'bg-slate-100 text-slate-500 group-hover:bg-white group-hover:shadow-sm'}`}>
+                          <Calendar className={`h-6 w-6 ${isExpanded ? 'text-white' : 'text-slate-600'}`} />
+                        </div>
+                        <div className="space-y-1.5">
+                          <div className="flex flex-wrap items-center gap-3">
+                            <h4 className="text-slate-900 font-black text-xl tracking-tight">
+                              {compra.proveedor_nombre}
+                            </h4>
+                            <Badge className={`px-2.5 py-0.5 rounded-lg font-bold text-[10px] uppercase tracking-tighter shadow-sm ${
+                              compra.tipo_pago === 'credito' 
+                                ? 'bg-amber-50 text-amber-600 border border-amber-100' 
+                                : compra.tipo_pago === 'por_pagar'
+                                  ? 'bg-blue-50 text-blue-600 border border-blue-100'
+                                  : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                            }`}>
+                              {compra.tipo_pago === 'credito' 
+                                ? `Crédito ${compra.dias_credito}d` 
+                                : compra.tipo_pago === 'por_pagar'
+                                  ? 'Por Pagar'
+                                  : 'Contado'}
                             </Badge>
-                          </td>
-                          <td className="p-3 text-right font-bold text-primary align-top md:align-middle">
-                            ${compra.total_usd.toFixed(2)}
-                          </td>
-                        </tr>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-slate-500">
+                            <span className="flex items-center gap-2 font-bold text-slate-700">
+                              {dateObj.toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            <span className="flex items-center gap-2">
+                              <FileText className="h-4 w-4 text-blue-500/50" />
+                              <span className="font-medium">Fac: {compra.numero_factura || 'S/F'}</span>
+                            </span>
+                            <span className="flex items-center gap-2">
+                              <User className="h-4 w-4 text-blue-500/50" />
+                              <span className="font-medium italic">{compra.creado_por || '—'}</span>
+                            </span>
+                          </div>
+                        </div>
+                      </div>
 
-                        {/* Expanded Area */}
-                        {isExpanded && (
-                          <tr className="bg-muted/10">
-                            <td colSpan={6} className="p-0 border-b">
-                              <div className="p-4 md:pl-14 border-l-2 border-l-primary mx-3 my-2 bg-background rounded-md shadow-sm relative">
-                                <div className="flex items-center justify-between mb-3">
-                                  <div className="flex flex-wrap gap-2">
-                                    {(compra as any).numero_comprobante && (
-                                      <div className="flex gap-1">
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={(e) => handlePrint(e, compra, 'retention')}
-                                        >
-                                          <Printer className="h-4 w-4 mr-2" /> Imprimir Retención
-                                        </Button>
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={(e) => handleDownload(e, compra, 'retention')}
-                                          title="Descargar archivo PDF directamente"
-                                        >
-                                          <Download className="h-4 w-4" />
-                                        </Button>
-                                      </div>
-                                    )}
-                                    <div className="flex gap-1">
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={(e) => handlePrint(e, compra, 'summary')}
-                                      >
-                                        <Printer className="h-4 w-4 mr-2" /> Imprimir Resumen
-                                      </Button>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={(e) => handleDownload(e, compra, 'summary')}
-                                        title="Descargar archivo PDF directamente"
-                                      >
-                                        <Download className="h-4 w-4" />
-                                      </Button>
-                                    </div>
+                      <div className="flex items-center justify-between md:justify-end gap-8 border-t md:border-t-0 pt-5 md:pt-0 border-slate-100">
+                        <div className="text-right">
+                          <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] mb-1">
+                            {compra.moneda_original === 'bs' ? 'Total BS' : 'Total USD'}
+                          </p>
+                          <p className="text-3xl font-black text-blue-600 tabular-nums leading-none">
+                            {compra.moneda_original === 'bs'
+                              ? `Bs ${(compra.total_bs || (compra.total_usd * compra.tasa_cambio)).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                              : `$${compra.total_usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                            }
+                          </p>
+                          <p className="text-[10px] text-slate-500 mt-1.5 flex items-center justify-end gap-1 font-medium">
+                            <span className="opacity-70">≈ </span>
+                            {compra.moneda_original === 'bs'
+                              ? `$${compra.total_usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                              : `Bs ${(compra.total_bs || (compra.total_usd * compra.tasa_cambio)).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                            }
+                          </p>
+                        </div>
+                        <div className={`p-2.5 rounded-full transition-all duration-500 ${isExpanded ? 'rotate-180 bg-blue-50 text-blue-600 ring-1 ring-blue-100' : 'text-slate-300 bg-slate-50'}`}>
+                          <ChevronDown className="h-6 w-6" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Expanded Detail Overlay */}
+                    {isExpanded && (
+                      <div className="p-6 pt-0 animate-in fade-in slide-in-from-top-4 duration-500">
+                        <div className="h-px bg-slate-100 mb-6" />
+
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                          {/* Items Section */}
+                          <div className="lg:col-span-2 space-y-4">
+                            <h5 className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                              <div className="h-1.5 w-1.5 rounded-full bg-blue-600" /> Detalle de Ítems
+                            </h5>
+                            <div className="rounded-2xl overflow-hidden border border-slate-100 bg-slate-50/50 shadow-sm">
+                              <table className="w-full text-xs">
+                                <thead className="bg-slate-100/50 text-slate-500 uppercase tracking-tighter font-black">
+                                  <tr>
+                                    <th className="text-left py-4 px-5">Descripción</th>
+                                    <th className="text-center py-4 px-5 w-20">Cant</th>
+                                    <th className="text-right py-4 px-5 w-32">
+                                      Costo Unit ({compra.moneda_original === 'bs' ? 'BS' : '$'})
+                                    </th>
+                                    <th className="text-right py-4 px-5 w-36">
+                                      Subtotal ({compra.moneda_original === 'bs' ? 'BS' : '$'})
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 text-slate-600">
+                                  {compra.items.map((item, idx) => (
+                                    <tr key={idx} className="hover:bg-white transition-colors">
+                                      <td className="py-4 px-5 font-bold text-slate-800">{item.nombre}</td>
+                                      <td className="py-4 px-5 text-center font-mono">{item.cantidad}</td>
+                                      <td className="py-4 px-5 text-right font-mono">
+                                        {compra.moneda_original === 'bs'
+                                          ? `Bs ${(item.costo_unitario_usd * compra.tasa_cambio).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                                          : `$${item.costo_unitario_usd.toFixed(2)}`
+                                        }
+                                      </td>
+                                      <td className="py-4 px-5 text-right font-black text-slate-900 tabular-nums">
+                                        {compra.moneda_original === 'bs'
+                                          ? `Bs ${(item.subtotal_usd * compra.tasa_cambio).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                                          : `$${item.subtotal_usd.toFixed(2)}`
+                                        }
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+
+                          {/* Financial Summary & Action Hub */}
+                          <div className="space-y-6">
+                            <h5 className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                              <div className="h-1.5 w-1.5 rounded-full bg-blue-600" /> Resumen Fiscal ({compra.moneda_original === 'bs' ? 'BS' : 'USD'})
+                            </h5>
+                            <div className="p-6 rounded-3xl bg-blue-50/50 border border-blue-100 space-y-4 shadow-sm">
+                              <div className="flex justify-between text-sm">
+                                <span className="text-slate-500">Base Imponible:</span>
+                                <span className="text-slate-900 font-bold">
+                                  {compra.moneda_original === 'bs'
+                                    ? `Bs ${(compra.subtotal_bs || (compra.subtotal_usd * compra.tasa_cambio)).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                                    : `$${compra.subtotal_usd.toFixed(2)}`
+                                  }
+                                </span>
+                              </div>
+                              <div className="flex justify-between text-sm">
+                                <span className="text-slate-500">I.V.A. (16%):</span>
+                                <span className="text-slate-900 font-bold">
+                                  {compra.moneda_original === 'bs'
+                                    ? `Bs ${(compra.iva_monto_bs || (compra.iva_monto * compra.tasa_cambio)).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                                    : `$${compra.iva_monto.toFixed(2)}`
+                                  }
+                                </span>
+                              </div>
+                              <div className="h-px bg-blue-100/50 my-2" />
+                              <div className="flex justify-between items-end">
+                                <div className="space-y-1">
+                                  <span className="text-blue-600 font-black uppercase text-[10px] tracking-widest">Total Factura</span>
+                                  <div className="flex items-baseline gap-2">
+                                    <span className="text-3xl font-black text-slate-900 leading-none">
+                                      {compra.moneda_original === 'bs'
+                                        ? `Bs ${(compra.total_bs || (compra.total_usd * compra.tasa_cambio)).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                                        : `$${compra.total_usd.toFixed(2)}`
+                                      }
+                                    </span>
                                   </div>
                                 </div>
-                                <div className="overflow-x-auto">
-                                  <table className="w-full text-xs">
-                                    <thead className="border-b bg-muted/30">
-                                      <tr>
-                                        <th className="text-left py-2 px-3">Producto</th>
-                                        <th className="text-center py-2 px-3 w-20">Cant.</th>
-                                        <th className="text-right py-2 px-3 w-28">Costo Unit. ($)</th>
-                                        <th className="text-right py-2 px-3 w-28">Subtotal ($)</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-border/50">
-                                      {compra.items.map((item, idx) => (
-                                        <tr key={idx}>
-                                          <td className="py-2 px-3 font-medium">{item.nombre}</td>
-                                          <td className="py-2 px-3 text-center">{item.cantidad}</td>
-                                          <td className="py-2 px-3 text-right">${item.costo_unitario_usd.toFixed(2)}</td>
-                                          <td className="py-2 px-3 text-right font-semibold">${item.subtotal_usd.toFixed(2)}</td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-                                <div className="mt-4 flex justify-end">
-                                  <div className="text-xs text-right bg-muted/40 p-3 rounded-md w-full md:w-64">
-                                    <div className="flex justify-between mb-1">
-                                      <span className="text-muted-foreground">Subtotal:</span>
-                                      <span>${compra.subtotal_usd.toFixed(2)}</span>
-                                    </div>
-                                    <div className="flex justify-between mb-2">
-                                      <span className="text-muted-foreground">IVA (16%):</span>
-                                      <span>${compra.iva_monto.toFixed(2)}</span>
-                                    </div>
-                                    <div className="flex justify-between font-bold text-sm border-t pt-2">
-                                      <span>TOTAL:</span>
-                                      <span>${compra.total_usd.toFixed(2)}</span>
-                                    </div>
-                                    <div className="flex justify-between text-muted-foreground mt-1 text-[10px] mb-3">
-                                      <span>Tasa BCV: {compra.tasa_cambio.toFixed(2)}</span>
-                                      <span>Bs {compra.total_bs.toFixed(2)}</span>
-                                    </div>
-                                    <div className="flex justify-end pt-3 border-t">
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="text-destructive hover:bg-destructive hover:text-destructive-foreground h-8 text-xs px-2 gap-1.5"
-                                        disabled={isDeleting}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setCompraToDelete(compra);
-                                          setDeductInventory(true); // default true
-                                          setDeleteModalOpen(true);
-                                        }}
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                        Anular/Borrar Factura
-                                      </Button>
-                                    </div>
-                                  </div>
+                                <div className="text-right space-y-1">
+                                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
+                                    Tasa BCV
+                                  </span>
+                                  <span className="block text-sm font-bold text-slate-600 tracking-tight">
+                                    {compra.tasa_cambio.toFixed(2)}
+                                  </span>
                                 </div>
                               </div>
-                            </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
+                            </div>
+
+                            {/* Action Buttons Hub */}
+                            <div className="grid grid-cols-2 gap-3">
+                              {(compra as any).numero_comprobante ? (
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    onClick={(e) => handlePrint(e, compra, 'retention')}
+                                    className="col-span-1 bg-white border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-xl h-12 shadow-sm"
+                                  >
+                                    <Printer className="h-4 w-4 mr-2 text-blue-600" /> Retención
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    onClick={(e) => handleDownload(e, compra, 'retention')}
+                                    className="col-span-1 bg-white border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl h-12 shadow-sm"
+                                  >
+                                    <Download className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              ) : null}
+
+                              <Button
+                                variant="outline"
+                                onClick={(e) => handlePrint(e, compra, 'summary')}
+                                className="col-span-1 bg-blue-600/5 border-blue-200 hover:bg-blue-600/10 text-blue-700 font-bold rounded-xl h-12 shadow-sm"
+                              >
+                                <Printer className="h-4 w-4 mr-2" /> Resumen
+                              </Button>
+                              <Button
+                                variant="outline"
+                                onClick={(e) => handleDownload(e, compra, 'summary')}
+                                className="col-span-1 bg-blue-600/5 border-blue-200 hover:bg-blue-600/10 text-blue-700 rounded-xl h-12 shadow-sm"
+                              >
+                                <Download className="h-4 w-4" />
+                              </Button>
+
+                              <Button
+                                variant="ghost"
+                                disabled={isDeleting}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCompraToDelete(compra);
+                                  setDeductInventory(true);
+                                  setDeleteModalOpen(true);
+                                }}
+                                className="col-span-2 mt-2 text-rose-600 hover:bg-rose-50 hover:text-rose-700 font-bold uppercase text-[10px] tracking-[0.2em] rounded-xl h-12"
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Anular Documento
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -547,12 +608,12 @@ export function PurchaseHistoryDialog({
 
             <div className="bg-muted p-4 mt-2 mb-2 w-full flex items-start gap-3 rounded-lg border text-left cursor-pointer transition-colors hover:bg-muted/80" onClick={() => setDeductInventory(!deductInventory)}>
               <div className="flex items-center h-5 mt-0.5">
-                <input 
-                  type="checkbox" 
-                  checked={deductInventory} 
+                <input
+                  type="checkbox"
+                  checked={deductInventory}
                   onChange={e => setDeductInventory(e.target.checked)}
                   onClick={e => e.stopPropagation()}
-                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary accent-primary" 
+                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary accent-primary"
                 />
               </div>
               <div className="flex flex-col">
@@ -629,7 +690,8 @@ export function PurchaseHistoryDialog({
 
         return (
           <div id="history-print-root" style={{ display: 'none' }}>
-            <style dangerouslySetInnerHTML={{ __html: `
+            <style dangerouslySetInnerHTML={{
+              __html: `
                 @media print {
                   body * { visibility: hidden !important; }
                   #history-print-root, #history-print-root * { visibility: visible !important; }
@@ -648,9 +710,9 @@ export function PurchaseHistoryDialog({
             <div key={`history-print-${printData.id}-${printMode}`} className="print-root text-black font-sans bg-white w-[210mm]">
               {/* PAGE 1: PURCHASE SUMMARY */}
               {(printMode === 'both' || printMode === 'summary') && (
-                <div 
+                <div
                   data-print-page="summary"
-                  className={hasRetention && printMode === 'both' ? 'page-break-after' : ''} 
+                  className={hasRetention && printMode === 'both' ? 'page-break-after' : ''}
                   style={{ padding: '8mm 15mm 5mm 15mm', height: '297mm', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', position: 'relative' }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>

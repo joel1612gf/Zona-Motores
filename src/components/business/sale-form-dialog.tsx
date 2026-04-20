@@ -431,7 +431,7 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave }: 
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl">
+        <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl rounded-[2rem]">
           {/* Header */}
           <div className="bg-primary/5 p-5 border-b flex-shrink-0">
             <DialogHeader className="mb-4">

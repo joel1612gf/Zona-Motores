@@ -542,7 +542,7 @@ export function VehicleFormDialog({ open, onOpenChange, editingVehicle, concesio
   return (
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] sm:max-w-3xl max-h-[90vh] overflow-y-auto rounded-[2rem]">
 
         {currentStep < 5 && (
           <DialogHeader>

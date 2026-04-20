@@ -629,7 +629,7 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl max-h-[95vh] overflow-hidden flex flex-col bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl border-white/20 dark:border-white/10 shadow-2xl p-0 gap-0 transition-all duration-300">
+      <DialogContent className="w-[95vw] sm:max-w-3xl max-h-[90vh] overflow-hidden flex flex-col bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl border-white/20 dark:border-white/10 shadow-2xl p-0 gap-0 transition-all duration-300 rounded-[2rem]">
         {step < STEPS.length && (
           <DialogHeader className="p-6 pb-2 space-y-4">
             <div className="flex items-center justify-between">
@@ -1844,7 +1844,7 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                         <span>{sym}{formatAmt(igtfUsd)}</span>
                       </div>
                       {!isBs && successData.tasa_cambio && (
-                        <div style={{ fontSize: 9, color: '#6b7280', marginTop: 1 }}>Equiv: Bs {getBsEquiv(igtfUsd).toFixed(2)}</div>
+                        <div style={{ fontSize: 9, color: '#6b7280', marginTop: 1 }}>Bs {getBsEquiv(igtfUsd).toFixed(2)}</div>
                       )}
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', borderTop: '2px solid #d1d5db', paddingTop: 6 }}>

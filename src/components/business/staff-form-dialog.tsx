@@ -133,7 +133,7 @@ export function StaffFormDialog({ open, onOpenChange, editingStaff, concesionari
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto rounded-[2rem]">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Configurar Perfil Fintech' : 'Nuevo Perfil Fintech'}</DialogTitle>
           <DialogDescription>
