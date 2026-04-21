@@ -849,7 +849,7 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                     )}
                   >
                     <div className={cn("w-2 h-2 rounded-full", invoiceCurrency === 'bs' ? "bg-primary animate-pulse" : "bg-slate-300")} />
-                    Bs Bolívares (VES)
+                    Bolívares (VES)
                   </button>
                   <button
                     type="button"
@@ -862,7 +862,7 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                     )}
                   >
                     <div className={cn("w-2 h-2 rounded-full", invoiceCurrency === 'usd' ? "bg-primary animate-pulse" : "bg-slate-300")} />
-                    $ Dólares (USD)
+                    Dólares (USD)
                   </button>
                 </div>
                 {invoiceCurrency === 'bs' && (

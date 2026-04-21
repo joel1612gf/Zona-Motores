@@ -441,6 +441,7 @@ export type Compra = {
   total_bs: number;
   tasa_cambio: number;
   moneda_original?: 'usd' | 'bs';
+  is_fiscal?: boolean;
   estado: 'pendiente' | 'pagada';
   saldo_pendiente?: number; // Added to support partial payments and fiscal notes
   creado_por: string;

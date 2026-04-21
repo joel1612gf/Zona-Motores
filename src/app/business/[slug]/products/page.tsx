@@ -58,6 +58,8 @@ import { ProductFormDialog } from '@/components/business/product-form-dialog';
 import { SuppliersDialog } from '@/components/business/suppliers-dialog';
 import { PurchaseOrderDialog } from '@/components/business/purchase-order-dialog';
 import { PurchaseHistoryDialog } from '@/components/business/purchase-history-dialog';
+import { PurchaseEntrySwitcher } from '@/components/business/purchase-entry-switcher';
+import { DeliveryNoteDialog } from '@/components/business/delivery-note-dialog';
 
 export default function ProductsPage() {
   const params = useParams();
@@ -73,7 +75,12 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Producto | null>(null);
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const [suppliersOpen, setSuppliersOpen] = useState(false);
+  
+  // Dialogs for entry flow
+  const [entrySwitcherOpen, setEntrySwitcherOpen] = useState(false);
   const [purchaseOpen, setPurchaseOpen] = useState(false);
+  const [deliveryNoteOpen, setDeliveryNoteOpen] = useState(false);
+  
   const [purchaseHistoryOpen, setPurchaseHistoryOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('todos');
   const [tasaCambio, setTasaCambio] = useState<number>(0);
@@ -156,10 +163,17 @@ export default function ProductsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold font-headline text-slate-900">Productos</h1>
-          <p className="text-muted-foreground mt-1">{productos.length} producto{productos.length !== 1 ? 's' : ''} en catálogo</p>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative z-10">
+        <div className="space-y-1">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-primary rounded-2xl shadow-lg shadow-primary/25">
+              <Package className="h-6 w-6 text-primary-foreground" />
+            </div>
+            <h1 className="text-3xl font-bold font-headline tracking-tight text-slate-900">Productos</h1>
+          </div>
+          <p className="text-muted-foreground font-medium flex items-center gap-2">
+            {productos.length} producto{productos.length !== 1 ? 's' : ''} en catálogo
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {hasManageRole && (
@@ -180,8 +194,8 @@ export default function ProductsPage() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="rounded-xl shadow-xl">
-                  <DropdownMenuItem onSelect={() => setTimeout(() => setPurchaseOpen(true), 100)} className="font-bold">
-                    <Plus className="mr-2 h-4 w-4" /> Nueva Compra
+                  <DropdownMenuItem onSelect={() => setTimeout(() => setEntrySwitcherOpen(true), 100)} className="font-bold">
+                    <Plus className="mr-2 h-4 w-4" /> Nueva Entrada
                   </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => setTimeout(() => setPurchaseHistoryOpen(true), 100)} className="font-bold">
                     <FileClock className="mr-2 h-4 w-4" /> Historial
@@ -197,6 +211,20 @@ export default function ProductsPage() {
           )}
         </div>
       </div>
+
+      {/* Logic for entry selection */}
+      <PurchaseEntrySwitcher 
+        open={entrySwitcherOpen}
+        onOpenChange={setEntrySwitcherOpen}
+        onSelectType={(type) => {
+          setEntrySwitcherOpen(false);
+          if (type === 'fiscal') {
+            setTimeout(() => setPurchaseOpen(true), 150);
+          } else {
+            setTimeout(() => setDeliveryNoteOpen(true), 150);
+          }
+        }}
+      />
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -461,6 +489,7 @@ export default function ProductsPage() {
       />
       <SuppliersDialog open={suppliersOpen} onOpenChange={setSuppliersOpen} />
       <PurchaseOrderDialog open={purchaseOpen} onOpenChange={setPurchaseOpen} onSaved={loadProductos} />
+      <DeliveryNoteDialog open={deliveryNoteOpen} onOpenChange={setDeliveryNoteOpen} onSaved={loadProductos} />
       <PurchaseHistoryDialog open={purchaseHistoryOpen} onOpenChange={setPurchaseHistoryOpen} onPurchaseDeleted={loadProductos} />
     </div>
   );

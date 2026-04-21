@@ -6,10 +6,10 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogClose } fr
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { VehicleImage } from '@/lib/types';
+import type { any } from '@/lib/types';
 
 interface ImageLightboxProps {
-  images: VehicleImage[];
+  images: any[];
   isOpen: boolean;
   onClose: () => void;
   initialIndex?: number;
