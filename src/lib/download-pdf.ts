@@ -32,6 +32,21 @@ export async function downloadPdf({ elementId, filename, maxWaitMs = 4000 }: Dow
     return;
   }
 
+  // 1.5 Pre-wait for images in the source element to be loaded
+  const sourceImages = element.querySelectorAll('img');
+  if (sourceImages.length > 0) {
+    await Promise.all(
+      Array.from(sourceImages).map(img => {
+        if (img.complete && img.naturalHeight > 0) return Promise.resolve();
+        return new Promise<void>(resolve => {
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+          setTimeout(resolve, 2000); // Wait up to 2s for source images
+        });
+      })
+    );
+  }
+
   // 2. Create an offscreen iframe — completely invisible, no flash
   const iframe = document.createElement('iframe');
   iframe.style.cssText = 'position:fixed;top:-10000px;left:-10000px;width:210mm;height:297mm;border:none;opacity:0;pointer-events:none;z-index:-1;';

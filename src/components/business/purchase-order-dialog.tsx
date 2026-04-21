@@ -1174,6 +1174,9 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                   const precioAnteriorBs = precioAnteriorUsd * tasa;
                   const itemConPrecio = item as any;
 
+                  // Definir el costo base con IVA para los cálculos de margen
+                  const costWithIvaUsd = item.aplica_iva ? item.costo_unitario_usd * 1.16 : item.costo_unitario_usd;
+
                   const handleMargenChange = (val: string) => {
                     const margen = parseFloat(val) || 0;
                     const factor = (1 - margen / 100);
@@ -1775,7 +1778,7 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
                     <div>{concesionario?.logo_url
-                      ? <img src={concesionario.logo_url} alt="Logo" crossOrigin="anonymous" style={{ width: 65, height: 65, objectFit: 'contain' }} />
+                      ? <img src={concesionario.logo_url} alt="Logo" crossOrigin="anonymous" loading="eager" style={{ width: 65, height: 65, objectFit: 'contain' }} />
                       : <div style={{ width: 65, height: 65, background: '#2563eb', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: 22, borderRadius: 4 }}>ZM</div>}
                     </div>
                     <div style={{ textAlign: 'right' }}>
@@ -1851,9 +1854,9 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                       <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontWeight: 'bold', fontSize: 15 }}>
                         <span>Total:</span><span style={{ color: '#2563eb' }}>{sym}{formatAmt(finalTotalUsd)}</span>
                       </div>
-                      {!isBs && successData.tasa_cambio && (
-                        <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>Equivalente: Bs {getBsEquiv(finalTotalUsd).toFixed(2)}</div>
-                      )}
+                      <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>
+                        {isBs ? `Ref: $${finalTotalUsd.toFixed(2)}` : `Equiv: Bs ${(finalTotalUsd * (successData.tasa_cambio || 1)).toFixed(2)}`}
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -41,7 +41,7 @@ export function DeliveryNotePrint({ data, concesionario, id = "delivery-print-ro
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
             <div>{concesionario?.logo_url
-              ? <img src={concesionario.logo_url} alt="Logo" crossOrigin="anonymous" style={{ width: 65, height: 65, objectFit: 'contain' }} />
+              ? <img src={concesionario.logo_url} alt="Logo" crossOrigin="anonymous" loading="eager" style={{ width: 65, height: 65, objectFit: 'contain' }} />
               : <div style={{ width: 65, height: 65, background: '#64748b', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: 22, borderRadius: 4 }}>ZM</div>}
             </div>
             <div style={{ textAlign: 'right' }}>
@@ -65,7 +65,7 @@ export function DeliveryNotePrint({ data, concesionario, id = "delivery-print-ro
               <p style={{ margin: '2px 0' }}><strong>Tasa BCV:</strong> {data.tasa_cambio ? 'Bs ' + data.tasa_cambio.toFixed(2) : 'N/A'}</p>
               <p style={{ margin: '2px 0' }}><strong>Cargado por:</strong> {data.creado_por || 'Administrador'}</p>
             </div>
-            <div style={{ gridColumn: '1 / span 2', textAlign: 'center', marginTop: 8, paddingTop: 6, borderTop: '0.5px solid #e5e7eb' }}>
+            <div style={{ gridColumn: '1 / span 2', textAlign: 'center', marginTop: 8, paddingTop: 6 }}>
               <p style={{ margin: 0, fontSize: 10, color: '#9ca3af', fontStyle: 'italic' }}>Este documento es para control interno y no tiene validez fiscal.</p>
             </div>
           </div>
@@ -116,12 +116,6 @@ export function DeliveryNotePrint({ data, concesionario, id = "delivery-print-ro
                 EQUIV: Bs {(data.total_usd * data.tasa_cambio).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
               </div>
             )}
-          </div>
-
-          <div style={{ marginTop: 'auto', textAlign: 'center', borderTop: '1px solid #f1f5f9', paddingTop: 10 }}>
-            <p style={{ fontSize: 9, color: '#94a3b8', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: 1, margin: 0 }}>
-              Zona Motores Business - Sistema de Gestión Automotriz
-            </p>
           </div>
         </div>
       </div>
