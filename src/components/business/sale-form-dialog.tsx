@@ -16,6 +16,7 @@ import type { StockVehicle } from '@/lib/business-types';
 import { ROLE_LABELS, verifySHA256 } from '@/lib/business-types';
 import { cn } from '@/lib/utils';
 import { SaleDocumentsPrint } from './sale-documents-print';
+import { PaymentEngine } from './payment-engine';
 
 // ---------- Helpers ----------
 const padNum = (n: number, len: number) => String(n).padStart(len, '0');
@@ -42,6 +43,7 @@ interface SaleFormDialogProps {
   onOpenChange: (open: boolean) => void;
   concesionarioId: string;
   onSave: () => void;
+  preInvoice?: any;
 }
 
 const STEP_LABELS: Record<WizardStep, string> = {
@@ -50,7 +52,7 @@ const STEP_LABELS: Record<WizardStep, string> = {
 const WIZARD_STEPS: WizardStep[] = ['tipo', 'vehiculo', 'cliente', 'exito', 'documentos'];
 
 // ---------- Main Component ----------
-export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave }: SaleFormDialogProps) {
+export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, preInvoice }: SaleFormDialogProps) {
   const { concesionario, staff, currentRole, staffList } = useBusinessAuth();
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -83,7 +85,11 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave }: 
   const [compradorEmail, setCompradorEmail] = useState('');
   const [existingClients, setExistingClients] = useState<any[]>([]);
   const [isLoadingClients, setIsLoadingClients] = useState(false);
-  const [metodoPago, setMetodoPago] = useState('');
+  
+  // Payment Engine States
+  const [paymentSplits, setPaymentSplits] = useState<any[]>([]);
+  const [isPaymentValid, setIsPaymentValid] = useState(false);
+  
   const [registrarCaja, setRegistrarCaja] = useState(true);
   const [tipoDocumento, setTipoDocumento] = useState<'factura_fiscal' | 'nota_entrega'>('factura_fiscal');
   const [docsAlerta, setDocsAlerta] = useState(false);
@@ -133,9 +139,8 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave }: 
 
   const metodosPago = concesionario?.configuracion?.metodos_pago || ['Efectivo', 'Zelle'];
   const metodosPagoDivisa = concesionario?.configuracion?.metodos_pago_divisa || [];
-  const esDivisa = metodosPagoDivisa.includes(metodoPago);
 
-    const negotiationInfo = useMemo(() => {
+  const negotiationInfo = useMemo(() => {
     if (!selectedVehicle) return null;
     const totalCost = (selectedVehicle.costo_compra || 0) + (selectedVehicle.gastos_adecuacion || []).reduce((a, g) => a + (g.monto || 0), 0);
     const currentPrice = Number(precioVenta) || 0;
@@ -194,14 +199,23 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave }: 
     };
     fetchVehicles();
     resetAll();
-    if (currentRole === 'vendedor' && staff) setVendedorId(staff.id);
-  }, [open, concesionarioId]);
+    
+    if (preInvoice) {
+      setTipoVenta(preInvoice.item_tipo);
+      setSelectedVehicleId(preInvoice.item_id);
+      setPrecioVenta(preInvoice.precio_negociado);
+      setVendedorId(preInvoice.vendedor_id);
+      setStep('cliente'); // Skip directly to client/checkout
+    } else {
+      if (currentRole === 'vendedor' && staff) setVendedorId(staff.id);
+    }
+  }, [open, concesionarioId, preInvoice]);
 
   const resetAll = () => {
     setStep('tipo'); setTipoVenta(null); setSelectedVehicleId(''); setPrecioVenta(''); setVendedorId('');
     setSearchQuery(''); setAuthGranted(false); setAuthModalOpen(false); setAuthPin(['', '', '', '']); setAuthUserId('');
     setParteDePago(false); setCompradorNombre(''); setCompradorCedula(''); setCompradorTelefono('');
-    setMetodoPago(''); setRegistrarCaja(true); setTipoDocumento('factura_fiscal'); setDocsAlerta(false);
+    setPaymentSplits([]); setIsPaymentValid(false); setRegistrarCaja(true); setTipoDocumento('factura_fiscal'); setDocsAlerta(false);
     setNumFactura(''); setNumControl(''); setPrintDoc(null);
   };
 
@@ -254,7 +268,7 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave }: 
   };
 
   const handleSubmit = async () => {
-    if (!selectedVehicleId || !compradorNombre || !precioVenta || !metodoPago || !vendedorId) {
+    if (!selectedVehicleId || !compradorNombre || !precioVenta || !isPaymentValid || !vendedorId) {
       toast({ title: 'Faltan datos', description: 'Completa todos los campos obligatorios.', variant: 'destructive' }); return;
     }
     setIsSaving(true);
@@ -263,13 +277,16 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave }: 
       const vStaff = staffList.find(s => s.id === vendedorId);
       const vendedorNombre = vStaff?.nombre || 'Desconocido';
       let commRate = concesionario?.configuracion.estructura_comision || 0;
-      if (vStaff?.comision_porcentaje != null) commRate = vStaff.comision_porcentaje;
+      if (vStaff?.commission_percentage != null) commRate = vStaff.commission_percentage;
       const salePrice = Number(precioVenta);
       const comision = (salePrice * commRate) / 100;
       const totalBasis = (vehicle.costo_compra || 0) + (vehicle.gastos_adecuacion || []).reduce((a, g) => a + (g.monto || 0), 0);
       const gananciaNeta = vehicle.es_consignacion
         ? (vehicle.consignacion_info?.comision_acordada || 0) / 100 * salePrice - comision
         : salePrice - totalBasis - comision;
+
+      const metodoPagoStr = paymentSplits.map(s => s.method).join(', ');
+      const totalIgtf = paymentSplits.reduce((acc, s) => acc + (s.igtfAmount || 0), 0);
 
       // --- Handle Client ---
       let cId = compradorId;
@@ -327,7 +344,9 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave }: 
         vendedor_staff_id: vendedorId,
         vendedor_nombre: vendedorNombre,
         precio_venta: salePrice,
-        metodo_pago: metodoPago,
+        metodo_pago: metodoPagoStr,
+        pagos_combinados: paymentSplits,
+        igtf_total: totalIgtf,
         comision_vendedor: comision,
         ganancia_neta: gananciaNeta,
         fecha: serverTimestamp(),
@@ -362,9 +381,16 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave }: 
       if (registrarCaja && staff) {
         await addDoc(collection(firestore, 'concesionarios', concesionarioId, 'caja'), {
           tipo: 'ingreso', monto: salePrice, descripcion: `Venta: ${ventaData.vehiculo_nombre}`,
-          metodo_pago: metodoPago, cajero_staff_id: staff.id, cajero_nombre: staff.nombre, fecha: serverTimestamp(),
+          metodo_pago: metodoPagoStr, cajero_staff_id: staff.id, cajero_nombre: staff.nombre, fecha: serverTimestamp(),
         });
       }
+      
+      // Delete preInvoice if it exists
+      if (preInvoice?.id) {
+        const { deleteDoc } = await import('firebase/firestore');
+        await deleteDoc(doc(firestore, 'concesionarios', concesionarioId, 'pre_invoices', preInvoice.id));
+      }
+      
       setNumFactura(facN); setNumControl(ctrlN); setVentaFecha(now);
       setStep('exito'); onSave();
     } catch (e: any) {
@@ -409,8 +435,8 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave }: 
   };
 
   const ventaDataForDocs = selectedVehicle ? {
-    compradorNombre, compradorCedula, compradorTelefono, metodoPago,
-    precioVenta: Number(precioVenta), numFactura, numControl, tipoDocumento, esDivisa,
+    compradorNombre, compradorCedula, compradorTelefono, metodoPago: paymentSplits.map(s => s.method).join(', '),
+    precioVenta: Number(precioVenta), numFactura, numControl, tipoDocumento, esDivisa: paymentSplits.some(s => s.currency === 'USD' && metodosPagoDivisa.includes(s.method)),
     vendedorNombre: staffList.find(s => s.id === vendedorId)?.nombre || '',
     fecha: ventaFecha,
     vehiculo: {
@@ -665,21 +691,21 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave }: 
                   </div>
                 </div>
                 {/* Payment */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Método de Pago *</Label>
-                    <Select value={metodoPago} onValueChange={setMetodoPago}>
-                      <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-                      <SelectContent>{metodosPago.map((m: string) => <SelectItem key={m} value={m}>{m}{metodosPagoDivisa.includes(m) ? ' ($)' : ' (Bs)'}</SelectItem>)}</SelectContent>
-                    </Select>
-                    {esDivisa && <p className="text-xs text-amber-600">Se aplicará IGTF 3% en la factura</p>}
-                  </div>
-                  <div className="space-y-2">
-                    <Label>&nbsp;</Label>
-                    <div className="flex items-center gap-2 h-10">
-                      <Checkbox id="caja" checked={registrarCaja} onCheckedChange={c => setRegistrarCaja(c as boolean)} />
-                      <Label htmlFor="caja" className="text-xs text-muted-foreground cursor-pointer leading-tight">Registrar ingreso en Caja Chica</Label>
-                    </div>
+                <div className="space-y-4 pt-2">
+                  <PaymentEngine 
+                    totalUsd={Number(precioVenta) || 0}
+                    metodosPago={metodosPago}
+                    metodosPagoDivisa={metodosPagoDivisa}
+                    tasaBcv={concesionario?.configuracion?.tasa_cambio_manual || 36.2}
+                    onValidChange={(valid, splits) => {
+                      setIsPaymentValid(valid);
+                      setPaymentSplits(splits);
+                    }}
+                  />
+                  
+                  <div className="flex items-center gap-2 h-10 border-t pt-4">
+                    <Checkbox id="caja" checked={registrarCaja} onCheckedChange={c => setRegistrarCaja(c as boolean)} />
+                    <Label htmlFor="caja" className="text-sm font-medium cursor-pointer leading-tight">Registrar ingreso en Caja</Label>
                   </div>
                 </div>
               </div>
@@ -761,7 +787,7 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave }: 
                     Siguiente <ArrowRight className="h-4 w-4 ml-2" />
                   </Button>
                 ) : (
-                  <Button type="button" onClick={handleSubmit} disabled={isSaving || !metodoPago || !compradorNombre} className="px-8">
+                  <Button type="button" onClick={handleSubmit} disabled={isSaving || !isPaymentValid || !compradorNombre} className="px-8">
                     {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
                     Cerrar Negocio
                   </Button>

@@ -144,8 +144,8 @@ export default function StaffPage() {
                           <RoleIcon className="h-3 w-3 mr-1" />
                           {ROLE_LABELS[member.rol]}
                         </Badge>
-                        {member.comision_porcentaje != null && (
-                          <p className="text-xs text-muted-foreground mt-1">Comisión: {member.comision_porcentaje}%</p>
+                        {member.commission_percentage != null && (
+                          <p className="text-xs text-muted-foreground mt-1">Comisión: {member.commission_percentage}%</p>
                         )}
                       </div>
                     </div>

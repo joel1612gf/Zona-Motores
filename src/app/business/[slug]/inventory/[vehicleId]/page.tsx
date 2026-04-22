@@ -11,7 +11,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { useToast } from '@/hooks/use-toast';
 import {
   ArrowLeft,
@@ -30,9 +29,12 @@ import {
   TrendingUp,
   UserRound,
   PauseCircle,
+  X,
+  Info,
+  ShieldCheck,
+  Zap,
   ChevronLeft,
   ChevronRight,
-  X,
 } from 'lucide-react';
 import Image from 'next/image';
 import {
@@ -48,8 +50,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { PhotoSlider } from 'react-photo-view';
 import 'react-photo-view/dist/react-photo-view.css';
-import type { StockVehicle, StockStatus, GastoCategoria } from '@/lib/business-types';
-import { GASTO_CATEGORIA_LABELS, ROLE_LABELS } from '@/lib/business-types';
+import type { StockVehicle, StockStatus } from '@/lib/business-types';
 import { VehicleFormDialog } from '@/components/business/vehicle-form-dialog';
 import { formatCurrency } from '@/lib/utils';
 
@@ -66,7 +67,7 @@ export default function VehicleDetailPage() {
   const router = useRouter();
   const slug = params.slug as string;
   const vehicleId = params.vehicleId as string;
-  const { concesionario, hasPermission, canSeeCosts, staffList } = useBusinessAuth();
+  const { concesionario, hasPermission, canSeeCosts, staffList, currentRole } = useBusinessAuth();
   const firestore = useFirestore();
   const { toast } = useToast();
 
@@ -78,23 +79,18 @@ export default function VehicleDetailPage() {
   const [marketPrice, setMarketPrice] = useState<{ message: string; found: boolean } | null>(null);
   const [viewerVisible, setViewerVisible] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
+  const [mainPhotoIndex, setMainPhotoIndex] = useState(0);
 
   const permission = hasPermission('inventory');
-  
-  // Initialize vendor mode from session storage
   const [vendorModeEnabled] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return sessionStorage.getItem('zm_vendor_mode') === 'true';
-    }
+    if (typeof window !== 'undefined') return sessionStorage.getItem('zm_vendor_mode') === 'true';
     return false;
   });
 
-  const currentRole = useBusinessAuth().currentRole;
   const isVendorMode = currentRole === 'vendedor' || vendorModeEnabled;
   const isReadOnly = isVendorMode || permission === 'read';
   const effectiveCanSeeCosts = !isVendorMode && canSeeCosts;
 
-  // Load vehicle
   useEffect(() => {
     const loadVehicle = async () => {
       if (!concesionario?.id || !vehicleId) return;
@@ -104,17 +100,20 @@ export default function VehicleDetailPage() {
         const snap = await getDoc(docRef);
         if (snap.exists()) {
           setVehicle({ id: snap.id, ...snap.data() } as StockVehicle);
+        } else {
+          toast({ title: 'No encontrado', description: 'El vehículo no existe.', variant: 'destructive' });
+          router.push(`/business/${slug}/inventory`);
         }
       } catch (error) {
-        console.error('[VehicleDetail] Error:', error);
+        console.error('[VehicleDetail] Error loading:', error);
+        toast({ title: 'Error', description: 'No se pudo cargar la información.', variant: 'destructive' });
       } finally {
         setIsLoading(false);
       }
     };
     loadVehicle();
-  }, [concesionario?.id, vehicleId, firestore]);
+  }, [concesionario?.id, vehicleId]);
 
-  // Market price
   useEffect(() => {
     if (!vehicle?.make || !vehicle?.model) return;
     const fetchPrice = async () => {
@@ -129,127 +128,60 @@ export default function VehicleDetailPage() {
       } catch { setMarketPrice(null); }
     };
     fetchPrice();
-  }, [vehicle?.make, vehicle?.model, vehicle?.year]);
-
-  const assignedStaff = useMemo(() => {
-    if (!vehicle?.asignado_a) return null;
-    return staffList.find(s => s.id === vehicle.asignado_a);
-  }, [vehicle?.asignado_a, staffList]);
-
-  const handleChangeStatus = async (newStatus: StockStatus) => {
-    if (!concesionario?.id || !vehicle) return;
-    setIsChangingStatus(true);
-    try {
-      const docRef = doc(firestore, 'concesionarios', concesionario.id, 'inventario', vehicle.id);
-      await updateDoc(docRef, { estado_stock: newStatus });
-      
-      // SYNC TO MARKETPLACE
-      if (concesionario.owner_uid) {
-        const publicRef = doc(firestore, 'users', concesionario.owner_uid, 'vehicleListings', vehicle.id);
-        
-        if (newStatus === 'publico_web' || newStatus === 'pausado') {
-          // Prepare complete data (mostly based on current vehicle state)
-          const publicVehicleData = {
-            id: vehicle.id,
-            sellerId: concesionario.owner_uid,
-            make: vehicle.make,
-            model: vehicle.model,
-            year: vehicle.year,
-            priceUSD: vehicle.precio_venta,
-            mileage: vehicle.mileage,
-            bodyType: vehicle.bodyType || 'Sedán',
-            transmission: vehicle.transmission,
-            engine: vehicle.engine || '—',
-            exteriorColor: vehicle.exteriorColor || 'Otro',
-            ownerCount: 1,
-            tireLife: 100,
-            hasAC: true,
-            hasSoundSystem: true,
-            hadMajorCrash: false,
-            isOperational: true,
-            isSignatory: true,
-            acceptsTradeIn: false,
-            description: vehicle.description || '',
-            images: vehicle.images || [],
-            seller: {
-              uid: concesionario.owner_uid,
-              displayName: concesionario.nombre_empresa,
-              accountType: 'dealer',
-              logoUrl: concesionario.logo_url || '',
-              heroUrl: concesionario.banner_url || '',
-              address: concesionario.direccion,
-              isVerified: true,
-              isSaaSBusiness: true,
-              saasSlug: concesionario.slug,
-              businessId: concesionario.id,
-              phone: concesionario.telefono || ''
-            },
-            location: {
-              city: 'Caracas', // Default to Caracas for now or use business location if exists
-              state: 'Miranda',
-              lat: concesionario.geolocalizacion?.latitude || 10.4806,
-              lon: concesionario.geolocalizacion?.longitude || -66.9036
-            },
-            asignado_a: vehicle.asignado_a || null,
-            assignedSeller: vehicle.asignado_a ? (() => {
-              const staff = staffList.find(s => s.id === vehicle.asignado_a);
-              return staff ? { nombre: staff.nombre, telefono: staff.telefono || '' } : null;
-            })() : null,
-            createdAt: (vehicle as any).created_at || serverTimestamp(),
-            status: newStatus === 'publico_web' ? 'active' : 'paused'
-          };
-          await setDoc(publicRef, publicVehicleData);
-        } else if (vehicle.estado_stock === 'publico_web' || vehicle.estado_stock === 'pausado') {
-          // It was in the marketplace, now it's not -> delete
-          await deleteDoc(publicRef);
-        }
-      }
-
-      setVehicle({ ...vehicle, estado_stock: newStatus });
-      toast({ title: 'Estado actualizado', description: `El vehículo ahora está: ${STATUS_CONFIG[newStatus].label}` });
-    } catch (error) {
-      console.error('[VehicleDetail] Error changing status:', error);
-      toast({ title: 'Error', description: 'No se pudo cambiar el estado.', variant: 'destructive' });
-    } finally {
-      setIsChangingStatus(false);
-    }
-  };
+  }, [vehicle]);
 
   const handleDelete = async () => {
-    if (!concesionario?.id || !vehicle) return;
+    if (!concesionario?.id || !vehicleId) return;
     setIsDeleting(true);
     try {
-      const docRef = doc(firestore, 'concesionarios', concesionario.id, 'inventario', vehicle.id);
-      await deleteDoc(docRef);
-      toast({ title: 'Eliminado', description: 'El vehículo fue eliminado del inventario.' });
+      if (vehicle?.estado_stock === 'publico_web' || vehicle?.estado_stock === 'pausado') {
+        await deleteDoc(doc(firestore, 'users', concesionario.owner_uid, 'vehicleListings', vehicleId));
+      }
+      await deleteDoc(doc(firestore, 'concesionarios', concesionario.id, 'inventario', vehicleId));
+      toast({ title: 'Eliminado', description: 'Vehículo eliminado del inventario.' });
       router.push(`/business/${slug}/inventory`);
     } catch (error) {
-      console.error('[VehicleDetail] Error deleting:', error);
-      toast({ title: 'Error', description: 'No se pudo eliminar el vehículo.', variant: 'destructive' });
-    } finally {
-      setIsDeleting(false);
-    }
+      toast({ title: 'Error', variant: 'destructive' });
+    } finally { setIsDeleting(false); }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+  const handleStatusChange = async (newStatus: StockStatus) => {
+    if (!concesionario?.id || !vehicleId || !vehicle) return;
+    setIsChangingStatus(true);
+    try {
+      await updateDoc(doc(firestore, 'concesionarios', concesionario.id, 'inventario', vehicleId), { 
+        estado_stock: newStatus, updated_at: serverTimestamp() 
+      });
+      if (concesionario.owner_uid && (vehicle.estado_stock === 'publico_web' || vehicle.estado_stock === 'pausado') && (newStatus !== 'publico_web' && newStatus !== 'pausado')) {
+        await deleteDoc(doc(firestore, 'users', concesionario.owner_uid, 'vehicleListings', vehicleId));
+      }
+      setVehicle({ ...vehicle, estado_stock: newStatus });
+      toast({ title: 'Estado actualizado' });
+    } catch (error) {
+      toast({ title: 'Error', variant: 'destructive' });
+    } finally { setIsChangingStatus(false); }
+  };
 
-  if (!vehicle) {
-    return (
-      <div className="flex flex-col items-center justify-center h-96 gap-4">
-        <Car className="h-16 w-16 text-muted-foreground" />
-        <p className="text-lg text-muted-foreground">Vehículo no encontrado</p>
-        <Button variant="outline" onClick={() => router.push(`/business/${slug}/inventory`)}>
-          <ArrowLeft className="h-4 w-4 mr-2" /> Volver al inventario
-        </Button>
-      </div>
-    );
-  }
+  const nextPhoto = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (!vehicle?.images) return;
+    setMainPhotoIndex((prev) => (prev + 1) % vehicle.images.length);
+  };
+
+  const prevPhoto = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (!vehicle?.images) return;
+    setMainPhotoIndex((prev) => (prev - 1 + vehicle.images.length) % vehicle.images.length);
+  };
+
+  if (isLoading) return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <p className="text-muted-foreground font-medium">Abriendo expediente...</p>
+    </div>
+  );
+
+  if (!vehicle) return null;
 
   const statusConf = STATUS_CONFIG[vehicle.estado_stock];
   const StatusIcon = statusConf.icon;
@@ -257,353 +189,308 @@ export default function VehicleDetailPage() {
   const totalInvertido = (vehicle.costo_compra || 0) + totalGastos;
   const ganancia = (vehicle.precio_venta || 0) - totalInvertido;
 
-  // Group expenses by category
-  const gastosPorCategoria: Record<string, { items: typeof vehicle.gastos_adecuacion; total: number }> = {};
-  (vehicle.gastos_adecuacion || []).forEach(g => {
-    const cat = g.categoria || 'otros';
-    if (!gastosPorCategoria[cat]) gastosPorCategoria[cat] = { items: [], total: 0 };
-    gastosPorCategoria[cat].items.push(g);
-    gastosPorCategoria[cat].total += g.monto;
-  });
-
   return (
-    <div className={cn(
-      "space-y-6 transition-all duration-300",
-      isVendorMode ? "max-w-5xl mx-auto p-4 sm:p-6" : ""
-    )}>
-      {/* Back + Actions */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <Button variant="ghost" onClick={() => router.push(`/business/${slug}/inventory`)} className="gap-2">
-          <ArrowLeft className="h-4 w-4" /> Inventario
-        </Button>
-        {!isReadOnly && (
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => setEditDialogOpen(true)}>
-              <Pencil className="h-4 w-4 mr-2" /> Editar
-            </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="outline" className="text-destructive hover:text-destructive">
-                  <Trash2 className="h-4 w-4 mr-2" /> Eliminar
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>¿Eliminar este vehículo?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Esta acción no se puede deshacer. El vehículo será eliminado permanentemente del inventario.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                    {isDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Eliminar
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+    <div className="max-w-7xl mx-auto pb-24">
+      {/* ─── HEADER & ACTIONS ─── */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 px-2 md:px-0">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" className="rounded-2xl h-12 w-12 border bg-background" onClick={() => router.back()}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl md:text-3xl font-black font-headline tracking-tight">
+                {vehicle.make} {vehicle.model}
+              </h1>
+              <Badge variant="outline" className={cn('h-7 px-3 text-[10px] font-black uppercase tracking-widest shrink-0', statusConf.color)}>
+                <StatusIcon className="h-3 w-3 mr-1.5" />
+                {statusConf.label}
+              </Badge>
+            </div>
+            <p className="text-muted-foreground font-bold mt-1.5 flex items-center gap-2 text-xs uppercase tracking-tighter">
+              <span className="bg-muted px-2 py-0.5 rounded-lg">{vehicle.year}</span>
+              <span className="opacity-40">•</span>
+              <span className="text-primary/70">{vehicle.placa || 'SIN PLACA'}</span>
+            </p>
           </div>
-        )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          {!isReadOnly && (
+            <div className="flex gap-2">
+              <Button variant="outline" className="rounded-xl h-11 px-4 md:px-6 font-bold border-2" onClick={() => setEditDialogOpen(true)}>
+                <Pencil className="h-4 w-4 md:mr-2 text-primary" /> <span className="hidden md:inline">Editar</span>
+              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="ghost" className="rounded-xl h-11 w-11 p-0 text-red-500 hover:bg-red-50">
+                    <Trash2 className="h-5 w-5" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="rounded-3xl border-none shadow-2xl">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="text-2xl font-black font-headline">¿Eliminar unidad?</AlertDialogTitle>
+                    <AlertDialogDescription className="text-lg">Esta acción es permanente e irreversible.</AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter className="mt-6 gap-3">
+                    <AlertDialogCancel className="rounded-xl h-12 font-bold">Cancelar</AlertDialogCancel>
+                    <AlertDialogAction className="rounded-xl h-12 font-bold bg-red-600 hover:bg-red-700" onClick={handleDelete} disabled={isDeleting}>Eliminar</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          )}
+
+          <Separator orientation="vertical" className="h-8 mx-2 hidden md:block" />
+
+          <Select value={vehicle.estado_stock} onValueChange={(v) => handleStatusChange(v as StockStatus)} disabled={isReadOnly || isChangingStatus}>
+            <SelectTrigger className={cn("h-11 min-w-[160px] md:min-w-[180px] rounded-xl border-2 font-black uppercase text-[10px] tracking-widest", statusConf.color)}>
+              {isChangingStatus ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <StatusIcon className="h-4 w-4 mr-2" />}
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl border-none shadow-2xl">
+              {(Object.keys(STATUS_CONFIG) as StockStatus[]).map(s => (
+                <SelectItem key={s} value={s} className="rounded-lg font-bold uppercase text-[10px] tracking-widest my-1">{STATUS_CONFIG[s].label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      <div className={cn(
-        "grid gap-6 items-start transition-all duration-300",
-        isVendorMode ? "grid-cols-1" : "md:grid-cols-3"
-      )}>
-        {/* Main Column */}
-        <div className={cn(
-          "space-y-6",
-          isVendorMode ? "w-full" : "md:col-span-2"
-        )}>
-          {/* Image Gallery */}
-          {vehicle.images && vehicle.images.length > 0 ? (
-            <>
-              <Carousel className="w-full">
-                <CarouselContent>
-                  {vehicle.images.map((image, index) => (
-                    <CarouselItem key={index}>
-                      <Card className="overflow-hidden">
-                        <CardContent 
-                          className="flex aspect-video items-center justify-center p-0 relative cursor-pointer group hover:opacity-95 transition-opacity"
-                          onClick={() => {
-                            setViewerIndex(index);
-                            setViewerVisible(true);
-                          }}
-                        >
-                          <Image
-                            src={image.url}
-                            alt={image.alt || "Vehículo"}
-                            fill
-                            className="object-cover"
-                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                          />
-                          {vehicle.images!.length > 1 && (
-                            <Badge variant="secondary" className="absolute bottom-3 right-3 bg-background/80 backdrop-blur-sm z-10 pointer-events-none">
-                              {index + 1} / {vehicle.images!.length}
-                            </Badge>
-                          )}
-                        </CardContent>
-                      </Card>
-                    </CarouselItem>
-                  ))}
-                </CarouselContent>
-                {vehicle.images.length > 1 && (
-                  <>
-                    <CarouselPrevious className="ml-12" />
-                    <CarouselNext className="mr-12" />
-                  </>
-                )}
-              </Carousel>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+        {/* ─── LEFT COLUMN: PHOTOS & DESC ─── */}
+        <div className="lg:col-span-2 space-y-10">
+          {/* Interactive Gallery Card */}
+          <div className="bg-card rounded-[2.5rem] border border-border/50 overflow-hidden shadow-xl">
+            <div className="relative aspect-video bg-muted group overflow-hidden">
+              {vehicle.images?.[mainPhotoIndex] ? (
+                <>
+                  <Image 
+                    src={vehicle.images[mainPhotoIndex].url} 
+                    alt="" 
+                    fill 
+                    className="object-cover cursor-pointer" 
+                    onClick={() => { setViewerIndex(mainPhotoIndex); setViewerVisible(true); }} 
+                  />
+                  {/* Navigation Arrows */}
+                  {vehicle.images.length > 1 && (
+                    <>
+                      <button 
+                        onClick={prevPhoto}
+                        className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/20 backdrop-blur-md text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/40"
+                      >
+                        <ChevronLeft className="h-6 w-6" />
+                      </button>
+                      <button 
+                        onClick={nextPhoto}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/20 backdrop-blur-md text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/40"
+                      >
+                        <ChevronRight className="h-6 w-6" />
+                      </button>
+                    </>
+                  )}
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full gap-4 opacity-20">
+                  <Car className="h-20 w-20" />
+                  <p className="text-xs font-black uppercase tracking-widest">Sin material visual</p>
+                </div>
+              )}
+              {/* Responsive Price Badge */}
+              <div className="absolute bottom-4 right-4 md:bottom-6 md:right-6 bg-background/90 backdrop-blur-xl px-4 py-3 md:px-8 md:py-5 rounded-2xl md:rounded-[2rem] border border-white/20 shadow-2xl">
+                <p className="text-[9px] md:text-[10px] font-black text-primary/60 uppercase tracking-[0.2em] mb-0.5 md:mb-1">Precio de Venta</p>
+                <p className="text-2xl md:text-4xl font-black font-headline text-primary tracking-tighter leading-none">
+                  {formatCurrency(vehicle.precio_venta)}
+                </p>
+              </div>
+            </div>
+            
+            {/* Thumbnails */}
+            {vehicle.images && vehicle.images.length > 1 && (
+              <div className="p-4 md:p-6 flex gap-3 border-t border-border/40 bg-muted/20 overflow-x-auto no-scrollbar">
+                {vehicle.images.map((img, i) => (
+                  <button
+                    key={i}
+                    className={cn(
+                      "relative min-w-[70px] md:min-w-[100px] aspect-square rounded-xl overflow-hidden border-2 transition-all active:scale-95 shrink-0",
+                      mainPhotoIndex === i ? "border-primary shadow-md scale-105" : "border-transparent opacity-60 hover:opacity-100"
+                    )}
+                    onClick={() => setMainPhotoIndex(i)}
+                  >
+                    <Image src={img.url} alt="" fill className="object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
-              <PhotoSlider
-                images={vehicle.images.map((item) => ({ src: item.url, key: item.url }))}
-                visible={viewerVisible}
-                onClose={() => setViewerVisible(false)}
-                index={viewerIndex}
-                onIndexChange={setViewerIndex}
-                maskClosable={true}
-              />
-            </>
-          ) : (
-            <Card className="overflow-hidden">
-              <CardContent className="flex aspect-video items-center justify-center bg-muted">
-                <Car className="h-16 w-16 text-muted-foreground/30" />
+          {/* Description Card */}
+          <div className="bg-card rounded-[2.5rem] border border-border/50 p-10 shadow-sm relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-2 h-full bg-primary/10" />
+            <h2 className="text-xs font-black text-muted-foreground uppercase tracking-[0.3em] mb-6 flex items-center gap-2">
+              <Info className="h-4 w-4 text-primary" /> Nota de la Unidad
+            </h2>
+            <p className="text-xl font-medium text-foreground/80 leading-relaxed whitespace-pre-wrap">
+              {vehicle.description || 'No se ha redactado una descripción para esta unidad.'}
+            </p>
+          </div>
+        </div>
+
+        {/* ─── RIGHT COLUMN: SPECS & FINANCIAL ─── */}
+        <div className="space-y-10">
+          {/* Quick Specs Grid */}
+          <div className="grid grid-cols-2 gap-4">
+            {[
+              { icon: Gauge, label: 'Kilometraje', val: `${vehicle.mileage?.toLocaleString()} KM`, color: 'text-blue-600 bg-blue-50' },
+              { icon: Settings2, label: 'Transmisión', val: vehicle.transmission, color: 'text-orange-600 bg-orange-50' },
+              { icon: Palette, label: 'Color Ext.', val: vehicle.exteriorColor, color: 'text-gray-600 bg-gray-50' },
+              { icon: UserRound, label: 'N° Dueños', val: vehicle.ownerCount, color: 'text-purple-600 bg-purple-50' },
+            ].map((spec, i) => (
+              <div key={i} className="bg-card border border-border/40 p-5 rounded-[2rem] shadow-sm flex flex-col items-center text-center gap-2 group hover:shadow-md transition-all">
+                <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110", spec.color)}>
+                  <spec.icon className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">{spec.label}</p>
+                  <p className="text-sm font-black tracking-tight">{spec.val}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Financial Scoreboard */}
+          {effectiveCanSeeCosts && (
+            <Card className="rounded-[2.5rem] border-none shadow-xl bg-primary text-primary-foreground overflow-hidden">
+              <CardHeader className="p-8 pb-4">
+                <CardTitle className="text-sm font-black uppercase tracking-[0.2em] flex items-center gap-2 opacity-80">
+                  <DollarSign className="h-4 w-4" /> Estado Financiero
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-8 pt-0 space-y-6">
+                <div className="space-y-1">
+                  <p className="text-[9px] font-bold uppercase opacity-50">Inversión Administrativa</p>
+                  <p className="text-4xl font-black font-headline tracking-tighter">{formatCurrency(totalInvertido)}</p>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
+                  <div className="space-y-1">
+                    <p className="text-[9px] font-bold uppercase opacity-40">Retorno Neto</p>
+                    <p className={cn("text-xl font-black font-headline tracking-tight", ganancia >= 0 ? "text-green-300" : "text-red-300")}>
+                      {ganancia >= 0 ? '+' : ''}{formatCurrency(ganancia)}
+                    </p>
+                  </div>
+                  <div className="text-right space-y-1">
+                    <p className="text-[9px] font-bold uppercase opacity-40">ROI Est.</p>
+                    <p className="text-xl font-black font-headline tracking-tight">
+                      {((ganancia / (totalInvertido || 1)) * 100).toFixed(1)}%
+                    </p>
+                  </div>
+                </div>
+
+                {marketPrice && (
+                  <div className="mt-2 p-4 bg-white/10 rounded-2xl border border-white/5 flex items-center gap-3 text-xs font-bold leading-tight">
+                    <Globe className="h-4 w-4 shrink-0 opacity-60" />
+                    <span className="opacity-90">{marketPrice.message}</span>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
 
-          {/* Vehicle Info Card */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <CardTitle className="text-2xl sm:text-3xl font-headline">
-                    {vehicle.year} {vehicle.make} {vehicle.model}
-                  </CardTitle>
-                  <div className="flex items-center gap-2 mt-2">
-                    <Badge variant="outline" className={statusConf.color}>
-                      <StatusIcon className="h-3 w-3 mr-1" />
-                      {statusConf.label}
-                    </Badge>
-                    {vehicle.es_consignacion && (
-                      <Badge variant="outline" className="bg-purple-500/10 text-purple-700 border-purple-500/30">
-                        Consignación
-                      </Badge>
-                    )}
-                  </div>
+          {/* Ficha Técnica Card */}
+          <Card className="rounded-[2.5rem] border border-border/40 shadow-sm bg-card/50">
+            <CardHeader className="p-8 pb-4">
+              <CardTitle className="text-xs font-black uppercase tracking-[0.3em] text-muted-foreground flex items-center gap-2">
+                 Ficha Técnica
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-8 pt-0 space-y-3">
+              {[
+                { l: 'Motor', v: vehicle.engine || 'N/D' },
+                { l: 'Neumáticos', v: `${vehicle.tireLife}% de vida` },
+                { l: 'Tracción', v: vehicle.is4x4 ? '4x4 / AWD' : '4x2 / FWD' },
+                { l: 'Puertas', v: `${vehicle.doorCount} P` },
+              ].map((item, i) => (
+                <div key={i} className="flex justify-between items-center text-sm border-b border-border/30 pb-3 last:border-0 last:pb-0">
+                  <span className="font-bold text-muted-foreground/60">{item.l}</span>
+                  <span className="font-black uppercase tracking-tight">{item.v}</span>
                 </div>
-                {vehicle.precio_venta > 0 && (
-                  <div className="text-right">
-                    <p className="text-3xl font-bold font-headline text-primary">
-                      {formatCurrency(vehicle.precio_venta)}
-                    </p>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* Configuration Badges */}
+          <div className="p-8 rounded-[2.5rem] bg-muted/20 border border-border/30">
+            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em] text-center mb-6">Equipamiento y Atributos</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {[
+                { label: 'A/C Operativo', value: vehicle.hasAC },
+                { label: 'Unidad Rodando', value: vehicle.isOperational },
+                { label: 'Firma de Título', value: vehicle.isSignatory },
+                { label: 'Tracción 4x4', value: vehicle.is4x4 },
+                { label: 'Sonido Premium', value: vehicle.hasSoundSystem },
+                { label: 'Blindaje', value: vehicle.isArmored },
+                { label: 'Acepta Cambio', value: vehicle.acceptsTradeIn },
+                { label: 'Choque Fuerte', value: vehicle.hadMajorCrash, isAlert: true },
+              ].map((attr, i) => {
+                const isActive = attr.value;
+                const isAlert = attr.isAlert;
+
+                return (
+                  <div key={i} className={cn(
+                    "px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all duration-300",
+                    isActive && !isAlert ? "bg-blue-500/10 border-blue-500/20 text-blue-700" :
+                    isActive && isAlert ? "bg-red-500/10 border-red-500/20 text-red-700 shadow-inner" :
+                    "bg-muted/50 border-transparent text-muted-foreground/30 opacity-50 grayscale"
+                  )}>
+                    {attr.label}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          
+          {/* Assignment / Consignment */}
+          {(vehicle.es_consignacion || vehicle.asignado_a) && (
+            <div className="p-8 rounded-[2.5rem] border-2 border-dashed border-primary/20 bg-primary/5 space-y-4">
+              <div className="flex items-center gap-3">
+                <BookmarkCheck className="h-5 w-5 text-primary" />
+                <h3 className="text-xs font-black uppercase tracking-widest text-primary">Información de Gestión</h3>
+              </div>
+              <div className="grid grid-cols-1 gap-4">
+                {vehicle.es_consignacion && (
+                  <div className="space-y-1">
+                    <p className="text-[9px] font-bold text-muted-foreground uppercase">Consignación de Tercero</p>
+                    <p className="font-black text-sm">Comisión: {vehicle.consignacion_info?.comision_acordada}%</p>
+                  </div>
+                )}
+                {vehicle.asignado_a && (
+                  <div className="space-y-1">
+                    <p className="text-[9px] font-bold text-muted-foreground uppercase">Responsable Asignado</p>
+                    <p className="font-black text-sm">{staffList.find(s => s.id === vehicle.asignado_a)?.nombre || '—'}</p>
                   </div>
                 )}
               </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Market price */}
-              {marketPrice?.found && (
-                <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                  <p className="text-sm">
-                    📊 <span className="font-medium">{marketPrice.message}</span>
-                  </p>
-                </div>
-              )}
-
-              <Separator />
-
-              {/* Specs Grid */}
-              {/* Specs Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Gauge className="h-4 w-4 shrink-0" />
-                    <span>Kilometraje</span>
-                  </div>
-                  <p className="font-semibold text-base">{vehicle.mileage?.toLocaleString() || 0} km</p>
-                </div>
-
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Palette className="h-4 w-4 shrink-0" />
-                    <span>Color</span>
-                  </div>
-                  <p className="font-semibold text-base">{vehicle.exteriorColor || '—'}</p>
-                </div>
-
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Settings2 className="h-4 w-4 shrink-0" />
-                    <span>Motor</span>
-                  </div>
-                  <p className="font-semibold text-base">{vehicle.engine || '—'}</p>
-                </div>
-
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Car className="h-4 w-4 shrink-0" />
-                    <span>Transmisión</span>
-                  </div>
-                  <p className="font-semibold text-base">{vehicle.transmission || '—'}</p>
-                </div>
-              </div>
-
-              {/* Description */}
-              {vehicle.description && (
-                <>
-                  <Separator />
-                  <div>
-                    <h3 className="font-semibold mb-2">Descripción</h3>
-                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{vehicle.description}</p>
-                  </div>
-                </>
-              )}
-
-              {/* Assigned seller */}
-              {assignedStaff && !isVendorMode && (
-                <>
-                  <Separator />
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                      <UserRound className="h-4 w-4 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">Asignado a: {assignedStaff.nombre}</p>
-                      <p className="text-xs text-muted-foreground">{ROLE_LABELS[assignedStaff.rol]}</p>
-                    </div>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
+            </div>
+          )}
         </div>
-
-        {/* Sidebar Column */}
-        {!isVendorMode && (
-          <div className="space-y-4">
-            {/* Status Change */}
-            {!isReadOnly && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium">Cambiar Estado</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Select
-                    value={vehicle.estado_stock}
-                    onValueChange={(v) => handleChangeStatus(v as StockStatus)}
-                    disabled={isChangingStatus}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="privado_taller">🔧 En Taller</SelectItem>
-                      <SelectItem value="publico_web">🌐 Publicado</SelectItem>
-                      <SelectItem value="pausado">🟠 Pausado</SelectItem>
-                      <SelectItem value="reservado">📌 Reservado</SelectItem>
-                      <SelectItem value="vendido">✅ Vendido</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Costs Card - only for authorized roles */}
-            {effectiveCanSeeCosts && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <DollarSign className="h-4 w-4" />
-                    Costos e Inversión
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {/* Purchase cost */}
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Costo de compra</span>
-                    <span className="font-medium">{formatCurrency(vehicle.costo_compra || 0)}</span>
-                  </div>
-
-                  {/* Expenses by category */}
-                  {Object.entries(gastosPorCategoria).length > 0 && (
-                    <div className="space-y-2">
-                      <Separator />
-                      <p className="text-xs font-semibold text-muted-foreground uppercase">Gastos de Adecuación</p>
-                      {Object.entries(gastosPorCategoria).map(([cat, data]) => (
-                        <div key={cat} className="space-y-1">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground flex items-center gap-1">
-                              <Badge variant="outline" className="text-[10px] px-1.5 py-0">{GASTO_CATEGORIA_LABELS[cat as GastoCategoria] || cat}</Badge>
-                            </span>
-                            <span className="font-medium">{formatCurrency(data.total)}</span>
-                          </div>
-                          {data.items.map((item, i) => (
-                            <p key={i} className="text-xs text-muted-foreground pl-4">
-                              — {item.descripcion}: {formatCurrency(item.monto)}
-                            </p>
-                          ))}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <Separator />
-
-                  {/* Totals */}
-                  <div className="flex justify-between text-sm font-medium">
-                    <span>Total invertido</span>
-                    <span>{formatCurrency(totalInvertido)}</span>
-                  </div>
-
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Precio de venta</span>
-                    <span className="font-medium">{formatCurrency(vehicle.precio_venta || 0)}</span>
-                  </div>
-
-                  <Separator />
-
-                  <div className={`flex justify-between items-center text-base font-bold ${ganancia >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                    <span className="flex items-center gap-1">
-                      <TrendingUp className="h-4 w-4" />
-                      Ganancia
-                    </span>
-                    <span>{ganancia >= 0 ? '+' : ''}{formatCurrency(ganancia)}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Consignment info */}
-            {vehicle.es_consignacion && vehicle.consignacion_info && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium">Info Consignación</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Vendedor particular</span>
-                    <span>{vehicle.consignacion_info.vendedor_particular_id}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Comisión acordada</span>
-                    <span>{vehicle.consignacion_info.comision_acordada}%</span>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        )}
       </div>
 
-      {/* Edit Dialog */}
+      {/* ─── MODALS ─── */}
       <VehicleFormDialog
         open={editDialogOpen}
         onOpenChange={setEditDialogOpen}
         editingVehicle={vehicle}
         concesionarioId={concesionario?.id || ''}
         onSave={() => window.location.reload()}
+      />
+
+      <PhotoSlider
+        images={vehicle.images?.map(img => ({ src: img.url, key: img.url })) || []}
+        visible={viewerVisible}
+        onClose={() => setViewerVisible(false)}
+        index={viewerIndex}
+        onIndexChange={setViewerIndex}
       />
     </div>
   );

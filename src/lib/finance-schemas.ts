@@ -44,3 +44,26 @@ export const fiscalNoteSchema = z.object({
 });
 
 export type FiscalNoteFormValues = z.infer<typeof fiscalNoteSchema>;
+
+export const paymentSplitSchema = z.object({
+  method: z.string().min(1, 'Método requerido'),
+  currency: z.enum(['USD', 'VES']),
+  amount: z.number().min(0.01, 'Monto inválido'),
+  exchangeRate: z.number().min(1, 'Tasa inválida'),
+  igtfAmount: z.number().default(0), // Applicable if method is USD/Efectivo
+  equivalentUsd: z.number().min(0),
+});
+
+export type PaymentSplit = z.infer<typeof paymentSplitSchema>;
+
+export const preInvoiceSchema = z.object({
+  vendedor_id: z.string().min(1),
+  vendedor_nombre: z.string().min(1),
+  item_id: z.string().min(1),
+  item_tipo: z.enum(['vehiculo', 'producto']),
+  item_nombre: z.string().min(1),
+  precio_negociado: z.number().min(0),
+});
+
+export type PreInvoiceFormValues = z.infer<typeof preInvoiceSchema>;
+
