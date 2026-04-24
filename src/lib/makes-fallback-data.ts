@@ -57,7 +57,7 @@ export const fallbackData: MakesByType = {
         Zotye: ['Nomada', 'Hunter', 'Z100'],
         Lada: ['Niva', 'Samara', '2105', '2107', 'Priora', 'Kalina'],
     },
-    Camioneta: {
+    Camión: {
         Mack: ['Granite', 'Vision', 'CH613', 'R600 (Trompa de Batea)', 'Pinnacle', 'RD690', 'CXU613'],
         Iveco: ['Stralis', 'Trakker', 'EuroCargo', 'Daily (Chasis)', 'EuroTech', 'Cavallino', 'Cursor'],
         Ford: ['Cargo 815', 'Cargo 1721', 'Cargo 2632', 'Cargo 4432', 'F-350', 'F-750', 'F-8000', 'Trader'],

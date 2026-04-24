@@ -45,7 +45,7 @@ import { Map, AdvancedMarker, Pin } from '@vis.gl/react-google-maps';
 import { MapsProvider } from '@/components/maps-provider';
 
 
-type VehicleType = 'Moto' | 'Carro' | 'Camioneta';
+type VehicleType = 'Moto' | 'Carro' | 'Camión';
 type Step = 'selection' | 'details' | 'location' | 'consignment' | 'photos';
 
 const vehicleTypeOptions: {
@@ -55,7 +55,7 @@ const vehicleTypeOptions: {
 }[] = [
         { id: 'Moto', name: 'Moto', icon: Bike },
         { id: 'Carro', name: 'Carro', icon: Car },
-        { id: 'Camioneta', name: 'Camioneta', icon: Truck },
+        { id: 'Camión', name: 'Camión', icon: Truck },
     ];
 
 // LISTING_LIMIT is now dynamic, see useSubscription()
@@ -389,7 +389,7 @@ function NewListingContent() {
             return;
         }
 
-        if ((selectedType === 'Carro' || selectedType === 'Camioneta') && price < minPriceCar) {
+        if ((selectedType === 'Carro' || selectedType === 'Camión') && price < minPriceCar) {
             toast({
                 title: "Precio muy bajo",
                 description: `El precio mínimo para un vehículo es de ${formatCurrency(minPriceCar)}.`,

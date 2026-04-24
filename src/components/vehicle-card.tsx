@@ -96,7 +96,9 @@ export function VehicleCard({ vehicle, isFeatured = false }: { vehicle: Vehicle;
           </div>
           <div className="flex items-center text-xs sm:text-sm text-muted-foreground pt-1">
             <MapPin className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-1.5 flex-shrink-0" />
-            <span className="truncate">{`${vehicle.location.city}, ${vehicle.location.state}`}</span>
+            <span className="truncate">
+              {vehicle.location ? `${vehicle.location.city}, ${vehicle.location.state}` : 'Ubicación no especificada'}
+            </span>
           </div>
         </CardContent>
       </Link>

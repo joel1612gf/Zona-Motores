@@ -32,6 +32,7 @@ import {
   Send,
   Gauge,
   Lock,
+  Sparkles,
 } from 'lucide-react';
 import Image from 'next/image';
 import type { StockVehicle, StockStatus } from '@/lib/business-types';
@@ -42,11 +43,31 @@ import { PreInvoiceDialog } from '@/components/business/pre-invoice-dialog';
 import { formatCurrency, cn } from '@/lib/utils';
 
 const STATUS_CONFIG: Record<StockStatus, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
-  privado_taller: { label: 'En Taller', color: 'bg-yellow-500/10 text-yellow-700 border-yellow-500/30', icon: Wrench },
-  publico_web: { label: 'Publicado', color: 'bg-green-500/10 text-green-700 border-green-500/30', icon: Globe },
-  pausado: { label: 'Pausado', color: 'bg-orange-500/10 text-orange-700 border-orange-500/30', icon: PauseCircle },
-  reservado: { label: 'Reservado', color: 'bg-blue-500/10 text-blue-700 border-blue-500/30', icon: BookmarkCheck },
-  vendido: { label: 'Vendido', color: 'bg-gray-500/10 text-gray-500 border-gray-500/30', icon: CheckCircle2 },
+  privado_taller: { 
+    label: 'En Taller', 
+    color: 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 border-blue-100 dark:border-blue-900/30', 
+    icon: Wrench 
+  },
+  publico_web: { 
+    label: 'Publicado', 
+    color: 'bg-blue-600 text-white border-transparent shadow-lg shadow-blue-500/20', 
+    icon: Globe 
+  },
+  pausado: { 
+    label: 'Pausado', 
+    color: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700', 
+    icon: PauseCircle 
+  },
+  reservado: { 
+    label: 'Reservado', 
+    color: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400 border-indigo-100 dark:border-indigo-900/30', 
+    icon: BookmarkCheck 
+  },
+  vendido: { 
+    label: 'Vendido', 
+    color: 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 border-transparent', 
+    icon: CheckCircle2 
+  },
 };
 
 export default function InventoryPage() {
@@ -191,36 +212,36 @@ export default function InventoryPage() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      {/* ─── FLOATING HEADER ─── */}
+      {/* ─── FLOATING HEADER - SYNCED WITH PRODUCTS/DASHBOARD ─── */}
       <div className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl border-b border-border/50 -mx-6 px-6 py-4 mb-8">
         <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0 border border-primary/20 shadow-sm">
-              <Package className="h-6 w-6" />
+          <div className="space-y-1">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-primary rounded-2xl shadow-lg shadow-primary/25">
+                <Car className="h-6 w-6 text-primary-foreground" />
+              </div>
+              <h1 className="text-3xl font-bold font-headline tracking-tight text-slate-900 dark:text-white">Inventario</h1>
             </div>
-            <div>
-              <h1 className="text-2xl font-black font-headline tracking-tight">Gestión de Inventario</h1>
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-                <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                {statusCounts.todos} Unidades en Stock
-              </p>
-            </div>
+            <p className="text-muted-foreground font-medium flex items-center gap-2">
+              <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              {statusCounts.todos} Unidades en Stock
+            </p>
           </div>
 
           <div className="flex items-center gap-3">
             {canToggleVendorMode && (
-              <div className="flex items-center space-x-3 bg-muted/40 py-2 px-4 rounded-2xl border border-border/50">
+              <div className="flex items-center space-x-3 bg-slate-50 dark:bg-slate-900 px-4 py-2 rounded-full border border-slate-200 dark:border-slate-800 shadow-sm transition-all hover:bg-slate-100">
                 <Switch
                   id="vendor-mode"
                   checked={vendorModeEnabled}
                   onCheckedChange={setVendorModeEnabled}
                   className="data-[state=checked]:bg-primary"
                 />
-                <Label htmlFor="vendor-mode" className="text-xs font-black cursor-pointer uppercase tracking-tighter">Modo Vendedor</Label>
+                <Label htmlFor="vendor-mode" className="text-[10px] font-black uppercase tracking-widest cursor-pointer text-slate-500 whitespace-nowrap">Modo Vendedor</Label>
               </div>
             )}
             {!isReadOnly && (
-              <Button onClick={handleAddVehicle} size="lg" className="rounded-2xl px-6 h-12 shadow-xl shadow-primary/20 bg-primary hover:bg-primary/90 transition-all active:scale-95 font-bold">
+              <Button onClick={handleAddVehicle} className="rounded-xl font-bold shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90 transition-all active:scale-95 px-6 h-11">
                 <Plus className="h-5 w-5 mr-2" />
                 Nueva Unidad
               </Button>
@@ -234,18 +255,18 @@ export default function InventoryPage() {
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_auto] gap-6 items-end">
           <div className="space-y-4 w-full">
              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="h-12 bg-muted/30 p-1 rounded-2xl border border-border/40 w-full justify-start overflow-x-auto overflow-y-hidden no-scrollbar">
-                <TabsTrigger value="todos" className="rounded-xl px-6 font-bold text-xs gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">
-                  Todos <Badge variant="secondary" className="h-5 min-w-[20px] px-1 bg-primary/10 text-primary border-none ml-1">{statusCounts.todos || 0}</Badge>
+              <TabsList className="bg-slate-100 dark:bg-slate-900 p-1 rounded-2xl h-12 border border-slate-200/60 dark:border-slate-800/60 shadow-inner w-full justify-start overflow-x-auto no-scrollbar">
+                <TabsTrigger value="todos" className="rounded-xl px-6 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary data-[state=active]:shadow-md transition-all font-bold text-xs gap-2">
+                  Todos <Badge variant="secondary" className="ml-1.5 text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400 font-black">{statusCounts.todos || 0}</Badge>
                 </TabsTrigger>
                 {(Object.keys(STATUS_CONFIG) as StockStatus[]).map(status => {
                   const config = STATUS_CONFIG[status];
                   const Icon = config.icon;
                   return (
-                    <TabsTrigger key={status} value={status} className="rounded-xl px-6 font-bold text-xs gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all whitespace-nowrap">
+                    <TabsTrigger key={status} value={status} className="rounded-xl px-6 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary data-[state=active]:shadow-md transition-all font-bold text-xs gap-2 whitespace-nowrap">
                       <Icon className="h-3.5 w-3.5" />
                       {config.label}
-                      <span className="opacity-40 ml-1">{(statusCounts[status] || 0)}</span>
+                      <Badge variant="secondary" className="ml-1.5 text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400 font-black">{(statusCounts[status] || 0)}</Badge>
                     </TabsTrigger>
                   );
                 })}
@@ -253,12 +274,12 @@ export default function InventoryPage() {
             </Tabs>
 
             <div className="relative group max-w-2xl">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-primary transition-colors" />
               <Input
                 placeholder="Buscar por marca, modelo, año o placa..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="pl-12 h-14 rounded-2xl bg-muted/20 border-border/40 focus:bg-background transition-all text-base shadow-sm font-medium"
+                className="pl-12 h-12 rounded-xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 focus:border-primary/50 transition-all shadow-sm font-medium"
               />
             </div>
           </div>
@@ -273,17 +294,17 @@ export default function InventoryPage() {
                 <Car className="h-8 w-8 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
               </div>
               <div className="text-center">
-                <p className="text-xl font-bold font-headline">Cargando Inventario</p>
-                <p className="text-muted-foreground text-sm font-medium">Sincronizando con la nube...</p>
+                <p className="text-xl font-bold font-headline text-slate-900 dark:text-white">Cargando Inventario</p>
+                <p className="text-slate-500 text-sm font-medium italic">Sincronizando unidades...</p>
               </div>
             </div>
           ) : filteredVehicles.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-[50vh] border-2 border-dashed border-border/60 rounded-[3rem] bg-muted/5 p-12 text-center">
-              <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center mb-8">
-                <Car className="h-12 w-12 text-muted-foreground/30" />
+            <div className="flex flex-col items-center justify-center h-[50vh] border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[3rem] bg-slate-50/50 dark:bg-slate-900/50 p-12 text-center">
+              <div className="w-24 h-24 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-8">
+                <Car className="h-12 w-12 text-slate-300 dark:text-slate-700" />
               </div>
-              <h3 className="text-3xl font-black font-headline tracking-tight mb-2">Inventario Vacío</h3>
-              <p className="text-muted-foreground max-w-sm mx-auto font-medium text-lg leading-relaxed">
+              <h3 className="text-3xl font-black font-headline tracking-tight mb-2 text-slate-900 dark:text-white uppercase">Inventario Vacío</h3>
+              <p className="text-slate-500 max-w-sm mx-auto font-medium text-lg leading-relaxed">
                 {searchQuery ? `No encontramos unidades que coincidan con "${searchQuery}"` : 'No hay vehículos registrados en este concesionario todavía.'}
               </p>
               {!isReadOnly && !searchQuery && (
@@ -306,22 +327,22 @@ export default function InventoryPage() {
                 return (
                   <div 
                     key={vehicle.id} 
-                    className="group relative flex flex-col bg-card rounded-[2.5rem] border border-border/50 overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2"
+                    className="group relative flex flex-col bg-white dark:bg-slate-950 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2"
                   >
                     {/* Visual Badge (Top Left) */}
                     <div className="absolute top-4 left-4 z-20 pointer-events-none">
                        <div className={cn(
-                        "flex items-center gap-2 px-4 py-2 rounded-2xl backdrop-blur-xl border border-white/20 shadow-lg",
+                        "flex items-center gap-2 px-3 py-1.5 rounded-xl backdrop-blur-md border shadow-sm",
                         statusConf.color
                       )}>
-                        <StatusIcon className="h-4 w-4" />
-                        <span className="text-[10px] font-black uppercase tracking-widest">{statusConf.label}</span>
+                        <StatusIcon className="h-3.5 w-3.5" />
+                        <span className="text-[9px] font-black uppercase tracking-widest">{statusConf.label}</span>
                       </div>
                     </div>
 
                     {/* Image Container */}
                     <div 
-                      className="relative w-full pt-[65%] cursor-pointer overflow-hidden bg-muted"
+                      className="relative w-full pt-[65%] cursor-pointer overflow-hidden bg-slate-100 dark:bg-slate-900"
                       onClick={() => router.push(`/business/${slug}/inventory/${vehicle.id}`)}
                     >
                       {mainImage ? (
@@ -334,20 +355,23 @@ export default function InventoryPage() {
                         />
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <Car className="h-16 w-16 text-muted-foreground/10" />
+                          <Car className="h-16 w-16 text-slate-200 dark:text-slate-800" />
                         </div>
                       )}
                       
                       {/* Price Overlay (Bottom Right) */}
-                      <div className="absolute bottom-4 right-4 bg-background/90 backdrop-blur-md px-5 py-2 rounded-2xl border border-border/50 shadow-xl">
+                      <div className="absolute bottom-4 right-4 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md px-5 py-2 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xl">
                         <p className="text-xl font-black font-headline text-primary">
                           {formatCurrency(vehicle.precio_venta)}
                         </p>
                       </div>
 
                       {vehicle.es_consignacion && (
-                        <div className="absolute top-4 right-4 z-20">
-                          <Badge className="bg-purple-600/90 backdrop-blur-md text-white border-none px-3 py-1 rounded-xl text-[9px] font-black shadow-lg">CONSIGNACIÓN</Badge>
+                        <div className="absolute top-4 right-4 z-20 pointer-events-none">
+                          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl backdrop-blur-md bg-white/10 border border-white/20 text-white shadow-lg">
+                            <Sparkles className="h-3 w-3" />
+                            <span className="text-[9px] font-black uppercase tracking-widest">Consignación</span>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -357,16 +381,16 @@ export default function InventoryPage() {
                       {/* Title & Basics */}
                       <div className="space-y-1">
                         <div className="flex items-start justify-between">
-                          <h3 className="text-xl font-bold font-headline leading-tight tracking-tight line-clamp-1">
+                          <h3 className="text-xl font-bold font-headline leading-tight tracking-tight text-slate-900 dark:text-white line-clamp-1">
                             {vehicle.make} {vehicle.model}
                           </h3>
-                          <span className="text-sm font-black text-muted-foreground/60">{vehicle.year}</span>
+                          <span className="text-sm font-black text-slate-400">{vehicle.year}</span>
                         </div>
                         <div className="flex items-center gap-3">
                           {vehicle.placa && (
-                            <span className="text-[10px] font-black bg-muted px-2 py-0.5 rounded-lg tracking-widest text-muted-foreground">{vehicle.placa}</span>
+                            <span className="text-[10px] font-black bg-slate-100 dark:bg-slate-900 px-2 py-0.5 rounded-lg tracking-widest text-slate-500">{vehicle.placa}</span>
                           )}
-                          <span className="text-[10px] font-bold text-muted-foreground flex items-center gap-1">
+                          <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
                             <Gauge className="h-3 w-3" /> {vehicle.mileage?.toLocaleString()} KM
                           </span>
                         </div>
@@ -374,16 +398,16 @@ export default function InventoryPage() {
 
                       {/* Financial Insight (Only if allowed) */}
                       {effectiveCanSeeCosts && (
-                        <div className="grid grid-cols-2 gap-3 p-4 rounded-3xl bg-muted/30 border border-border/40 relative overflow-hidden">
+                        <div className="grid grid-cols-2 gap-3 p-4 rounded-3xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 relative overflow-hidden">
                           <div className="space-y-0.5">
-                            <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Inversión Total</p>
-                            <p className="font-bold text-sm tracking-tight">{formatCurrency(totalInvertido)}</p>
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Inversión Total</p>
+                            <p className="font-bold text-sm tracking-tight text-slate-700 dark:text-slate-300">{formatCurrency(totalInvertido)}</p>
                           </div>
-                          <div className="space-y-0.5 text-right border-l border-border/50 pl-3">
-                            <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Utilidad Est.</p>
+                          <div className="space-y-0.5 text-right border-l border-slate-200 dark:border-slate-800 pl-3">
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Utilidad Est.</p>
                             <p className={cn(
                               "font-black text-sm tracking-tight",
-                              ganancia >= 0 ? 'text-green-600' : 'text-red-500'
+                              ganancia >= 0 ? 'text-blue-600' : 'text-red-500'
                             )}>
                               {ganancia >= 0 ? '+' : ''}{formatCurrency(ganancia)}
                             </p>
@@ -408,31 +432,31 @@ export default function InventoryPage() {
                           <div className="grid grid-cols-3 gap-2">
                             <button 
                               onClick={(e) => { e.stopPropagation(); setEditingVehicle(vehicle); setDialogOpen(true); }}
-                              className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border border-border/50 bg-background hover:bg-muted/50 transition-colors group/tool"
+                              className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 transition-colors group/tool"
                             >
-                              <Pencil className="h-4 w-4 text-muted-foreground group-hover/tool:text-primary transition-colors" />
-                              <span className="text-[9px] font-black uppercase tracking-tighter">Editar</span>
+                              <Pencil className="h-4 w-4 text-slate-400 group-hover/tool:text-primary transition-colors" />
+                              <span className="text-[9px] font-black uppercase tracking-tighter text-slate-500">Editar</span>
                             </button>
                             <button 
                               onClick={(e) => { e.stopPropagation(); setCostsTarget(vehicle); }}
-                              className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border border-border/50 bg-background hover:bg-orange-50 transition-colors group/tool"
+                              className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-orange-50 transition-colors group/tool"
                             >
                               <DollarSign className="h-4 w-4 text-orange-500" />
-                              <span className="text-[9px] font-black uppercase tracking-tighter">Gastos</span>
+                              <span className="text-[9px] font-black uppercase tracking-tighter text-slate-500">Gastos</span>
                             </button>
                             <button 
                               onClick={(e) => { e.stopPropagation(); setInfoExtraTarget(vehicle); }}
-                              className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border border-border/50 bg-background hover:bg-blue-50 transition-colors group/tool"
+                              className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-blue-50 transition-colors group/tool"
                             >
                               <FileText className="h-4 w-4 text-blue-500" />
-                              <span className="text-[9px] font-black uppercase tracking-tighter">Legal</span>
+                              <span className="text-[9px] font-black uppercase tracking-tighter text-slate-500">Legal</span>
                             </button>
                           </div>
                         )}
                         
                         <Button
                           variant="ghost"
-                          className="w-full text-xs font-bold text-muted-foreground/60 hover:text-primary hover:bg-primary/5 rounded-xl h-9"
+                          className="w-full text-xs font-bold text-slate-400 hover:text-primary hover:bg-primary/5 rounded-xl h-9 transition-all"
                           onClick={(e) => { e.stopPropagation(); router.push(`/business/${slug}/inventory/${vehicle.id}`); }}
                         >
                           Ficha técnica y descripción completa
