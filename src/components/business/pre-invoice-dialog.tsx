@@ -44,7 +44,11 @@ export function PreInvoiceDialog({ open, onOpenChange, vehicle, concesionarioId,
   const negotiationInfo = useMemo(() => {
     if (!vehicle || !concesionario) return null;
     
-    const totalCost = (vehicle.costo_compra || 0) + (vehicle.gastos_adecuacion || []).reduce((a, g) => a + (g.monto || 0), 0);
+    const baseCost = vehicle.es_consignacion 
+      ? (vehicle.consignacion_info as any)?.owner_asking_price || 0 
+      : (vehicle.costo_compra || 0);
+    
+    const totalCost = baseCost + (vehicle.gastos_adecuacion || []).reduce((a, g) => a + (g.monto || 0), 0);
     const currentPrice = Number(precio) || 0;
     const minMargin = (concesionario.configuracion?.margen_minimo || 0) / 100;
     
@@ -167,7 +171,7 @@ export function PreInvoiceDialog({ open, onOpenChange, vehicle, concesionarioId,
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-md p-0 overflow-hidden rounded-[2rem] border-none shadow-2xl bg-background">
+        <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-md p-0 overflow-hidden rounded-[2rem] border-none shadow-2xl bg-background">
           <div className="bg-muted/30 p-6 space-y-6">
             <DialogHeader className="space-y-1">
               <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-2">

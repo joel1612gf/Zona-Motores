@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useBusinessAuth } from '@/context/business-auth-context';
 import { doc, getDoc, updateDoc, deleteDoc, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -28,6 +28,8 @@ import {
   DollarSign,
   TrendingUp,
   UserRound,
+  User,
+  Sparkles,
   PauseCircle,
   X,
   Info,
@@ -91,28 +93,29 @@ export default function VehicleDetailPage() {
   const isReadOnly = isVendorMode || permission === 'read';
   const effectiveCanSeeCosts = !isVendorMode && canSeeCosts;
 
-  useEffect(() => {
-    const loadVehicle = async () => {
-      if (!concesionario?.id || !vehicleId) return;
-      setIsLoading(true);
-      try {
-        const docRef = doc(firestore, 'concesionarios', concesionario.id, 'inventario', vehicleId);
-        const snap = await getDoc(docRef);
-        if (snap.exists()) {
-          setVehicle({ id: snap.id, ...snap.data() } as StockVehicle);
-        } else {
-          toast({ title: 'No encontrado', description: 'El vehículo no existe.', variant: 'destructive' });
-          router.push(`/business/${slug}/inventory`);
-        }
-      } catch (error) {
-        console.error('[VehicleDetail] Error loading:', error);
-        toast({ title: 'Error', description: 'No se pudo cargar la información.', variant: 'destructive' });
-      } finally {
-        setIsLoading(false);
+  const loadVehicle = useCallback(async (showLoading = true) => {
+    if (!concesionario?.id || !vehicleId) return;
+    if (showLoading) setIsLoading(true);
+    try {
+      const docRef = doc(firestore, 'concesionarios', concesionario.id, 'inventario', vehicleId);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        setVehicle({ id: snap.id, ...snap.data() } as StockVehicle);
+      } else {
+        toast({ title: 'No encontrado', description: 'El vehículo no existe.', variant: 'destructive' });
+        router.push(`/business/${slug}/inventory`);
       }
-    };
+    } catch (error) {
+      console.error('[VehicleDetail] Error loading:', error);
+      toast({ title: 'Error', description: 'No se pudo cargar la información.', variant: 'destructive' });
+    } finally {
+      if (showLoading) setIsLoading(false);
+    }
+  }, [concesionario?.id, firestore, router, slug, toast, vehicleId]);
+
+  useEffect(() => {
     loadVehicle();
-  }, [concesionario?.id, vehicleId]);
+  }, [loadVehicle]);
 
   useEffect(() => {
     if (!vehicle?.make || !vehicle?.model) return;
@@ -128,7 +131,7 @@ export default function VehicleDetailPage() {
       } catch { setMarketPrice(null); }
     };
     fetchPrice();
-  }, [vehicle]);
+  }, [vehicle?.make, vehicle?.model, vehicle?.year]);
 
   const handleDelete = async () => {
     if (!concesionario?.id || !vehicleId) return;
@@ -202,10 +205,12 @@ export default function VehicleDetailPage() {
               <h1 className="text-2xl md:text-3xl font-black font-headline tracking-tight">
                 {vehicle.make} {vehicle.model}
               </h1>
-              <Badge variant="outline" className={cn('h-7 px-3 text-[10px] font-black uppercase tracking-widest shrink-0', statusConf.color)}>
-                <StatusIcon className="h-3 w-3 mr-1.5" />
-                {statusConf.label}
-              </Badge>
+              {!isVendorMode && (
+                <Badge variant="outline" className={cn('h-7 px-3 text-[10px] font-black uppercase tracking-widest shrink-0', statusConf.color)}>
+                  <StatusIcon className="h-3 w-3 mr-1.5" />
+                  {statusConf.label}
+                </Badge>
+              )}
             </div>
             <p className="text-muted-foreground font-bold mt-1.5 flex items-center gap-2 text-xs uppercase tracking-tighter">
               <span className="bg-muted px-2 py-0.5 rounded-lg">{vehicle.year}</span>
@@ -241,19 +246,23 @@ export default function VehicleDetailPage() {
             </div>
           )}
 
-          <Separator orientation="vertical" className="h-8 mx-2 hidden md:block" />
+          {!isVendorMode && (
+            <>
+              <Separator orientation="vertical" className="h-8 mx-2 hidden md:block" />
 
-          <Select value={vehicle.estado_stock} onValueChange={(v) => handleStatusChange(v as StockStatus)} disabled={isReadOnly || isChangingStatus}>
-            <SelectTrigger className={cn("h-11 min-w-[160px] md:min-w-[180px] rounded-xl border-2 font-black uppercase text-[10px] tracking-widest", statusConf.color)}>
-              {isChangingStatus ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <StatusIcon className="h-4 w-4 mr-2" />}
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="rounded-xl border-none shadow-2xl">
-              {(Object.keys(STATUS_CONFIG) as StockStatus[]).map(s => (
-                <SelectItem key={s} value={s} className="rounded-lg font-bold uppercase text-[10px] tracking-widest my-1">{STATUS_CONFIG[s].label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+              <Select value={vehicle.estado_stock} onValueChange={(v) => handleStatusChange(v as StockStatus)} disabled={isReadOnly || isChangingStatus}>
+                <SelectTrigger className={cn("h-11 min-w-[160px] md:min-w-[180px] rounded-xl border-2 font-black uppercase text-[10px] tracking-widest", statusConf.color)}>
+                  {isChangingStatus ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <StatusIcon className="h-4 w-4 mr-2" />}
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-none shadow-2xl">
+                  {(Object.keys(STATUS_CONFIG) as StockStatus[]).map(s => (
+                    <SelectItem key={s} value={s} className="rounded-lg font-bold uppercase text-[10px] tracking-widest my-1">{STATUS_CONFIG[s].label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </>
+          )}
         </div>
       </div>
 
@@ -451,23 +460,76 @@ export default function VehicleDetailPage() {
           </div>
           
           {/* Assignment / Consignment */}
-          {(vehicle.es_consignacion || vehicle.asignado_a) && (
-            <div className="p-8 rounded-[2.5rem] border-2 border-dashed border-primary/20 bg-primary/5 space-y-4">
+          {!isVendorMode && (vehicle.es_consignacion || vehicle.asignado_a) && (
+            <div className="p-8 rounded-[2.5rem] border-2 border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 space-y-6">
               <div className="flex items-center gap-3">
                 <BookmarkCheck className="h-5 w-5 text-primary" />
                 <h3 className="text-xs font-black uppercase tracking-widest text-primary">Información de Gestión</h3>
               </div>
-              <div className="grid grid-cols-1 gap-4">
+              
+              <div className="flex flex-col gap-6">
                 {vehicle.es_consignacion && (
-                  <div className="space-y-1">
-                    <p className="text-[9px] font-bold text-muted-foreground uppercase">Consignación de Tercero</p>
-                    <p className="font-black text-sm">Comisión: {vehicle.consignacion_info?.comision_acordada}%</p>
+                  <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 space-y-4 shadow-sm relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full -mr-16 -mt-16 blur-3xl" />
+                    
+                    <div className="flex items-center gap-2 relative z-10">
+                      <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600">
+                        <User className="h-4 w-4" />
+                      </div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Datos del Propietario</p>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 gap-4 relative z-10">
+                      <div className="space-y-1">
+                        <p className="text-[9px] font-bold text-slate-400 uppercase">Nombre Completo</p>
+                        <p className="font-black text-sm text-slate-900 dark:text-white truncate">{ (vehicle.consignacion_info as any)?.owner_name || 'No especificado' }</p>
+                      </div>
+                      
+                      <div className="flex items-center justify-between gap-4 py-3 border-y border-slate-50 dark:border-slate-800">
+                        <div className="space-y-1">
+                          <p className="text-[9px] font-bold text-slate-400 uppercase">Teléfono</p>
+                          <p className="font-black text-sm text-slate-900 dark:text-white">{(vehicle.consignacion_info as any)?.owner_phone || 'No especificado'}</p>
+                        </div>
+                        {(vehicle.consignacion_info as any)?.owner_phone && (
+                          <Button size="sm" variant="outline" className="rounded-xl h-9 text-[10px] font-bold uppercase bg-blue-50/50 hover:bg-blue-100 border-blue-100 text-blue-600 dark:bg-blue-900/20 dark:border-blue-900/30 dark:text-blue-400" asChild>
+                            <a href={`https://wa.me/${(vehicle.consignacion_info as any)?.owner_phone.replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer">WhatsApp</a>
+                          </Button>
+                        )}
+                      </div>
+                      
+                      <div className="pt-1 flex items-center justify-between">
+                        <p className="text-[9px] font-bold text-slate-400 uppercase">Precio Pactado</p>
+                        <p className="font-black text-xl text-primary">{formatCurrency((vehicle.consignacion_info as any)?.owner_asking_price || 0)}</p>
+                      </div>
+                    </div>
                   </div>
                 )}
+                
                 {vehicle.asignado_a && (
-                  <div className="space-y-1">
-                    <p className="text-[9px] font-bold text-muted-foreground uppercase">Responsable Asignado</p>
-                    <p className="font-black text-sm">{staffList.find(s => s.id === vehicle.asignado_a)?.nombre || '—'}</p>
+                  <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 space-y-4 shadow-sm relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full -mr-16 -mt-16 blur-3xl" />
+                    
+                    <div className="flex items-center gap-2 relative z-10">
+                      <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-900/20 text-purple-600">
+                        <Sparkles className="h-4 w-4" />
+                      </div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Responsable Interno</p>
+                    </div>
+                    
+                    <div className="flex items-center justify-between gap-4 relative z-10">
+                      <div className="space-y-1">
+                        <p className="text-[9px] font-bold text-slate-400 uppercase">Vendedor Asignado</p>
+                        <p className="font-black text-sm text-slate-900 dark:text-white">
+                          {staffList.find(s => s.id === vehicle.asignado_a)?.nombre || 'Desconocido'}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Jerarquía</p>
+                        <Badge variant="secondary" className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-black text-[9px] uppercase tracking-tighter rounded-lg">
+                          {staffList.find(s => s.id === vehicle.asignado_a)?.rol || 'Staff'}
+                        </Badge>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -482,7 +544,7 @@ export default function VehicleDetailPage() {
         onOpenChange={setEditDialogOpen}
         editingVehicle={vehicle}
         concesionarioId={concesionario?.id || ''}
-        onSave={() => window.location.reload()}
+        onSave={() => loadVehicle(false)}
       />
 
       <PhotoSlider

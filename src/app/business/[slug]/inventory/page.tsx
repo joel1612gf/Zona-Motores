@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useBusinessAuth } from '@/context/business-auth-context';
 import { collection, getDocs, query, orderBy, updateDoc, doc } from 'firebase/firestore';
@@ -33,6 +33,8 @@ import {
   Gauge,
   Lock,
   Sparkles,
+  Filter,
+  Printer,
 } from 'lucide-react';
 import Image from 'next/image';
 import type { StockVehicle, StockStatus } from '@/lib/business-types';
@@ -40,7 +42,14 @@ import { VehicleFormDialog } from '@/components/business/vehicle-form-dialog';
 import { VehicleCostsDialog } from '@/components/business/vehicle-costs-dialog';
 import { VehicleInfoExtraDialog } from '@/components/business/vehicle-info-extra-dialog';
 import { PreInvoiceDialog } from '@/components/business/pre-invoice-dialog';
+import { VehicleDocumentsWizardDialog } from '@/components/business/vehicle-documents-wizard';
 import { formatCurrency, cn } from '@/lib/utils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const STATUS_CONFIG: Record<StockStatus, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
   privado_taller: { 
@@ -87,6 +96,7 @@ export default function InventoryPage() {
   const [editingVehicle, setEditingVehicle] = useState<StockVehicle | null>(null);
   const [costsTarget, setCostsTarget] = useState<StockVehicle | null>(null);
   const [infoExtraTarget, setInfoExtraTarget] = useState<StockVehicle | null>(null);
+  const [documentsTarget, setDocumentsTarget] = useState<StockVehicle | null>(null);
   const [preInvoiceTarget, setPreInvoiceTarget] = useState<StockVehicle | null>(null);
   const [vendorModeEnabled, setVendorModeEnabled] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -106,52 +116,52 @@ export default function InventoryPage() {
   const canToggleVendorMode = currentRole === 'dueno' || currentRole === 'encargado' || currentRole === 'secretario';
   const isVendorMode = currentRole === 'vendedor' || vendorModeEnabled;
 
+  const loadVehicles = useCallback(async (showLoading = true) => {
+    if (!concesionario?.id) return;
+    if (showLoading) setIsLoading(true);
+    try {
+      const ref = collection(firestore, 'concesionarios', concesionario.id, 'inventario');
+      const q = query(ref, orderBy('created_at', 'desc'));
+      const snap = await getDocs(q);
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as StockVehicle));
+      setVehicles(list);
+
+      // Cleanup: delete images of vehicles sold more than 30 days ago
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const toClean = list.filter(v =>
+        v.estado_stock === 'vendido' &&
+        v.images && v.images.length > 0 &&
+        v.fecha_venta && v.fecha_venta.toDate() < thirtyDaysAgo
+      );
+      if (toClean.length > 0) {
+        for (const v of toClean) {
+          try {
+            await Promise.all(v.images.map(img => {
+              try { return deleteObject(storageRef(storage, img.url)).catch(() => {}); }
+              catch { return Promise.resolve(); }
+            }));
+            await updateDoc(doc(firestore, 'concesionarios', concesionario!.id, 'inventario', v.id), { images: [] });
+          } catch (e) {
+            console.warn('[Inventory] Could not clean images for', v.id, e);
+          }
+        }
+        setVehicles(prev => prev.map(v =>
+          toClean.some(tc => tc.id === v.id) ? { ...v, images: [] } : v
+        ));
+      }
+    } catch (error) {
+      console.error('[Inventory] Error loading:', error);
+      toast({ title: 'Error', description: 'No se pudo cargar el inventario.', variant: 'destructive' });
+    } finally {
+      if (showLoading) setIsLoading(false);
+    }
+  }, [concesionario?.id, firestore, storage, toast]);
+
   // Load vehicles
   useEffect(() => {
-    const loadVehicles = async () => {
-      if (!concesionario?.id) return;
-      setIsLoading(true);
-      try {
-        const ref = collection(firestore, 'concesionarios', concesionario.id, 'inventario');
-        const q = query(ref, orderBy('created_at', 'desc'));
-        const snap = await getDocs(q);
-        const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as StockVehicle));
-        setVehicles(list);
-
-        // Cleanup: delete images of vehicles sold more than 30 days ago
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        const toClean = list.filter(v =>
-          v.estado_stock === 'vendido' &&
-          v.images && v.images.length > 0 &&
-          v.fecha_venta && v.fecha_venta.toDate() < thirtyDaysAgo
-        );
-        if (toClean.length > 0) {
-          for (const v of toClean) {
-            try {
-              await Promise.all(v.images.map(img => {
-                try { return deleteObject(storageRef(storage, img.url)).catch(() => {}); }
-                catch { return Promise.resolve(); }
-              }));
-              await updateDoc(doc(firestore, 'concesionarios', concesionario!.id, 'inventario', v.id), { images: [] });
-            } catch (e) {
-              console.warn('[Inventory] Could not clean images for', v.id, e);
-            }
-          }
-          setVehicles(prev => prev.map(v =>
-            toClean.some(tc => tc.id === v.id) ? { ...v, images: [] } : v
-          ));
-        }
-      } catch (error) {
-        console.error('[Inventory] Error loading:', error);
-        toast({ title: 'Error', description: 'No se pudo cargar el inventario.', variant: 'destructive' });
-      } finally {
-        setIsLoading(false);
-      }
-    };
     loadVehicles();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [concesionario?.id]);
+  }, [loadVehicles]);
 
   // Filter vehicles
   const filteredVehicles = useMemo(() => {
@@ -191,7 +201,7 @@ export default function InventoryPage() {
   };
 
   const handleSave = (_vehicleId?: string) => {
-    window.location.reload();
+    loadVehicles(false);
   };
 
   if (permission === false) {
@@ -212,6 +222,19 @@ export default function InventoryPage() {
 
   return (
     <div className="flex flex-col min-h-screen">
+      {/* ─── FLOATING VENDOR SWITCH (MOBILE ONLY) ─── */}
+      {canToggleVendorMode && (
+        <div className="md:hidden fixed top-4 right-4 z-[60] flex items-center gap-2 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-full border shadow-lg border-primary/20 scale-90">
+           <Switch
+            id="vendor-mode-mobile"
+            checked={vendorModeEnabled}
+            onCheckedChange={setVendorModeEnabled}
+            className="data-[state=checked]:bg-primary scale-75"
+          />
+          <Label htmlFor="vendor-mode-mobile" className="text-[9px] font-black uppercase tracking-tight text-slate-500 whitespace-nowrap">Modo Vendedor</Label>
+        </div>
+      )}
+
       {/* ─── FLOATING HEADER - SYNCED WITH PRODUCTS/DASHBOARD ─── */}
       <div className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl border-b border-border/50 -mx-6 px-6 py-4 mb-8">
         <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -220,29 +243,30 @@ export default function InventoryPage() {
               <div className="p-2.5 bg-primary rounded-2xl shadow-lg shadow-primary/25">
                 <Car className="h-6 w-6 text-primary-foreground" />
               </div>
-              <h1 className="text-3xl font-bold font-headline tracking-tight text-slate-900 dark:text-white">Inventario</h1>
+              <h1 className="text-2xl md:text-3xl font-bold font-headline tracking-tight text-slate-900 dark:text-white">Inventario</h1>
             </div>
-            <p className="text-muted-foreground font-medium flex items-center gap-2">
+            <p className="text-muted-foreground font-medium flex items-center gap-2 text-xs md:text-sm">
               <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
               {statusCounts.todos} Unidades en Stock
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-3">
+            {/* Desktop Switch */}
             {canToggleVendorMode && (
-              <div className="flex items-center space-x-3 bg-slate-50 dark:bg-slate-900 px-4 py-2 rounded-full border border-slate-200 dark:border-slate-800 shadow-sm transition-all hover:bg-slate-100">
+              <div className="hidden md:flex items-center space-x-3 bg-slate-50 dark:bg-slate-900 px-4 py-2 rounded-full border border-slate-200 dark:border-slate-800 shadow-sm transition-all hover:bg-slate-100">
                 <Switch
-                  id="vendor-mode"
+                  id="vendor-mode-desktop"
                   checked={vendorModeEnabled}
                   onCheckedChange={setVendorModeEnabled}
                   className="data-[state=checked]:bg-primary"
                 />
-                <Label htmlFor="vendor-mode" className="text-[10px] font-black uppercase tracking-widest cursor-pointer text-slate-500 whitespace-nowrap">Modo Vendedor</Label>
+                <Label htmlFor="vendor-mode-desktop" className="text-[10px] font-black uppercase tracking-widest cursor-pointer text-slate-500 whitespace-nowrap">Modo Vendedor</Label>
               </div>
             )}
             {!isReadOnly && (
-              <Button onClick={handleAddVehicle} className="rounded-xl font-bold shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90 transition-all active:scale-95 px-6 h-11">
-                <Plus className="h-5 w-5 mr-2" />
+              <Button onClick={handleAddVehicle} className="flex-1 md:flex-none rounded-xl font-bold shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90 transition-all active:scale-95 px-4 md:px-6 h-10 md:h-11 text-xs md:text-sm">
+                <Plus className="h-4 w-4 md:h-5 md:w-5 mr-1.5 md:mr-2" />
                 Nueva Unidad
               </Button>
             )}
@@ -250,11 +274,48 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      <div className="max-w-[1600px] mx-auto w-full space-y-8 px-2 sm:px-0">
+      <div className="max-w-[1600px] mx-auto w-full space-y-6 md:space-y-8 px-2 sm:px-0">
         {/* ─── FILTERS & SEARCH ─── */}
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_auto] gap-6 items-end">
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_auto] gap-4 md:gap-6 items-end">
           <div className="space-y-4 w-full">
-             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            {/* Mobile Filter Selector */}
+            <div className="md:hidden flex flex-col gap-3">
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">Mostrando:</p>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="w-full justify-between h-12 rounded-xl bg-white dark:bg-slate-950 font-bold border-2">
+                      <div className="flex items-center gap-2">
+                        {activeTab === 'todos' ? <Package className="h-4 w-4" /> : STATUS_CONFIG[activeTab as StockStatus]?.icon && <Filter className="h-4 w-4" />}
+                        <span className="capitalize">{activeTab === 'todos' ? 'Todos los vehículos' : STATUS_CONFIG[activeTab as StockStatus]?.label}</span>
+                      </div>
+                      <Badge variant="secondary" className="ml-2 bg-primary/10 text-primary border-none">
+                        {statusCounts[activeTab] || 0}
+                      </Badge>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-[calc(100vw-2rem)] rounded-xl p-2 shadow-2xl border-none">
+                    <DropdownMenuItem onClick={() => setActiveTab('todos')} className="rounded-lg h-11 font-bold gap-3">
+                      <Package className="h-4 w-4 text-slate-400" />
+                      Todos <span className="ml-auto text-muted-foreground">{statusCounts.todos}</span>
+                    </DropdownMenuItem>
+                    {(Object.keys(STATUS_CONFIG) as StockStatus[]).map(status => {
+                      const config = STATUS_CONFIG[status];
+                      const Icon = config.icon;
+                      return (
+                        <DropdownMenuItem key={status} onClick={() => setActiveTab(status)} className="rounded-lg h-11 font-bold gap-3">
+                          <Icon className="h-4 w-4 text-slate-400" />
+                          {config.label} <span className="ml-auto text-muted-foreground">{statusCounts[status] || 0}</span>
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+
+            {/* Desktop Tabs */}
+             <Tabs value={activeTab} onValueChange={setActiveTab} className="hidden md:block w-full">
               <TabsList className="bg-slate-100 dark:bg-slate-900 p-1 rounded-2xl h-12 border border-slate-200/60 dark:border-slate-800/60 shadow-inner w-full justify-start overflow-x-auto no-scrollbar">
                 <TabsTrigger value="todos" className="rounded-xl px-6 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary data-[state=active]:shadow-md transition-all font-bold text-xs gap-2">
                   Todos <Badge variant="secondary" className="ml-1.5 text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400 font-black">{statusCounts.todos || 0}</Badge>
@@ -273,13 +334,13 @@ export default function InventoryPage() {
               </TabsList>
             </Tabs>
 
-            <div className="relative group max-w-2xl">
+            <div className="relative group max-w-2xl px-1 md:px-0">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-primary transition-colors" />
               <Input
                 placeholder="Buscar por marca, modelo, año o placa..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="pl-12 h-12 rounded-xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 focus:border-primary/50 transition-all shadow-sm font-medium"
+                className="pl-12 h-11 md:h-12 rounded-xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 focus:border-primary/50 transition-all shadow-sm font-medium text-sm"
               />
             </div>
           </div>
@@ -299,12 +360,12 @@ export default function InventoryPage() {
               </div>
             </div>
           ) : filteredVehicles.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-[50vh] border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[3rem] bg-slate-50/50 dark:bg-slate-900/50 p-12 text-center">
+            <div className="flex flex-col items-center justify-center h-[50vh] border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[3rem] bg-slate-50/50 dark:bg-slate-900/50 p-12 text-center mx-2">
               <div className="w-24 h-24 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-8">
                 <Car className="h-12 w-12 text-slate-300 dark:text-slate-700" />
               </div>
-              <h3 className="text-3xl font-black font-headline tracking-tight mb-2 text-slate-900 dark:text-white uppercase">Inventario Vacío</h3>
-              <p className="text-slate-500 max-w-sm mx-auto font-medium text-lg leading-relaxed">
+              <h3 className="text-2xl md:text-3xl font-black font-headline tracking-tight mb-2 text-slate-900 dark:text-white uppercase">Inventario Vacío</h3>
+              <p className="text-slate-500 max-w-sm mx-auto font-medium text-base md:text-lg leading-relaxed">
                 {searchQuery ? `No encontramos unidades que coincidan con "${searchQuery}"` : 'No hay vehículos registrados en este concesionario todavía.'}
               </p>
               {!isReadOnly && !searchQuery && (
@@ -315,7 +376,7 @@ export default function InventoryPage() {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-8">
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-8 px-1">
               {filteredVehicles.map(vehicle => {
                 const statusConf = STATUS_CONFIG[vehicle.estado_stock];
                 const StatusIcon = statusConf.icon;
@@ -327,16 +388,16 @@ export default function InventoryPage() {
                 return (
                   <div 
                     key={vehicle.id} 
-                    className="group relative flex flex-col bg-white dark:bg-slate-950 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2"
+                    className="group relative flex flex-col bg-white dark:bg-slate-950 rounded-2xl sm:rounded-[2.5rem] border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-1 sm:hover:-translate-y-2"
                   >
                     {/* Visual Badge (Top Left) */}
-                    <div className="absolute top-4 left-4 z-20 pointer-events-none">
+                    <div className="absolute top-2 left-2 sm:top-4 sm:left-4 z-20 pointer-events-none">
                        <div className={cn(
-                        "flex items-center gap-2 px-3 py-1.5 rounded-xl backdrop-blur-md border shadow-sm",
+                        "flex items-center gap-1 sm:gap-2 px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl backdrop-blur-md border shadow-sm",
                         statusConf.color
                       )}>
-                        <StatusIcon className="h-3.5 w-3.5" />
-                        <span className="text-[9px] font-black uppercase tracking-widest">{statusConf.label}</span>
+                        <StatusIcon className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5" />
+                        <span className="text-[7px] sm:text-[9px] font-black uppercase tracking-widest">{statusConf.label}</span>
                       </div>
                     </div>
 
@@ -351,62 +412,62 @@ export default function InventoryPage() {
                           alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
                           fill
                           className="object-cover transition-transform duration-1000 group-hover:scale-110"
-                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                          sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
                         />
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <Car className="h-16 w-16 text-slate-200 dark:text-slate-800" />
+                          <Car className="h-10 w-10 sm:h-16 sm:w-16 text-slate-200 dark:text-slate-800" />
                         </div>
                       )}
                       
                       {/* Price Overlay (Bottom Right) */}
-                      <div className="absolute bottom-4 right-4 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md px-5 py-2 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xl">
-                        <p className="text-xl font-black font-headline text-primary">
+                      <div className="absolute bottom-2 right-2 sm:bottom-4 sm:right-4 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md px-2.5 py-1 sm:px-5 sm:py-2 rounded-xl sm:rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xl">
+                        <p className="text-[11px] sm:text-xl font-black font-headline text-primary leading-none sm:leading-normal">
                           {formatCurrency(vehicle.precio_venta)}
                         </p>
                       </div>
 
                       {vehicle.es_consignacion && (
-                        <div className="absolute top-4 right-4 z-20 pointer-events-none">
-                          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl backdrop-blur-md bg-white/10 border border-white/20 text-white shadow-lg">
-                            <Sparkles className="h-3 w-3" />
-                            <span className="text-[9px] font-black uppercase tracking-widest">Consignación</span>
+                        <div className="absolute top-2 right-2 sm:top-4 sm:right-4 z-20 pointer-events-none">
+                          <div className="flex items-center gap-1 sm:gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl backdrop-blur-md bg-white/10 border border-white/20 text-white shadow-lg">
+                            <Sparkles className="h-2.5 w-2.5 sm:h-3" />
+                            <span className="text-[7px] sm:text-[9px] font-black uppercase tracking-widest hidden xs:inline">Consignación</span>
                           </div>
                         </div>
                       )}
                     </div>
 
                     {/* Content Section */}
-                    <div className="p-6 flex-1 flex flex-col space-y-6">
+                    <div className="p-3 sm:p-6 flex-1 flex flex-col space-y-3 sm:space-y-6">
                       {/* Title & Basics */}
                       <div className="space-y-1">
-                        <div className="flex items-start justify-between">
-                          <h3 className="text-xl font-bold font-headline leading-tight tracking-tight text-slate-900 dark:text-white line-clamp-1">
+                        <div className="flex items-start justify-between gap-1">
+                          <h3 className="text-[13px] sm:text-xl font-bold font-headline leading-tight tracking-tight text-slate-900 dark:text-white line-clamp-2 sm:line-clamp-1">
                             {vehicle.make} {vehicle.model}
                           </h3>
-                          <span className="text-sm font-black text-slate-400">{vehicle.year}</span>
+                          <span className="text-[9px] sm:text-sm font-black text-slate-400 shrink-0">{vehicle.year}</span>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1.5 sm:gap-3 flex-wrap">
                           {vehicle.placa && (
-                            <span className="text-[10px] font-black bg-slate-100 dark:bg-slate-900 px-2 py-0.5 rounded-lg tracking-widest text-slate-500">{vehicle.placa}</span>
+                            <span className="text-[8px] sm:text-[10px] font-black bg-slate-100 dark:bg-slate-900 px-1.5 py-0.5 rounded sm:rounded-lg tracking-widest text-slate-500 uppercase">{vehicle.placa}</span>
                           )}
-                          <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
-                            <Gauge className="h-3 w-3" /> {vehicle.mileage?.toLocaleString()} KM
+                          <span className="text-[8px] sm:text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                            <Gauge className="h-2.5 w-2.5 sm:h-3 sm:w-3" /> {vehicle.mileage?.toLocaleString()} KM
                           </span>
                         </div>
                       </div>
 
                       {/* Financial Insight (Only if allowed) */}
                       {effectiveCanSeeCosts && (
-                        <div className="grid grid-cols-2 gap-3 p-4 rounded-3xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 relative overflow-hidden">
+                        <div className="grid grid-cols-2 gap-1 sm:gap-3 p-2 sm:p-4 rounded-xl sm:rounded-3xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 relative overflow-hidden">
                           <div className="space-y-0.5">
-                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Inversión Total</p>
-                            <p className="font-bold text-sm tracking-tight text-slate-700 dark:text-slate-300">{formatCurrency(totalInvertido)}</p>
+                            <p className="text-[7px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Inversión</p>
+                            <p className="font-bold text-[9px] sm:text-sm tracking-tight text-slate-700 dark:text-slate-300 truncate">{formatCurrency(totalInvertido)}</p>
                           </div>
-                          <div className="space-y-0.5 text-right border-l border-slate-200 dark:border-slate-800 pl-3">
-                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Utilidad Est.</p>
+                          <div className="space-y-0.5 text-right border-l border-slate-200 dark:border-slate-800 pl-1.5 sm:pl-3">
+                            <p className="text-[7px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Utilidad</p>
                             <p className={cn(
-                              "font-black text-sm tracking-tight",
+                              "font-black text-[9px] sm:text-sm tracking-tight truncate",
                               ganancia >= 0 ? 'text-blue-600' : 'text-red-500'
                             )}>
                               {ganancia >= 0 ? '+' : ''}{formatCurrency(ganancia)}
@@ -416,50 +477,68 @@ export default function InventoryPage() {
                       )}
 
                       {/* Primary Action */}
-                      <div className="space-y-4">
+                      <div className="space-y-2 sm:space-y-4 mt-auto">
                         {isVendorMode && vehicle.estado_stock !== 'reservado' && vehicle.estado_stock !== 'vendido' && (
                           <Button
                             onClick={(e) => { e.stopPropagation(); setPreInvoiceTarget(vehicle); }}
-                            className="w-full h-14 rounded-2xl bg-primary hover:bg-primary/90 text-white font-black text-base shadow-lg shadow-primary/20 transition-all active:scale-95 group/btn"
+                            className="w-full h-9 sm:h-14 rounded-xl sm:rounded-2xl bg-primary hover:bg-primary/90 text-white font-black text-[11px] sm:text-base shadow-lg shadow-primary/20 transition-all active:scale-95 group/btn"
                           >
-                            <Send className="h-5 w-5 mr-2 group-hover/btn:translate-x-1 group-hover/btn:-translate-y-1 transition-transform" />
-                            Enviar a Caja
+                            <Send className="h-3.5 w-3.5 sm:h-5 sm:w-5 mr-1.5 sm:mr-2 group-hover/btn:translate-x-1 group-hover/btn:-translate-y-1 transition-transform" />
+                            A Caja
                           </Button>
                         )}
 
-                        {/* Admin Tools Re-organized */}
+                        {/* Admin Tools */}
                         {!isReadOnly && (
-                          <div className="grid grid-cols-3 gap-2">
+                          <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                             <button 
                               onClick={(e) => { e.stopPropagation(); setEditingVehicle(vehicle); setDialogOpen(true); }}
-                              className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 transition-colors group/tool"
+                              className="flex flex-col items-center justify-center gap-1 p-1.5 sm:p-3 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 transition-colors group/tool"
                             >
-                              <Pencil className="h-4 w-4 text-slate-400 group-hover/tool:text-primary transition-colors" />
-                              <span className="text-[9px] font-black uppercase tracking-tighter text-slate-500">Editar</span>
+                              <Pencil className="h-3 w-3 sm:h-4 sm:w-4 text-slate-400 group-hover/tool:text-primary transition-colors" />
+                              <span className="text-[7px] sm:text-[9px] font-black uppercase tracking-tighter text-slate-500 hidden xs:inline">Editar</span>
                             </button>
                             <button 
                               onClick={(e) => { e.stopPropagation(); setCostsTarget(vehicle); }}
-                              className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-orange-50 transition-colors group/tool"
+                              className="flex flex-col items-center justify-center gap-1 p-2 sm:p-3 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-orange-50 transition-colors group/tool"
                             >
-                              <DollarSign className="h-4 w-4 text-orange-500" />
-                              <span className="text-[9px] font-black uppercase tracking-tighter text-slate-500">Gastos</span>
+                              <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-orange-500" />
+                              <span className="text-[7px] sm:text-[9px] font-black uppercase tracking-tighter text-slate-500 hidden xs:inline">Gastos</span>
                             </button>
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); setInfoExtraTarget(vehicle); }}
-                              className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-blue-50 transition-colors group/tool"
-                            >
-                              <FileText className="h-4 w-4 text-blue-500" />
-                              <span className="text-[9px] font-black uppercase tracking-tighter text-slate-500">Legal</span>
-                            </button>
+                            {(() => {
+                              const hasDocsReady = vehicle.info_extra?.serial_carroceria && vehicle.info_extra?.serial_motor && vehicle.info_extra?.cedula_propietario;
+                              return (
+                                <button 
+                                  onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    if (hasDocsReady) setDocumentsTarget(vehicle);
+                                    else setInfoExtraTarget(vehicle);
+                                  }}
+                                  className={cn(
+                                    "flex flex-col items-center justify-center gap-1 p-1.5 sm:p-3 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 transition-colors group/tool",
+                                    hasDocsReady ? "hover:bg-indigo-50" : "hover:bg-blue-50"
+                                  )}
+                                >
+                                  {hasDocsReady ? (
+                                    <Printer className="h-3 w-3 sm:h-4 sm:w-4 text-indigo-500" />
+                                  ) : (
+                                    <FileText className="h-3 w-3 sm:h-4 sm:w-4 text-blue-500" />
+                                  )}
+                                  <span className="text-[7px] sm:text-[9px] font-black uppercase tracking-tighter text-slate-500 hidden xs:inline">
+                                    {hasDocsReady ? "Docs" : "Legal"}
+                                  </span>
+                                </button>
+                              );
+                            })()}
                           </div>
                         )}
                         
                         <Button
                           variant="ghost"
-                          className="w-full text-xs font-bold text-slate-400 hover:text-primary hover:bg-primary/5 rounded-xl h-9 transition-all"
+                          className="w-full text-[9px] sm:text-xs font-bold text-slate-400 hover:text-primary hover:bg-primary/5 rounded-lg h-7 sm:h-9 transition-all truncate"
                           onClick={(e) => { e.stopPropagation(); router.push(`/business/${slug}/inventory/${vehicle.id}`); }}
                         >
-                          Ficha técnica y descripción completa
+                          Ver ficha
                         </Button>
                       </div>
                     </div>
@@ -493,7 +572,7 @@ export default function InventoryPage() {
       {infoExtraTarget && (
         <VehicleInfoExtraDialog
           open={!!infoExtraTarget}
-          onOpenChange={(open) => { if (!open) setInfoExtraTarget(null); }}
+          onOpenChange={(val) => { if (!val) setInfoExtraTarget(null); }}
           vehicle={infoExtraTarget}
           concesionarioId={concesionario?.id || ''}
           onSave={handleSave}
@@ -507,6 +586,18 @@ export default function InventoryPage() {
         concesionarioId={concesionario?.id || ''}
         onSave={handleSave}
       />
+
+      {documentsTarget && (
+        <VehicleDocumentsWizardDialog
+          open={!!documentsTarget}
+          onOpenChange={(val) => { if (!val) setDocumentsTarget(null); }}
+          vehicle={documentsTarget}
+          onEditLegalData={() => {
+            setDocumentsTarget(null);
+            setTimeout(() => setInfoExtraTarget(documentsTarget), 100);
+          }}
+        />
+      )}
     </div>
   );
 }

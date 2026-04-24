@@ -7,7 +7,7 @@ import Link from 'next/link';
 import type { Vehicle } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Star, Flame, Heart } from 'lucide-react';
+import { MapPin, Star, Flame, Heart, Sparkles } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { useFavorites } from '@/context/favorites-context';
@@ -32,6 +32,7 @@ export function VehicleCard({ vehicle, isFeatured = false }: { vehicle: Vehicle;
 
   const isPromoted = vehicle.promotionExpiresAt && vehicle.promotionExpiresAt.toDate() > new Date();
   const mainImage = vehicle.images?.[0];
+  const isConsignment = (vehicle as any).es_consignacion;
 
   return (
     <Card className={cn(
@@ -57,6 +58,12 @@ export function VehicleCard({ vehicle, isFeatured = false }: { vehicle: Vehicle;
                 <Badge className="border-transparent bg-orange-500 text-white hover:bg-orange-600 shadow-lg">
                   <Flame className="h-4 w-4 sm:-ml-1 sm:mr-1.5" />
                   <span className="hidden sm:inline">Promocionado</span>
+                </Badge>
+              )}
+              {isConsignment && (
+                <Badge variant="secondary" className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm border-primary/20 text-primary font-black uppercase text-[10px] tracking-widest shadow-lg">
+                  <Sparkles className="h-3 w-3 mr-1.5" />
+                  Consignación
                 </Badge>
               )}
             </div>

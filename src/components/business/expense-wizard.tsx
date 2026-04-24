@@ -33,7 +33,7 @@ import { cn } from '@/lib/utils';
 import type { Proveedor } from '@/lib/business-types';
 import { useCurrency } from '@/context/currency-context';
 import { ExpensePrint } from './expense-print';
-import { downloadPdf } from '@/lib/download-pdf';
+import { downloadPdf, printPdf } from '@/lib/download-pdf';
 
 interface ExpenseWizardProps {
   open: boolean;
@@ -255,12 +255,7 @@ export function ExpenseWizard({ open, onOpenChange }: ExpenseWizardProps) {
   const handlePrint = (mode: 'summary' | 'iva' | 'islr') => {
     setPrintMode(mode);
     setTimeout(() => {
-      const element = document.getElementById('expense-print-root');
-      if (element) {
-        element.style.display = 'block';
-        window.print();
-        element.style.display = 'none';
-      }
+      printPdf({ elementId: 'expense-print-root' });
     }, 250);
   };
 

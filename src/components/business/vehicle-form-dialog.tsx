@@ -365,6 +365,7 @@ export function VehicleFormDialog({ open, onOpenChange, editingVehicle, concesio
             status: estadoStock === 'publico_web' ? 'active' : 'paused',
             isDealership: true, dealershipId: concesionarioId, dealershipSlug: concesionario.slug,
             dealershipName: concesionario.nombre_empresa || concesionario.nombre,
+            es_consignacion: esConsignacion,
             location: (concesionario as any).ubicacion || null, updatedAt: serverTimestamp(),
             seller: { isSaaSBusiness: true, uid: concesionario.owner_uid },
           };
@@ -446,10 +447,10 @@ export function VehicleFormDialog({ open, onOpenChange, editingVehicle, concesio
                   </div>
                 </div>
                 
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <Button 
                     onClick={() => { setLegalModalOpen(true); }}
-                    className="flex-1 h-12 rounded-xl shadow-lg shadow-blue-500/20 bg-blue-600 hover:bg-blue-700 transition-all font-bold gap-2 text-xs uppercase"
+                    className="w-full sm:flex-1 h-12 rounded-xl shadow-lg shadow-blue-500/20 bg-blue-600 hover:bg-blue-700 transition-all font-bold gap-2 text-xs uppercase"
                   >
                     Vincular Documentos <ChevronRight className="w-4 h-4" />
                   </Button>

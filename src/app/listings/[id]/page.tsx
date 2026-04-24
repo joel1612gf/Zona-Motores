@@ -56,6 +56,7 @@ import {
   Play,
   Pause,
   Heart,
+  Sparkles,
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Map, AdvancedMarker, Pin } from '@vis.gl/react-google-maps';
@@ -405,6 +406,7 @@ function ListingDetailContent() {
     notFound();
   }
 
+  const isConsignment = (vehicle as any).es_consignacion;
   const isVehicleFavorite = isFavorite(vehicle.id);
 
   const handleFavoriteToggle = () => {
@@ -816,6 +818,14 @@ function ListingDetailContent() {
                         data-ai-hint={image.hint}
                         priority={index === 0}
                       />
+                      <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
+                        {isConsignment && (
+                          <Badge variant="secondary" className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm border-primary/20 text-primary font-black uppercase text-[10px] tracking-widest shadow-lg">
+                            <Sparkles className="h-3 w-3 mr-1.5" />
+                            Consignación
+                          </Badge>
+                        )}
+                      </div>
                       {vehicle.images.length > 1 && (
                         <Badge variant="secondary" className="absolute bottom-3 right-3 bg-background/80 backdrop-blur-sm shadow-lg text-xs font-medium">
                           {index + 1} / {vehicle.images.length}

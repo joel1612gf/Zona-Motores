@@ -71,7 +71,7 @@ import type { Proveedor, Producto, CompraItem, StockVehicle } from '@/lib/busine
 import { cn } from '@/lib/utils';
 import { ProductFormDialog } from '@/components/business/product-form-dialog';
 import { SupplierFormDialog } from '@/components/business/supplier-form-dialog';
-import { downloadPdf } from '@/lib/download-pdf';
+import { downloadPdf, printPdf } from '@/lib/download-pdf';
 import { LegalRetentionVoucher } from '@/components/business/legal-retention-voucher';
 import { VehicleInfoExtraDialog } from './vehicle-info-extra-dialog';
 
@@ -516,28 +516,16 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
     }
   };
 
-  const handlePrintSummary = () => {
+  const handlePrintSummary = async () => {
     setPrintMode('summary');
-    setTimeout(() => {
-      const element = document.getElementById('purchase-print-root');
-      if (element) {
-        element.style.display = 'block';
-        window.print();
-        element.style.display = 'none';
-      }
-    }, 250);
+    await new Promise(r => setTimeout(r, 100)); // wait for react to render
+    await printPdf({ elementId: 'purchase-print-root' });
   };
 
-  const handlePrintRetention = () => {
+  const handlePrintRetention = async () => {
     setPrintMode('retention');
-    setTimeout(() => {
-      const element = document.getElementById('purchase-print-root');
-      if (element) {
-        element.style.display = 'block';
-        window.print();
-        element.style.display = 'none';
-      }
-    }, 250);
+    await new Promise(r => setTimeout(r, 100)); // wait for react to render
+    await printPdf({ elementId: 'purchase-print-root' });
   };
 
   const handleDownload = async (mode: 'summary' | 'retention') => {
