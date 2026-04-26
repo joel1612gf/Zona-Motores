@@ -11,12 +11,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Car, User, DollarSign, ArrowRight, ArrowLeft, AlertCircle, CheckCircle2, Search, Lock, FileText, Receipt, Printer, Download, ShieldAlert, Package, LayoutGrid } from 'lucide-react';
+import { Loader2, Car, User, DollarSign, ArrowRight, ArrowLeft, AlertCircle, CheckCircle2, Search, Lock, FileText, Receipt, Printer, Download, ShieldAlert, Package, LayoutGrid, Plus, Trash2, Wallet, RefreshCw } from 'lucide-react';
 import type { StockVehicle } from '@/lib/business-types';
 import { ROLE_LABELS, verifySHA256 } from '@/lib/business-types';
 import { cn } from '@/lib/utils';
 import { SaleDocumentsPrint } from './sale-documents-print';
-import { PaymentEngine } from './payment-engine';
+import type { PaymentSplit } from '@/lib/finance-schemas';
 
 // ---------- Helpers ----------
 const padNum = (n: number, len: number) => String(n).padStart(len, '0');
@@ -36,7 +36,7 @@ function numberToWords(amount: number): string {
 }
 
 // ---------- Types ----------
-type WizardStep = 'tipo' | 'vehiculo' | 'cliente' | 'exito' | 'documentos';
+type WizardStep = 'tipo' | 'vehiculo' | 'precio' | 'cliente' | 'pago' | 'exito' | 'documentos';
 
 interface SaleFormDialogProps {
   open: boolean;
@@ -47,9 +47,9 @@ interface SaleFormDialogProps {
 }
 
 const STEP_LABELS: Record<WizardStep, string> = {
-  tipo: 'Tipo', vehiculo: 'Vehículo', cliente: 'Cliente', exito: 'Éxito', documentos: 'Documentos',
+  tipo: 'Tipo', vehiculo: 'Vehículo', precio: 'Precio', cliente: 'Cliente', pago: 'Pago', exito: 'Éxito', documentos: 'Documentos',
 };
-const WIZARD_STEPS: WizardStep[] = ['tipo', 'vehiculo', 'cliente', 'exito', 'documentos'];
+const WIZARD_STEPS: WizardStep[] = ['tipo', 'vehiculo', 'precio', 'cliente', 'pago', 'exito', 'documentos'];
 
 // ---------- Main Component ----------
 export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, preInvoice }: SaleFormDialogProps) {
@@ -65,6 +65,8 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
   const [isLoadingVehicles, setIsLoadingVehicles] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
+
+  // Step 3 - Price & Seller
   const [precioVenta, setPrecioVenta] = useState<number | ''>('');
   const [vendedorId, setVendedorId] = useState('');
   // Auth modal
@@ -76,7 +78,10 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
   const pinRefs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)];
   // Trade-in
   const [parteDePago, setParteDePago] = useState(false);
-  // Step 3 - Client
+
+  // Step 4 - Client
+  const [clientMode, setClientMode] = useState<'cargar' | 'crear'>('cargar');
+  const [clientSearchQuery, setClientSearchQuery] = useState('');
   const [compradorId, setCompradorId] = useState('');
   const [compradorNombre, setCompradorNombre] = useState('');
   const [compradorApellido, setCompradorApellido] = useState('');
@@ -85,14 +90,129 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
   const [compradorEmail, setCompradorEmail] = useState('');
   const [existingClients, setExistingClients] = useState<any[]>([]);
   const [isLoadingClients, setIsLoadingClients] = useState(false);
-  
-  // Payment Engine States
-  const [paymentSplits, setPaymentSplits] = useState<any[]>([]);
-  const [isPaymentValid, setIsPaymentValid] = useState(false);
-  
+
+  // Step 5 - Payment & Documentation
+  const [tipoDocumento, setTipoDocumento] = useState<'factura_fiscal' | 'nota_entrega'>('nota_entrega');
+  const [customTasaBcv, setCustomTasaBcv] = useState<number>(0);
+  const [isTasaLoading, setIsTasaLoading] = useState(false);
+  const [paymentMode, setPaymentMode] = useState<'completo' | 'combinado'>('completo');
+  const [paymentSplits, setPaymentSplits] = useState<PaymentSplit[]>([]);
   const [registrarCaja, setRegistrarCaja] = useState(true);
-  const [tipoDocumento, setTipoDocumento] = useState<'factura_fiscal' | 'nota_entrega'>('factura_fiscal');
   const [docsAlerta, setDocsAlerta] = useState(false);
+
+  // Exchange rate logic matching PurchaseOrderDialog
+  useEffect(() => {
+    if (!open || !concesionario) return;
+
+    const cfg = concesionario.configuracion as Record<string, any> | undefined;
+    const manualRate = typeof cfg?.tasa_cambio_manual === 'number' ? cfg.tasa_cambio_manual : 0;
+    const autoEnabled = cfg?.tasa_cambio_auto === true;
+
+    if (autoEnabled) {
+      setIsTasaLoading(true);
+      fetch('/api/business/exchange-rate')
+        .then(r => r.json())
+        .then(data => { 
+          if (data.tasa) setCustomTasaBcv(data.tasa); 
+          else setCustomTasaBcv(manualRate); 
+        })
+        .catch(() => setCustomTasaBcv(manualRate))
+        .finally(() => setIsTasaLoading(false));
+    } else {
+      setCustomTasaBcv(manualRate);
+    }
+  }, [open, concesionario]);
+
+  const effectiveTasa = Number(customTasaBcv) || 1;
+  const negotiatedPrice = Number(precioVenta) || 0;
+  
+  // Tax Calculations
+  // IVA is 16% of the negotiated price
+  const ivaAmount = tipoDocumento === 'factura_fiscal' ? negotiatedPrice * 0.16 : 0;
+  const baseFiscalDebt = negotiatedPrice + ivaAmount;
+
+  // IGTF (3%) logic:
+  // Legally, IGTF is 3% of the total amount handed over in foreign currency.
+  // If a user enters $100 in the split, the tax is $3.
+  const igtfAmount = useMemo(() => {
+    if (tipoDocumento !== 'factura_fiscal') return 0;
+    
+    return paymentSplits
+      .filter(s => s.currency === 'USD')
+      .reduce((acc, s) => acc + (s.amount * 0.03), 0);
+  }, [tipoDocumento, paymentSplits]);
+  
+  const totalOperacionUsd = baseFiscalDebt + igtfAmount;
+  const totalPaidUsd = paymentSplits.reduce((acc, s) => acc + (s.equivalentUsd || 0), 0);
+  const remainingUsd = Math.max(0, totalOperacionUsd - totalPaidUsd);
+  const isPaymentValid = remainingUsd < 0.01 && paymentSplits.length > 0;
+
+  const metodosPago = concesionario?.configuracion?.metodos_pago || ['Efectivo', 'Zelle'];
+  const metodosPagoDivisa = concesionario?.configuracion?.metodos_pago_divisa || [];
+
+  // Currency logic helpers
+  const isMethodDivisa = (method: string) => metodosPagoDivisa.includes(method);
+
+  const calculateSplit = (method: string, amount: number, rate: number): PaymentSplit => {
+    const isUSD = isMethodDivisa(method);
+    return {
+      method,
+      currency: isUSD ? 'USD' : 'VES',
+      amount: amount,
+      exchangeRate: rate,
+      igtfAmount: (isUSD && method === 'Efectivo') ? amount * 0.03 : 0,
+      equivalentUsd: isUSD ? amount : amount / rate
+    };
+  };
+
+  const handleAddSplit = () => {
+    const defaultMethod = metodosPago[0] || 'Efectivo';
+    setPaymentSplits([...paymentSplits, calculateSplit(defaultMethod, 0, effectiveTasa)]);
+  };
+
+  const handleUpdateSplit = (i: number, field: keyof PaymentSplit, val: any) => {
+    const newSplits = [...paymentSplits];
+    const current = newSplits[i];
+    let method = current.method;
+    let amount = current.amount;
+    if (field === 'method') {
+      method = val;
+      const isWasUSD = current.currency === 'USD';
+      const isNowUSD = isMethodDivisa(val);
+      if (isWasUSD && !isNowUSD) amount = amount * effectiveTasa;
+      else if (!isWasUSD && isNowUSD) amount = amount / effectiveTasa;
+    }
+    if (field === 'amount') amount = Number(val);
+    newSplits[i] = calculateSplit(method, amount, effectiveTasa);
+    setPaymentSplits(newSplits);
+  };
+
+  const handleSetFullPayment = (method: string) => {
+    const isUSD = isMethodDivisa(method);
+    
+    if (tipoDocumento === 'factura_fiscal') {
+      const baseFiscalDebt = negotiatedPrice * 1.16;
+      if (isUSD) {
+        // Correct recursive formula to cover net debt + tax:
+        // Debt (D) + Tax (0.03 * P) = Payment (P)
+        // D = P - 0.03P  =>  D = 0.97P  =>  P = D / 0.97
+        const totalToPay = baseFiscalDebt / 0.97;
+        setPaymentSplits([calculateSplit(method, totalToPay, effectiveTasa)]);
+      } else {
+        // In VES, IGTF is 0.
+        const amountVES = baseFiscalDebt * effectiveTasa;
+        setPaymentSplits([calculateSplit(method, amountVES, effectiveTasa)]);
+      }
+    } else {
+      // Nota de Entrega logic (No taxes)
+      const amount = isUSD ? negotiatedPrice : negotiatedPrice * effectiveTasa;
+      setPaymentSplits([calculateSplit(method, amount, effectiveTasa)]);
+    }
+  };
+
+  const handleRemoveSplit = (i: number) => {
+    setPaymentSplits(paymentSplits.filter((_, idx) => idx !== i));
+  };
 
   // Load clients
   useEffect(() => {
@@ -109,23 +229,32 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
     }
   }, [step, concesionarioId]);
 
-  const handleSelectClient = (clientId: string) => {
-    const client = existingClients.find(c => c.id === clientId);
-    if (client) {
-      setCompradorId(client.id);
-      setCompradorNombre(client.nombre || '');
-      setCompradorApellido(client.apellido || '');
-      setCompradorCedula(client.cedula_rif || '');
-      setCompradorTelefono(client.telefono || '');
-      setCompradorEmail(client.email || '');
-    }
+  const filteredClients = useMemo(() => {
+    if (!clientSearchQuery) return existingClients;
+    const low = clientSearchQuery.toLowerCase();
+    return existingClients.filter(c =>
+      `${c.nombre} ${c.apellido}`.toLowerCase().includes(low) ||
+      (c.cedula_rif || '').toLowerCase().includes(low) ||
+      (c.telefono || '').toLowerCase().includes(low)
+    );
+  }, [existingClients, clientSearchQuery]);
+
+  const handleSelectClient = (client: any) => {
+    setCompradorId(client.id);
+    setCompradorNombre(client.nombre || '');
+    setCompradorApellido(client.apellido || '');
+    setCompradorCedula(client.cedula_rif || '');
+    setCompradorTelefono(client.telefono || '');
+    setCompradorEmail(client.email || '');
+    setClientSearchQuery('');
   };
-  // Step 4 - Success
+
+  // Step 6 - Success
   const [isSaving, setIsSaving] = useState(false);
   const [numFactura, setNumFactura] = useState('');
   const [numControl, setNumControl] = useState('');
   const [ventaFecha, setVentaFecha] = useState<Date>(new Date());
-  // Step 5 - Docs
+  // Step 7 - Docs
   const [printDoc, setPrintDoc] = useState<'factura' | 'contrato' | 'acta' | null>(null);
 
   const selectedVehicle = useMemo(() => availableVehicles.find(v => v.id === selectedVehicleId), [availableVehicles, selectedVehicleId]);
@@ -137,37 +266,26 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
     });
   }, [availableVehicles, searchQuery]);
 
-  const metodosPago = concesionario?.configuracion?.metodos_pago || ['Efectivo', 'Zelle'];
-  const metodosPagoDivisa = concesionario?.configuracion?.metodos_pago_divisa || [];
-
   const negotiationInfo = useMemo(() => {
     if (!selectedVehicle) return null;
     const totalCost = (selectedVehicle.costo_compra || 0) + (selectedVehicle.gastos_adecuacion || []).reduce((a, g) => a + (g.monto || 0), 0);
     const currentPrice = Number(precioVenta) || 0;
     const minMargin = (concesionario?.configuracion.margen_minimo || 0) / 100;
-    
-    // Logic updated to match 2026 Fintech standard
+
     const v = vendedorId ? staffList.find(s => s.id === vendedorId) : null;
     const commType = v?.commission_type || 'total_price';
     const commPercentage = v?.commission_percentage ?? concesionario?.configuracion.estructura_comision ?? 0;
     const sellerComRate = commPercentage / 100;
 
-    // Calculation varies based on base (Price vs Profit)
-    // For Margin Validation, we use the effective commission
     let minPriceForMargin = 0;
     if (commType === 'total_price') {
       minPriceForMargin = totalCost === 0 ? 0 : (totalCost * (1 + minMargin)) / (1 - sellerComRate);
     } else {
-      // If commission is on profit: Price = Cost + Margin + CommOnProfit
-      // Price - Cost = Profit; Comm = Profit * rate
-      // Price = Cost + MarginProfit + (Price - Cost - MarginProfit) * rate? No, usually it's simpler:
-      // Profit = Price - Cost; NetProfit = Profit * (1 - rate)
-      // MinPrice = Cost * (1 + minMargin) / (1 - rate) -- wait, this depends on business policy
       minPriceForMargin = totalCost * (1 + minMargin);
     }
-    
-    const breakEvenPrice = totalCost; // Simple break-even
-    
+
+    const breakEvenPrice = totalCost;
+
     let status: 'ok' | 'low' | 'very_low' | 'critical' = 'ok';
     let message = '';
     if (currentPrice > 0) {
@@ -199,13 +317,13 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
     };
     fetchVehicles();
     resetAll();
-    
+
     if (preInvoice) {
       setTipoVenta(preInvoice.item_tipo);
       setSelectedVehicleId(preInvoice.item_id);
       setPrecioVenta(preInvoice.precio_negociado);
       setVendedorId(preInvoice.vendedor_id);
-      setStep('cliente'); // Skip directly to client/checkout
+      setStep('cliente'); // Redirect to client step as requested
     } else {
       if (currentRole === 'vendedor' && staff) setVendedorId(staff.id);
     }
@@ -215,28 +333,39 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
     setStep('tipo'); setTipoVenta(null); setSelectedVehicleId(''); setPrecioVenta(''); setVendedorId('');
     setSearchQuery(''); setAuthGranted(false); setAuthModalOpen(false); setAuthPin(['', '', '', '']); setAuthUserId('');
     setParteDePago(false); setCompradorNombre(''); setCompradorCedula(''); setCompradorTelefono('');
-    setPaymentSplits([]); setIsPaymentValid(false); setRegistrarCaja(true); setTipoDocumento('factura_fiscal'); setDocsAlerta(false);
-    setNumFactura(''); setNumControl(''); setPrintDoc(null);
+    setPaymentSplits([]); setRegistrarCaja(true); setTipoDocumento('nota_entrega'); setDocsAlerta(false);
+    setNumFactura(''); setNumControl(''); setPrintDoc(null); setClientMode('cargar'); setClientSearchQuery('');
+    setPaymentMode('completo');
   };
 
   const handleNext = () => {
     if (step === 'tipo') { if (tipoVenta === 'vehiculo') setStep('vehiculo'); }
     else if (step === 'vehiculo') {
       if (!selectedVehicleId) return;
+      setStep('precio');
+    }
+    else if (step === 'precio') {
       if (!vendedorId) { toast({ title: 'Vendedor requerido', variant: 'destructive' }); return; }
       if (!precioVenta) { toast({ title: 'Precio requerido', variant: 'destructive' }); return; }
       if (needsAuth && !authGranted) { setAuthModalOpen(true); return; }
       if (parteDePago) { toast({ title: 'Opción bloqueada', description: 'Desactiva "Vehículo como Parte de Pago" para continuar.', variant: 'destructive' }); return; }
-      // Check vehicle docs
+      setStep('cliente');
+    }
+    else if (step === 'cliente') {
+      if (!compradorNombre || !compradorCedula || !compradorTelefono) {
+        toast({ title: 'Datos faltantes', description: 'Nombre, Cédula y Teléfono son obligatorios.', variant: 'destructive' }); return;
+      }
       const hasSerial = !!(selectedVehicle?.info_extra?.serial_carroceria && selectedVehicle?.info_extra?.serial_motor);
       setDocsAlerta(!hasSerial);
-      setStep('cliente');
+      setStep('pago');
     }
   };
 
   const handleBack = () => {
     if (step === 'vehiculo') setStep('tipo');
-    else if (step === 'cliente') setStep('vehiculo');
+    else if (step === 'precio') setStep('vehiculo');
+    else if (step === 'cliente' && !preInvoice) setStep('precio');
+    else if (step === 'pago') setStep('cliente');
     else if (step === 'documentos') setStep('exito');
   };
 
@@ -251,8 +380,6 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
       if (ok) {
         setAuthGranted(true); setAuthModalOpen(false);
         toast({ title: '✓ Autorización concedida', description: `Autorizado por ${s.nombre}.` });
-        const hasSerial = !!(selectedVehicle?.info_extra?.serial_carroceria && selectedVehicle?.info_extra?.serial_motor);
-        setDocsAlerta(!hasSerial);
         setStep('cliente');
       } else {
         toast({ title: 'PIN incorrecto', variant: 'destructive' });
@@ -288,45 +415,27 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
       const metodoPagoStr = paymentSplits.map(s => s.method).join(', ');
       const totalIgtf = paymentSplits.reduce((acc, s) => acc + (s.igtfAmount || 0), 0);
 
-      // --- Handle Client ---
       let cId = compradorId;
       const clientsRef = collection(firestore, 'concesionarios', concesionarioId, 'clientes');
-      
-      // If no compradorId, search by cedula to avoid duplicates
+
       if (!cId && compradorCedula) {
         const q = query(clientsRef, where('cedula_rif', '==', compradorCedula));
         const snap = await getDocs(q);
-        if (!snap.empty) {
-          cId = snap.docs[0].id;
-        }
+        if (!snap.empty) cId = snap.docs[0].id;
       }
 
       const clientUpdateData = {
-        nombre: compradorNombre,
-        apellido: compradorApellido,
-        cedula_rif: compradorCedula,
-        telefono: compradorTelefono,
-        email: compradorEmail,
-        updated_at: serverTimestamp(),
-        total_invertido: (existingClients.find(c => c.id === cId)?.total_invertido || 0) + salePrice,
-        ultima_compra_fecha: serverTimestamp(),
-        traspaso_pendiente: true, // New vehicle purchase triggers transfer tracking
-        traspaso_fecha_limite: Timestamp.fromMillis(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+        nombre: compradorNombre, apellido: compradorApellido, cedula_rif: compradorCedula, telefono: compradorTelefono, email: compradorEmail,
+        updated_at: serverTimestamp(), total_invertido: (existingClients.find(c => c.id === cId)?.total_invertido || 0) + salePrice,
+        ultima_compra_fecha: serverTimestamp(), traspaso_pendiente: true, traspaso_fecha_limite: Timestamp.fromMillis(Date.now() + 30 * 24 * 60 * 60 * 1000),
       };
 
-      if (cId) {
-        await updateDoc(doc(firestore, 'concesionarios', concesionarioId, 'clientes', cId), clientUpdateData);
-      } else {
-        const newClient = await addDoc(clientsRef, {
-          ...clientUpdateData,
-          compras_ids: [],
-          tags: tipoVenta === 'vehiculo' ? ['Comprador de Carros'] : ['Comprador de Productos'],
-          created_at: serverTimestamp(),
-        });
+      if (cId) { await updateDoc(doc(firestore, 'concesionarios', concesionarioId, 'clientes', cId), clientUpdateData); }
+      else {
+        const newClient = await addDoc(clientsRef, { ...clientUpdateData, compras_ids: [], tags: ['Comprador de Carros'], created_at: serverTimestamp() });
         cId = newClient.id;
       }
 
-      // Invoice number
       const concDoc = await getDoc(doc(firestore, 'concesionarios', concesionarioId));
       const lastNum = (concDoc.data()?.configuracion?.ultimo_numero_factura_ventas || 0) as number;
       const next = lastNum + 1;
@@ -337,68 +446,42 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
       const ventaData = {
         vehiculo_id: vehicle.id,
         vehiculo_nombre: `${vehicle.year} ${vehicle.make} ${vehicle.model}${vehicle.placa ? ` (${vehicle.placa})` : ''}`,
-        comprador_id: cId,
-        comprador_nombre: `${compradorNombre} ${compradorApellido}`,
-        comprador_telefono: compradorTelefono,
-        comprador_cedula: compradorCedula,
-        vendedor_staff_id: vendedorId,
-        vendedor_nombre: vendedorNombre,
-        precio_venta: salePrice,
-        metodo_pago: metodoPagoStr,
-        pagos_combinados: paymentSplits,
-        igtf_total: totalIgtf,
-        comision_vendedor: comision,
-        ganancia_neta: gananciaNeta,
-        fecha: serverTimestamp(),
-        tipo_venta: 'vehiculo' as const,
-        tipo_documento_emitido: tipoDocumento,
-        numero_factura_venta: facN,
-        numero_control_venta: ctrlN,
+        comprador_id: cId, comprador_nombre: `${compradorNombre} ${compradorApellido}`, comprador_telefono: compradorTelefono, comprador_cedula: compradorCedula,
+        vendedor_staff_id: vendedorId, vendedor_nombre: vendedorNombre, precio_venta: salePrice, metodo_pago: metodoPagoStr, pagos_combinados: paymentSplits,
+        igtf_total: totalIgtf, comision_vendedor: comision, ganancia_neta: gananciaNeta, fecha: serverTimestamp(), tipo_venta: 'vehiculo' as const,
+        tipo_documento_emitido: tipoDocumento, numero_factura_venta: facN, numero_control_venta: ctrlN,
         vehiculo_info: {
-          make: vehicle.make,
-          model: vehicle.model,
-          year: vehicle.year,
-          placa: vehicle.placa || vehicle.info_extra?.placa || '',
-          exteriorColor: vehicle.exteriorColor || '',
-          serial_carroceria: vehicle.info_extra?.serial_carroceria || '',
-          serial_motor: vehicle.info_extra?.serial_motor || '',
-          clase: vehicle.info_extra?.clase || '',
-          tipo: vehicle.info_extra?.tipo || '',
-          mileage: vehicle.mileage || 0,
+          make: vehicle.make, model: vehicle.model, year: vehicle.year, placa: vehicle.placa || vehicle.info_extra?.placa || '',
+          exteriorColor: vehicle.exteriorColor || '', serial_carroceria: vehicle.info_extra?.serial_carroceria || '', serial_motor: vehicle.info_extra?.serial_motor || '',
+          clase: vehicle.info_extra?.clase || '', tipo: vehicle.info_extra?.tipo || '', mileage: vehicle.mileage || 0,
         },
       };
 
       const saleDoc = await addDoc(collection(firestore, 'concesionarios', concesionarioId, 'ventas'), ventaData);
-      
-      // Update client with sale ID
       await updateDoc(doc(firestore, 'concesionarios', concesionarioId, 'clientes', cId), {
         compras_ids: [...(existingClients.find(c => c.id === cId)?.compras_ids || []), saleDoc.id]
       });
-
       await updateDoc(doc(firestore, 'concesionarios', concesionarioId, 'inventario', vehicle.id), { estado_stock: 'vendido', fecha_venta: serverTimestamp(), updated_at: serverTimestamp() });
       await updateDoc(doc(firestore, 'concesionarios', concesionarioId), { 'configuracion.ultimo_numero_factura_ventas': next });
-      
+
       if (registrarCaja && staff) {
         await addDoc(collection(firestore, 'concesionarios', concesionarioId, 'caja'), {
           tipo: 'ingreso', monto: salePrice, descripcion: `Venta: ${ventaData.vehiculo_nombre}`,
           metodo_pago: metodoPagoStr, cajero_staff_id: staff.id, cajero_nombre: staff.nombre, fecha: serverTimestamp(),
         });
       }
-      
-      // Delete preInvoice if it exists
+
       if (preInvoice?.id) {
         const { deleteDoc } = await import('firebase/firestore');
         await deleteDoc(doc(firestore, 'concesionarios', concesionarioId, 'pre_invoices', preInvoice.id));
       }
-      
+
       setNumFactura(facN); setNumControl(ctrlN); setVentaFecha(now);
       setStep('exito'); onSave();
     } catch (e: any) {
       console.error(e);
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
-    } finally {
-      setIsSaving(false);
-    }
+    } finally { setIsSaving(false); }
   };
 
   const handlePrintDoc = (doc: 'factura' | 'contrato' | 'acta') => {
@@ -451,9 +534,6 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
     precioEnLetras: numberToWords(Number(precioVenta)),
   } : null;
 
-  const stepIdx = WIZARD_STEPS.indexOf(step);
-  const isLastStep = step === 'exito' || step === 'documentos';
-
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -469,8 +549,9 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
             {/* Step indicators */}
             {step !== 'exito' && (
               <div className="flex items-center gap-1">
-                {(['tipo', 'vehiculo', 'cliente', 'documentos'] as WizardStep[]).map((s, i) => {
-                  const idx = ['tipo', 'vehiculo', 'cliente', 'documentos'].indexOf(step);
+                {(['tipo', 'vehiculo', 'precio', 'cliente', 'pago', 'documentos'] as WizardStep[]).map((s, i) => {
+                  const wizardFlow = ['tipo', 'vehiculo', 'precio', 'cliente', 'pago', 'documentos'];
+                  const idx = wizardFlow.indexOf(step);
                   const done = i < idx;
                   const active = s === step;
                   return (
@@ -479,7 +560,7 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
                         {done ? '✓' : i + 1}
                       </div>
                       <span className={cn("text-[11px] hidden sm:block", active ? "text-primary font-semibold" : "text-muted-foreground")}>{STEP_LABELS[s]}</span>
-                      {i < 3 && <div className={cn("h-px w-4 sm:w-8", done ? "bg-primary/40" : "bg-muted")} />}
+                      {i < 5 && <div className={cn("h-px w-2 sm:w-4", done ? "bg-primary/40" : "bg-muted")} />}
                     </div>
                   );
                 })}
@@ -518,22 +599,18 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
                     </button>
                   ))}
                 </div>
-                <div className="p-3 rounded-xl bg-blue-50 border border-blue-100 text-xs text-blue-700 flex gap-2">
-                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                  <span>Por favor, procese una venta a la vez (primero el vehículo y luego productos adicionales si aplica).</span>
-                </div>
               </div>
             )}
 
-            {/* ═══ STEP 2: VEHÍCULO + PRECIO ═══ */}
+            {/* ═══ STEP 2: VEHÍCULO ═══ */}
             {step === 'vehiculo' && (
               <div className="space-y-5 animate-in fade-in slide-in-from-right-2 duration-300">
-                {/* Vehicle picker */}
+                <h3 className="font-semibold text-lg flex items-center gap-2"><Car className="h-5 w-5 text-primary" /> Seleccionar Vehículo</h3>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input placeholder="Buscar por marca, modelo o placa..." className="pl-9" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
                 </div>
-                <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto pr-1">
+                <div className="grid grid-cols-1 gap-2 max-h-72 overflow-y-auto pr-1">
                   {isLoadingVehicles ? (
                     <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
                   ) : filteredVehicles.length === 0 ? (
@@ -552,169 +629,250 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
                     </div>
                   ))}
                 </div>
-
-                {selectedVehicle && (
-                  <div className="space-y-4 border-t pt-4">
-                    {/* Seller */}
-                    <div className="space-y-1.5">
-                      <Label className="flex items-center gap-1.5"><User className="h-4 w-4" />Vendedor Responsable *</Label>
-                      <Select value={vendedorId} onValueChange={setVendedorId}>
-                        <SelectTrigger><SelectValue placeholder="Seleccionar vendedor..." /></SelectTrigger>
-                        <SelectContent>{staffList.filter(s => s.activo).map(s => <SelectItem key={s.id} value={s.id}>{s.nombre} ({ROLE_LABELS[s.rol]})</SelectItem>)}</SelectContent>
-                      </Select>
-                    </div>
-                    {/* Price */}
-                    <div className="flex flex-col items-center gap-2">
-                      <Label className="text-muted-foreground text-xs uppercase tracking-widest">Precio Final de Venta ($)</Label>
-                      <div className="relative w-full max-w-xs">
-                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-6 w-6 text-primary/40" />
-                        <Input type="number" value={precioVenta} onChange={e => { setPrecioVenta(e.target.value ? Number(e.target.value) : ''); setAuthGranted(false); }}
-                          className="h-16 text-3xl text-center font-bold pl-10 rounded-xl border-2 border-primary/20" placeholder="0" />
-                      </div>
-                    </div>
-                    {/* Margin alert */}
-                    {negotiationInfo?.message && (
-                      <div className={cn("p-3 rounded-xl flex items-start gap-2 border text-sm", negotiationInfo.status === 'critical' && "bg-red-50 text-red-800 border-red-200 animate-pulse", negotiationInfo.status === 'very_low' && "bg-orange-50 text-orange-800 border-orange-200", negotiationInfo.status === 'low' && "bg-yellow-50 text-yellow-800 border-yellow-200")}>
-                        {negotiationInfo.status === 'critical' ? <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" /> : <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />}
-                        <div>
-                          <p className="font-bold">{negotiationInfo.message}</p>
-                          {needsAuth && !authGranted && <p className="text-xs mt-1">Se requiere autorización de un Dueño/Encargado para continuar.</p>}
-                          {authGranted && <p className="text-xs mt-1 text-green-700 font-semibold">✓ Precio autorizado</p>}
-                        </div>
-                      </div>
-                    )}
-                    {/* Trade-in */}
-                    <div className="border rounded-xl overflow-hidden">
-                      <button onClick={() => setParteDePago(!parteDePago)} className="w-full p-3 flex items-center justify-between text-sm font-medium hover:bg-muted/30 transition-colors">
-                        <span className="flex items-center gap-2"><Car className="h-4 w-4 text-muted-foreground" />Vehículo como Parte de Pago</span>
-                        <span className="text-muted-foreground">{parteDePago ? '▲' : '▼'}</span>
-                      </button>
-                      {parteDePago && (
-                        <div className="p-3 border-t bg-amber-50/50 space-y-2">
-                          <div className="p-2 rounded-lg bg-amber-100 text-amber-800 text-xs flex gap-2">
-                            <Lock className="h-3 w-3 shrink-0 mt-0.5" />Esta función bloquea el avance hasta que sea implementada completamente.
-                          </div>
-                          <div className="grid grid-cols-3 gap-2">
-                            <div className="space-y-1"><Label className="text-xs">Marca</Label><Input className="h-8 text-sm" placeholder="Toyota" /></div>
-                            <div className="space-y-1"><Label className="text-xs">Modelo</Label><Input className="h-8 text-sm" placeholder="Corolla" /></div>
-                            <div className="space-y-1"><Label className="text-xs">Año</Label><Input className="h-8 text-sm" type="number" placeholder="2018" /></div>
-                          </div>
-                          <p className="text-xs text-amber-700 font-medium">⚠️ Valor estimado en stock: $— (en desarrollo)</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
-            {/* ═══ STEP 3: CLIENTE ═══ */}
-            {step === 'cliente' && (
+            {/* ═══ STEP 3: PRECIO Y VENDEDOR ═══ */}
+            {step === 'precio' && (
               <div className="space-y-5 animate-in fade-in slide-in-from-right-2 duration-300">
-                {/* Vehicle summary */}
+                <h3 className="font-semibold text-lg flex items-center gap-2"><DollarSign className="h-5 w-5 text-primary" /> Precio y Vendedor</h3>
                 {selectedVehicle && (
-                  <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl border text-sm">
+                  <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl border text-sm mb-4">
                     <Car className="h-5 w-5 text-primary shrink-0" />
                     <div className="flex-1">
                       <p className="font-bold">{selectedVehicle.year} {selectedVehicle.make} {selectedVehicle.model}</p>
-                      <p className="text-xs text-muted-foreground">{selectedVehicle.placa || selectedVehicle.info_extra?.placa || 'SIN PLACA'}</p>
+                      <p className="text-xs text-muted-foreground font-mono">{selectedVehicle.placa || 'SIN PLACA'}</p>
                     </div>
-                    <p className="font-headline text-primary font-bold">${Number(precioVenta).toLocaleString()}</p>
                   </div>
                 )}
-                
-                {/* Client selection/search */}
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2"><User className="h-4 w-4" />Buscar Cliente Existente</Label>
-                  <Select value={compradorId} onValueChange={handleSelectClient}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Seleccionar cliente (opcional)..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {isLoadingClients ? (
-                        <div className="flex items-center justify-center p-4"><Loader2 className="h-4 w-4 animate-spin" /></div>
-                      ) : (
-                        <>
-                          <SelectItem value="new">+ Nuevo Cliente</SelectItem>
-                          {existingClients.map(c => (
-                            <SelectItem key={c.id} value={c.id}>
-                              {c.nombre} {c.apellido} ({c.cedula_rif})
-                            </SelectItem>
-                          ))}
-                        </>
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Client data */}
-                <div className="space-y-3 p-4 rounded-2xl bg-muted/30 border">
-                  <h4 className="font-semibold flex items-center gap-2 text-sm"><User className="h-4 w-4" />Datos del Comprador</h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label>Nombre *</Label>
-                      <Input value={compradorNombre} onChange={e => { setCompradorNombre(e.target.value); setCompradorId(''); }} placeholder="Ej: María" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Apellido *</Label>
-                      <Input value={compradorApellido} onChange={e => { setCompradorApellido(e.target.value); setCompradorId(''); }} placeholder="Ej: López" />
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <Label className="flex items-center gap-1.5"><User className="h-4 w-4" />Vendedor Responsable *</Label>
+                    <Select value={vendedorId} onValueChange={setVendedorId}>
+                      <SelectTrigger><SelectValue placeholder="Seleccionar vendedor..." /></SelectTrigger>
+                      <SelectContent>{staffList.filter(s => s.activo).map(s => <SelectItem key={s.id} value={s.id}>{s.nombre} ({ROLE_LABELS[s.rol]})</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex flex-col items-center gap-2">
+                    <Label className="text-muted-foreground text-xs uppercase tracking-widest">Precio Final de Venta ($)</Label>
+                    <div className="relative w-full max-w-xs">
+                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-6 w-6 text-primary/40" />
+                      <Input type="number" value={precioVenta} onChange={e => { setPrecioVenta(e.target.value ? Number(e.target.value) : ''); setAuthGranted(false); }}
+                        className="h-16 text-3xl text-center font-bold pl-10 rounded-xl border-2 border-primary/20" placeholder="0" />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label>Cédula / RIF *</Label>
-                      <Input value={compradorCedula} onChange={e => { setCompradorCedula(e.target.value); setCompradorId(''); }} placeholder="V-00.000.000" />
+                  {negotiationInfo?.message && (
+                    <div className={cn("p-3 rounded-xl flex items-start gap-2 border text-sm", negotiationInfo.status === 'critical' && "bg-red-50 text-red-800 border-red-200 animate-pulse", negotiationInfo.status === 'very_low' && "bg-orange-50 text-orange-800 border-orange-200", negotiationInfo.status === 'low' && "bg-yellow-50 text-yellow-800 border-yellow-200")}>
+                      <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-bold">{negotiationInfo.message}</p>
+                        {needsAuth && !authGranted && <p className="text-xs mt-1">Se requiere autorización de un Dueño/Encargado para continuar.</p>}
+                        {authGranted && <p className="text-xs mt-1 text-green-700 font-semibold">✓ Precio autorizado</p>}
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Teléfono *</Label>
-                      <Input value={compradorTelefono} onChange={e => { setCompradorTelefono(e.target.value); setCompradorId(''); }} placeholder="0424..." />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Correo Electrónico</Label>
-                    <Input type="email" value={compradorEmail} onChange={e => { setCompradorEmail(e.target.value); setCompradorId(''); }} placeholder="cliente@email.com" />
-                  </div>
-                </div>
-                
-                {/* Document type */}
-                <div className="space-y-2">
-                  <Label>Tipo de Documento a Emitir</Label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {[{ id: 'factura_fiscal', label: 'Factura Fiscal', icon: Receipt, desc: 'Incluye Factura + Contrato + Acta' }, { id: 'nota_entrega', label: 'Nota de Entrega', icon: FileText, desc: 'Solo Contrato + Acta de Entrega' }].map(opt => (
-                      <button key={opt.id} onClick={() => setTipoDocumento(opt.id as any)}
-                        className={cn("p-3 rounded-xl border-2 text-left transition-all", tipoDocumento === opt.id ? "border-primary bg-primary/5" : "border-transparent bg-muted/40 hover:bg-muted/60")}>
-                        <opt.icon className={cn("h-5 w-5 mb-1", tipoDocumento === opt.id ? "text-primary" : "text-muted-foreground")} />
-                        <p className="font-semibold text-sm">{opt.label}</p>
-                        <p className="text-xs text-muted-foreground">{opt.desc}</p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                {/* Payment */}
-                <div className="space-y-4 pt-2">
-                  <PaymentEngine 
-                    totalUsd={Number(precioVenta) || 0}
-                    metodosPago={metodosPago}
-                    metodosPagoDivisa={metodosPagoDivisa}
-                    tasaBcv={concesionario?.configuracion?.tasa_cambio_manual || 36.2}
-                    onValidChange={(valid, splits) => {
-                      setIsPaymentValid(valid);
-                      setPaymentSplits(splits);
-                    }}
-                  />
-                  
-                  <div className="flex items-center gap-2 h-10 border-t pt-4">
-                    <Checkbox id="caja" checked={registrarCaja} onCheckedChange={c => setRegistrarCaja(c as boolean)} />
-                    <Label htmlFor="caja" className="text-sm font-medium cursor-pointer leading-tight">Registrar ingreso en Caja</Label>
-                  </div>
+                  )}
                 </div>
               </div>
             )}
 
-            {/* ═══ STEP 4: ÉXITO ═══ */}
+            {/* ═══ STEP 4: CLIENTE ═══ */}
+            {step === 'cliente' && (
+              <div className="space-y-5 animate-in fade-in slide-in-from-right-2 duration-300">
+                <div className="flex gap-2 p-1 bg-muted/40 rounded-2xl border mb-4">
+                  {[{ id: 'cargar', label: 'Cargar Cliente', icon: Search }, { id: 'crear', label: 'Crear Nuevo', icon: Plus }].map(m => (
+                    <button key={m.id} onClick={() => setClientMode(m.id as any)} className={cn("flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold transition-all", clientMode === m.id ? "bg-white shadow-md text-primary" : "text-muted-foreground hover:bg-muted/50")}>
+                      <m.icon className="h-4 w-4" />{m.label}
+                    </button>
+                  ))}
+                </div>
+                {clientMode === 'cargar' ? (
+                  <div className="space-y-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input placeholder="Nombre, cédula o teléfono..." className="pl-9 h-12" value={clientSearchQuery} onChange={e => setClientSearchQuery(e.target.value)} />
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto pr-1">
+                      {isLoadingClients ? (
+                        <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+                      ) : filteredClients.length === 0 ? (
+                        <div className="text-center p-8 text-muted-foreground text-sm border-2 border-dashed rounded-xl">Sin clientes encontrados</div>
+                      ) : filteredClients.map(c => (
+                        <div key={c.id} onClick={() => handleSelectClient(c)} className={cn("flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-all", compradorId === c.id ? "border-primary bg-primary/5 shadow-sm" : "border-transparent bg-muted/40 hover:bg-muted/60")}>
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">{c.nombre[0]}{c.apellido?.[0] || ''}</div>
+                            <div>
+                              <p className="font-bold text-sm">{c.nombre} {c.apellido}</p>
+                              <p className="text-xs text-muted-foreground">{c.cedula_rif} • {c.telefono}</p>
+                            </div>
+                          </div>
+                          {compradorId === c.id && <CheckCircle2 className="h-5 w-5 text-primary" />}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4 p-4 rounded-2xl bg-muted/30 border animate-in slide-in-from-bottom-2">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5"><Label>Nombre *</Label><Input value={compradorNombre} onChange={e => { setCompradorNombre(e.target.value); setCompradorId(''); }} placeholder="María" /></div>
+                      <div className="space-y-1.5"><Label>Apellido *</Label><Input value={compradorApellido} onChange={e => { setCompradorApellido(e.target.value); setCompradorId(''); }} placeholder="López" /></div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5"><Label>Cédula / RIF *</Label><Input value={compradorCedula} onChange={e => { setCompradorCedula(e.target.value); setCompradorId(''); }} placeholder="V-00.000.000" /></div>
+                      <div className="space-y-1.5"><Label>Teléfono *</Label><Input value={compradorTelefono} onChange={e => { setCompradorTelefono(e.target.value); setCompradorId(''); }} placeholder="0424..." /></div>
+                    </div>
+                    <div className="space-y-1.5"><Label>Correo Electrónico</Label><Input type="email" value={compradorEmail} onChange={e => { setCompradorEmail(e.target.value); setCompradorId(''); }} placeholder="cliente@email.com" /></div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ═══ STEP 5: PAGO Y DOCUMENTACIÓN ═══ */}
+            {step === 'pago' && (
+              <div className="space-y-5 animate-in fade-in slide-in-from-right-2 duration-300">
+                {/* Documentation Selector */}
+                <div className="flex gap-2 p-1 bg-muted/40 rounded-2xl border mb-4">
+                  {[{ id: 'nota_entrega', label: 'Nota de Entrega', icon: FileText }, { id: 'factura_fiscal', label: 'Factura Fiscal', icon: Receipt }].map(m => (
+                    <button key={m.id} onClick={() => setTipoDocumento(m.id as any)} className={cn("flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold transition-all", tipoDocumento === m.id ? "bg-white shadow-md text-primary" : "text-muted-foreground hover:bg-muted/50")}>
+                      <m.icon className="h-4 w-4" />{m.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Exchange Rate */}
+                <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-primary/5 border-2 border-primary/20 shadow-sm">
+                  <div className="flex-1">
+                    <Label className="text-xs font-bold uppercase text-primary flex items-center gap-1.5 mb-1">
+                      <RefreshCw className={cn("h-3 w-3", isTasaLoading && "animate-spin")} /> Tasa de Cambio (BCV)
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-mono font-medium text-muted-foreground bg-muted px-2 py-1 rounded">Bs/USD</span>
+                      <Input 
+                        type="number" 
+                        value={customTasaBcv || ''} 
+                        onChange={e => setCustomTasaBcv(parseFloat(e.target.value) || 0)} 
+                        className="h-9 w-32 text-sm font-bold border-primary/30 bg-white focus-visible:ring-primary shadow-inner" 
+                        placeholder="Ej: 36.50"
+                      />
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] text-muted-foreground uppercase font-semibold">Equivalencia Total</p>
+                    <p className="text-base font-bold text-primary">Bs. {(totalOperacionUsd * effectiveTasa).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                  </div>
+                </div>
+
+                {/* Payment Totals */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 rounded-2xl bg-muted/30 border text-center flex flex-col justify-center">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold">Total Operación</p>
+                    <p className="text-2xl font-headline text-primary">${totalOperacionUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    
+                    {tipoDocumento === 'factura_fiscal' && (
+                      <div className="mt-2 pt-2 border-t border-muted-foreground/10 space-y-0.5">
+                        <div className="flex justify-between text-[10px]">
+                          <span className="text-muted-foreground">Gravable:</span>
+                          <span className="font-mono">${negotiatedPrice.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between text-[10px]">
+                          <span className="text-muted-foreground">IVA (16%):</span>
+                          <span className="font-mono">${ivaAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex justify-between text-[10px]">
+                          <span className="text-muted-foreground">IGTF (3% Divisas):</span>
+                          <span className={cn("font-mono", igtfAmount > 0 ? "text-amber-600 font-bold" : "")}>
+                            ${igtfAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-4 rounded-2xl bg-muted/30 border text-center flex flex-col justify-center">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold">
+                      {totalPaidUsd > (totalOperacionUsd + 0.01) ? 'Vuelto a entregar' : 'Saldo Restante'}
+                    </p>
+                    <p className={cn("text-2xl font-headline transition-colors", totalPaidUsd > (totalOperacionUsd + 0.01) ? "text-red-600 font-bold" : remainingUsd > 0.01 ? "text-amber-500" : "text-green-600")}>
+                      ${Math.abs(totalOperacionUsd - totalPaidUsd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground font-mono">
+                      ≈ Bs. {Math.abs((totalOperacionUsd - totalPaidUsd) * effectiveTasa).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Payment Mode Selector */}
+                <div className="flex gap-2 mb-2">
+                  {[{ id: 'completo', label: 'Pago Completo', icon: Wallet }, { id: 'combinado', label: 'Pago Combinado', icon: LayoutGrid }].map(m => (
+                    <Button key={m.id} variant={paymentMode === m.id ? 'default' : 'outline'} className="flex-1 gap-2" onClick={() => {
+                      setPaymentMode(m.id as any);
+                      if (m.id === 'completo') {
+                        handleSetFullPayment(metodosPago[0] || 'Efectivo');
+                      } else { setPaymentSplits([]); }
+                    }}>
+                      <m.icon className="h-4 w-4" />{m.label}
+                    </Button>
+                  ))}
+                </div>
+
+                {/* Combined Payment Interface */}
+                <div className="space-y-3">
+                  {paymentMode === 'completo' && (
+                    <div className="p-3 rounded-xl bg-primary/5 border border-primary/20 space-y-3">
+                      <Label className="text-xs font-bold text-primary uppercase">Seleccionar Método de Pago</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {metodosPago.map(m => (
+                          <button key={m} onClick={() => handleSetFullPayment(m)}
+                            className={cn("p-3 rounded-lg border text-sm font-medium transition-all text-left flex flex-col", paymentSplits[0]?.method === m ? "bg-primary text-white border-primary shadow-md" : "bg-white hover:bg-muted/50")}>
+                            <span>{m}</span>
+                            <span className={cn("text-[10px]", paymentSplits[0]?.method === m ? "text-white/80" : "text-muted-foreground")}>
+                              {isMethodDivisa(m) ? 'Dólares (USD)' : 'Bolívares (VES)'}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {paymentSplits.map((split, i) => (
+                    <div key={i} className="flex items-end gap-2 p-3 rounded-xl bg-card border animate-in zoom-in-95">
+                      <div className="flex-1 space-y-1">
+                        <Label className="text-[10px] uppercase">Método</Label>
+                        <Select value={split.method} onValueChange={v => handleUpdateSplit(i, 'method', v)}>
+                          <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {metodosPago.map(m => <SelectItem key={m} value={m}>{m} ({isMethodDivisa(m) ? 'USD' : 'Bs'})</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="w-32 space-y-1">
+                        <Label className="text-[10px] uppercase">Monto ({split.currency})</Label>
+                        <div className="relative">
+                          <Input type="number" value={split.amount || ''} onChange={e => handleUpdateSplit(i, 'amount', e.target.value)} className="h-9 font-bold pr-8" />
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground">{split.currency === 'VES' ? 'Bs' : '$'}</span>
+                        </div>
+                      </div>
+                      {paymentMode === 'combinado' && (
+                        <Button variant="ghost" size="icon" className="h-9 w-9 text-red-500" onClick={() => handleRemoveSplit(i)}><Trash2 className="h-4 w-4" /></Button>
+                      )}
+                    </div>
+                  ))}
+
+                  {paymentMode === 'combinado' && remainingUsd > 0.01 && (
+                    <Button variant="outline" className="w-full border-dashed h-12 gap-2" onClick={handleAddSplit}>
+                      <Plus className="h-4 w-4" /> Agregar Método de Pago
+                    </Button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 h-10 border-t pt-4">
+                  <Checkbox id="caja" checked={registrarCaja} onCheckedChange={c => setRegistrarCaja(c as boolean)} />
+                  <Label htmlFor="caja" className="text-sm font-medium cursor-pointer leading-tight">Registrar ingreso en Caja de Control</Label>
+                </div>
+              </div>
+            )}
+
+            {/* ═══ STEP 6: ÉXITO ═══ */}
             {step === 'exito' && (
               <div className="flex flex-col items-center justify-center py-8 text-center animate-in fade-in zoom-in-95 duration-500">
-                {/* Animated check */}
                 <div className="relative mb-6">
                   <div className="w-24 h-24 rounded-full bg-blue-50 flex items-center justify-center shadow-lg shadow-blue-200/50">
                     <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
@@ -724,27 +882,26 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
                   </div>
                   <style>{`@keyframes checkmark { to { stroke-dashoffset: 0; } } @keyframes dash { from { stroke-dashoffset: 163.4; } to { stroke-dashoffset: 0; } }`}</style>
                 </div>
-                <h2 className="text-2xl font-bold font-headline mb-1">¡Transacción Exitosa!</h2>
-                <p className="text-muted-foreground mb-6">La venta fue registrada correctamente</p>
+                <h2 className="text-2xl font-bold font-headline mb-1">¡Venta Registrada!</h2>
+                <p className="text-muted-foreground mb-6">La transacción se procesó con éxito</p>
                 <div className="bg-muted/30 rounded-2xl border p-4 text-left w-full max-w-sm space-y-2 text-sm">
                   {tipoDocumento === 'factura_fiscal' && <div className="flex justify-between"><span className="text-muted-foreground">N° Factura</span><span className="font-mono font-bold">{numFactura}</span></div>}
-                  {tipoDocumento === 'factura_fiscal' && <div className="flex justify-between"><span className="text-muted-foreground">N° Control</span><span className="font-mono">{numControl}</span></div>}
                   <div className="flex justify-between"><span className="text-muted-foreground">Vehículo</span><span className="font-medium">{selectedVehicle?.make} {selectedVehicle?.model}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Cliente</span><span className="font-medium">{compradorNombre}</span></div>
-                  <div className="flex justify-between border-t pt-2"><span className="text-muted-foreground">Total Operación</span><span className="font-bold text-primary">${Number(precioVenta).toLocaleString()}</span></div>
+                  <div className="flex justify-between border-t pt-2"><span className="text-muted-foreground">Total Pagado</span><span className="font-bold text-primary">${totalPaidUsd.toLocaleString()}</span></div>
                 </div>
                 <Button onClick={() => setStep('documentos')} className="mt-6 px-8 shadow-lg shadow-primary/20">
-                  <FileText className="h-4 w-4 mr-2" /> Ver e Imprimir Documentos
+                  <FileText className="h-4 w-4 mr-2" /> Gestionar Documentos
                 </Button>
               </div>
             )}
 
-            {/* ═══ STEP 5: DOCUMENTOS ═══ */}
+            {/* ═══ STEP 7: DOCUMENTOS ═══ */}
             {step === 'documentos' && (
               <div className="space-y-4 animate-in fade-in slide-in-from-right-2 duration-300">
                 <div>
-                  <h3 className="font-semibold text-lg">Documentos de la Venta</h3>
-                  <p className="text-sm text-muted-foreground">Imprime o descarga cada documento legal</p>
+                  <h3 className="font-semibold text-lg">Panel de Documentación</h3>
+                  <p className="text-sm text-muted-foreground">Imprime los documentos legales de la operación</p>
                 </div>
                 <div className="space-y-3">
                   {[
@@ -767,9 +924,7 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
                     </div>
                   ))}
                 </div>
-                <Button variant="outline" className="w-full" onClick={() => onOpenChange(false)}>
-                  Cerrar Asistente
-                </Button>
+                <Button variant="outline" className="w-full" onClick={() => onOpenChange(false)}>Finalizar y Cerrar</Button>
               </div>
             )}
           </div>
@@ -782,12 +937,12 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
               </Button>
               <div className="flex gap-3">
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>Cancelar</Button>
-                {step !== 'cliente' ? (
-                  <Button type="button" onClick={handleNext} disabled={step === 'tipo' ? !tipoVenta : !selectedVehicleId} className="px-8">
+                {step !== 'pago' ? (
+                  <Button type="button" onClick={handleNext} disabled={step === 'tipo' ? !tipoVenta : step === 'vehiculo' ? !selectedVehicleId : false} className="px-8">
                     Siguiente <ArrowRight className="h-4 w-4 ml-2" />
                   </Button>
                 ) : (
-                  <Button type="button" onClick={handleSubmit} disabled={isSaving || !isPaymentValid || !compradorNombre} className="px-8">
+                  <Button type="button" onClick={handleSubmit} disabled={isSaving || !isPaymentValid} className="px-8">
                     {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
                     Cerrar Negocio
                   </Button>
@@ -824,7 +979,7 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
                 <div className="flex gap-2 justify-center">
                   {authPin.map((digit, i) => (
                     <Input key={i} ref={pinRefs[i]} value={digit} onChange={e => handlePinInput(i, e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Backspace' && !digit && i > 0) pinRefs[i-1].current?.focus(); }}
+                      onKeyDown={e => { if (e.key === 'Backspace' && !digit && i > 0) pinRefs[i - 1].current?.focus(); }}
                       maxLength={1} type="password" className="w-12 h-12 text-xl text-center font-mono" />
                   ))}
                 </div>
@@ -840,7 +995,6 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
         </DialogContent>
       </Dialog>
 
-      {/* Hidden document print templates */}
       <SaleDocumentsPrint printDoc={printDoc} concesionario={concesionario} ventaData={ventaDataForDocs} />
     </>
   );
