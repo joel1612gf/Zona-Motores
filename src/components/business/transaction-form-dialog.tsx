@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useBusinessAuth } from '@/context/business-auth-context';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, getDocs, query, orderBy } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import type { BankAccount } from '@/lib/business-types';
+import { BANK_ENTRY_METHOD_LABELS } from '@/lib/business-types';
 
 interface TransactionFormDialogProps {
   open: boolean;
@@ -30,8 +32,10 @@ export function TransactionFormDialog({ open, onOpenChange, concesionarioId, onS
   const [descripcion, setDescripcion] = useState('');
   const [metodoPago, setMetodoPago] = useState('');
   const [referenciaPago, setReferenciaPago] = useState('');
-
   const [isSaving, setIsSaving] = useState(false);
+
+  // Dynamic payment methods from bank accounts
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
 
   useEffect(() => {
     if (open) {
@@ -40,8 +44,43 @@ export function TransactionFormDialog({ open, onOpenChange, concesionarioId, onS
       setDescripcion('');
       setMetodoPago('');
       setReferenciaPago('');
+
+      // Load bank accounts for dynamic payment method selection
+      const loadAccounts = async () => {
+        try {
+          const snap = await getDocs(
+            query(
+              collection(firestore, 'concesionarios', concesionarioId, 'cuentas_bancarias'),
+              orderBy('orden', 'asc')
+            )
+          );
+          const active = snap.docs
+            .map(d => ({ id: d.id, ...d.data() } as BankAccount))
+            .filter(a => a.activa);
+          setBankAccounts(active);
+        } catch {
+          setBankAccounts([]);
+        }
+      };
+      loadAccounts();
     }
-  }, [open]);
+  }, [open, concesionarioId, firestore]);
+
+  // Build dynamic payment options from bank accounts
+  // Each option = "Método — NombreCuenta"
+  const paymentOptions: { value: string; label: string }[] = bankAccounts.length > 0
+    ? bankAccounts.flatMap(acc => {
+        const methods = tipo === 'ingreso'
+          ? Object.entries(acc.metodos_entrada || {}).filter(([, v]) => v).map(([k]) => k)
+          : Object.entries(acc.metodos_salida || {}).filter(([, v]) => v).map(([k]) => k);
+        return methods.map((method) => ({
+          value: `${method}__${acc.id}`,
+          label: `${BANK_ENTRY_METHOD_LABELS[method as keyof typeof BANK_ENTRY_METHOD_LABELS] ?? method} — ${acc.nombre}`,
+        }));
+      })
+    // Backward-compat fallback if no bank accounts configured
+    : (concesionario?.configuracion?.metodos_pago ?? ['Efectivo', 'Zelle', 'Pago Móvil', 'Transferencia'])
+        .map((m: string) => ({ value: m, label: m }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,7 +122,7 @@ export function TransactionFormDialog({ open, onOpenChange, concesionarioId, onS
     }
   };
 
-  const metodosPago = concesionario?.configuracion?.metodos_pago || ['Efectivo', 'Zelle', 'Pago Móvil', 'Transferencia'];
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -99,9 +138,12 @@ export function TransactionFormDialog({ open, onOpenChange, concesionarioId, onS
           
           <div className="space-y-3">
             <Label>Tipo de Movimiento</Label>
-            <RadioGroup 
-              value={tipo} 
-              onValueChange={(val) => setTipo(val as 'ingreso' | 'egreso')}
+          <RadioGroup
+              value={tipo}
+              onValueChange={(val) => {
+                setTipo(val as 'ingreso' | 'egreso');
+                setMetodoPago(''); // Reset method selection when direction changes
+              }}
               className="flex space-x-4"
             >
               <div className="flex items-center space-x-2">
@@ -142,11 +184,11 @@ export function TransactionFormDialog({ open, onOpenChange, concesionarioId, onS
             <Label htmlFor="metodo_pago">Método de Pago *</Label>
             <Select value={metodoPago} onValueChange={setMetodoPago}>
               <SelectTrigger id="metodo_pago">
-                <SelectValue placeholder="Seleccionar" />
+                <SelectValue placeholder="Seleccionar método" />
               </SelectTrigger>
               <SelectContent>
-                {Array.isArray(metodosPago) && metodosPago.map((m: string) => (
-                  <SelectItem key={m} value={m}>{m}</SelectItem>
+                {paymentOptions.map(({ value, label }) => (
+                  <SelectItem key={value} value={value}>{label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

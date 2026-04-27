@@ -52,6 +52,9 @@ export const paymentSplitSchema = z.object({
   exchangeRate: z.number().min(1, 'Tasa inválida'),
   igtfAmount: z.number().default(0), // Applicable if method is USD/Efectivo
   equivalentUsd: z.number().min(0),
+  // Bank account traceability (optional for backward-compat during migration)
+  accountId: z.string().optional(),
+  accountName: z.string().optional(),
 });
 
 export type PaymentSplit = z.infer<typeof paymentSplitSchema>;

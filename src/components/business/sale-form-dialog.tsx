@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useBusinessAuth } from '@/context/business-auth-context';
-import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp, getDoc, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp, getDoc, Timestamp, orderBy } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -11,12 +11,14 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Car, User, DollarSign, ArrowRight, ArrowLeft, AlertCircle, CheckCircle2, Search, Lock, FileText, Receipt, Printer, Download, ShieldAlert, Package, LayoutGrid, Plus, Trash2, Wallet, RefreshCw } from 'lucide-react';
-import type { StockVehicle } from '@/lib/business-types';
+import { Loader2, Car, User, DollarSign, ArrowRight, ArrowLeft, AlertCircle, CheckCircle2, Search, Lock, FileText, Receipt, Printer, Download, ShieldAlert, Package, LayoutGrid, Plus, Trash2, Wallet } from 'lucide-react';
+import type { StockVehicle, BankAccount } from '@/lib/business-types';
 import { ROLE_LABELS, verifySHA256 } from '@/lib/business-types';
 import { cn } from '@/lib/utils';
 import { SaleDocumentsPrint } from './sale-documents-print';
 import type { PaymentSplit } from '@/lib/finance-schemas';
+import { PaymentEngine } from './payment-engine';
+
 
 // ---------- Helpers ----------
 const padNum = (n: number, len: number) => String(n).padStart(len, '0');
@@ -93,59 +95,25 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
 
   // Step 5 - Payment & Documentation
   const [tipoDocumento, setTipoDocumento] = useState<'factura_fiscal' | 'nota_entrega'>('nota_entrega');
-  const [customTasaBcv, setCustomTasaBcv] = useState<number>(0);
-  const [isTasaLoading, setIsTasaLoading] = useState(false);
+  const [customTasaBcv, setCustomTasaBcv] = useState<number | ''>('');
   const [paymentMode, setPaymentMode] = useState<'completo' | 'combinado'>('completo');
   const [paymentSplits, setPaymentSplits] = useState<PaymentSplit[]>([]);
   const [registrarCaja, setRegistrarCaja] = useState(true);
   const [docsAlerta, setDocsAlerta] = useState(false);
 
-  // Exchange rate logic matching PurchaseOrderDialog
+  // Load exchange rate from config
   useEffect(() => {
-    if (!open || !concesionario) return;
-
-    const cfg = concesionario.configuracion as Record<string, any> | undefined;
-    const manualRate = typeof cfg?.tasa_cambio_manual === 'number' ? cfg.tasa_cambio_manual : 0;
-    const autoEnabled = cfg?.tasa_cambio_auto === true;
-
-    if (autoEnabled) {
-      setIsTasaLoading(true);
-      fetch('/api/business/exchange-rate')
-        .then(r => r.json())
-        .then(data => { 
-          if (data.tasa) setCustomTasaBcv(data.tasa); 
-          else setCustomTasaBcv(manualRate); 
-        })
-        .catch(() => setCustomTasaBcv(manualRate))
-        .finally(() => setIsTasaLoading(false));
-    } else {
-      setCustomTasaBcv(manualRate);
+    const tasa = concesionario?.configuracion?.tasa_cambio_manual;
+    if (tasa) {
+      setCustomTasaBcv(tasa);
     }
-  }, [open, concesionario]);
+  }, [concesionario?.configuracion?.tasa_cambio_manual]);
 
   const effectiveTasa = Number(customTasaBcv) || 1;
-  const negotiatedPrice = Number(precioVenta) || 0;
-  
-  // Tax Calculations
-  // IVA is 16% of the negotiated price
-  const ivaAmount = tipoDocumento === 'factura_fiscal' ? negotiatedPrice * 0.16 : 0;
-  const baseFiscalDebt = negotiatedPrice + ivaAmount;
-
-  // IGTF (3%) logic:
-  // Legally, IGTF is 3% of the total amount handed over in foreign currency.
-  // If a user enters $100 in the split, the tax is $3.
-  const igtfAmount = useMemo(() => {
-    if (tipoDocumento !== 'factura_fiscal') return 0;
-    
-    return paymentSplits
-      .filter(s => s.currency === 'USD')
-      .reduce((acc, s) => acc + (s.amount * 0.03), 0);
-  }, [tipoDocumento, paymentSplits]);
-  
-  const totalOperacionUsd = baseFiscalDebt + igtfAmount;
+  const totalOperacionUsd = Number(precioVenta) || 0;
   const totalPaidUsd = paymentSplits.reduce((acc, s) => acc + (s.equivalentUsd || 0), 0);
   const remainingUsd = Math.max(0, totalOperacionUsd - totalPaidUsd);
-  const isPaymentValid = remainingUsd < 0.01 && paymentSplits.length > 0;
+  const isPaymentValid = totalPaidUsd >= (totalOperacionUsd - 0.01) && paymentSplits.length > 0;
 
   const metodosPago = concesionario?.configuracion?.metodos_pago || ['Efectivo', 'Zelle'];
   const metodosPagoDivisa = concesionario?.configuracion?.metodos_pago_divisa || [];
@@ -167,7 +135,9 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
 
   const handleAddSplit = () => {
     const defaultMethod = metodosPago[0] || 'Efectivo';
-    setPaymentSplits([...paymentSplits, calculateSplit(defaultMethod, 0, effectiveTasa)]);
+    const isUSD = isMethodDivisa(defaultMethod);
+    const suggestedAmount = isUSD ? remainingUsd : remainingUsd * effectiveTasa;
+    setPaymentSplits([...paymentSplits, calculateSplit(defaultMethod, suggestedAmount, effectiveTasa)]);
   };
 
   const handleUpdateSplit = (i: number, field: keyof PaymentSplit, val: any) => {
@@ -189,25 +159,8 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
 
   const handleSetFullPayment = (method: string) => {
     const isUSD = isMethodDivisa(method);
-    
-    if (tipoDocumento === 'factura_fiscal') {
-      const baseFiscalDebt = negotiatedPrice * 1.16;
-      if (isUSD) {
-        // Correct recursive formula to cover net debt + tax:
-        // Debt (D) + Tax (0.03 * P) = Payment (P)
-        // D = P - 0.03P  =>  D = 0.97P  =>  P = D / 0.97
-        const totalToPay = baseFiscalDebt / 0.97;
-        setPaymentSplits([calculateSplit(method, totalToPay, effectiveTasa)]);
-      } else {
-        // In VES, IGTF is 0.
-        const amountVES = baseFiscalDebt * effectiveTasa;
-        setPaymentSplits([calculateSplit(method, amountVES, effectiveTasa)]);
-      }
-    } else {
-      // Nota de Entrega logic (No taxes)
-      const amount = isUSD ? negotiatedPrice : negotiatedPrice * effectiveTasa;
-      setPaymentSplits([calculateSplit(method, amount, effectiveTasa)]);
-    }
+    const amount = isUSD ? totalOperacionUsd : totalOperacionUsd * effectiveTasa;
+    setPaymentSplits([calculateSplit(method, amount, effectiveTasa)]);
   };
 
   const handleRemoveSplit = (i: number) => {
@@ -323,7 +276,7 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
       setSelectedVehicleId(preInvoice.item_id);
       setPrecioVenta(preInvoice.precio_negociado);
       setVendedorId(preInvoice.vendedor_id);
-      setStep('cliente'); // Redirect to client step as requested
+      setStep('pago'); // Skip directly to payment
     } else {
       if (currentRole === 'vendedor' && staff) setVendedorId(staff.id);
     }
@@ -335,7 +288,6 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
     setParteDePago(false); setCompradorNombre(''); setCompradorCedula(''); setCompradorTelefono('');
     setPaymentSplits([]); setRegistrarCaja(true); setTipoDocumento('nota_entrega'); setDocsAlerta(false);
     setNumFactura(''); setNumControl(''); setPrintDoc(null); setClientMode('cargar'); setClientSearchQuery('');
-    setPaymentMode('completo');
   };
 
   const handleNext = () => {
@@ -742,15 +694,15 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
                 <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-primary/5 border-2 border-primary/20 shadow-sm">
                   <div className="flex-1">
                     <Label className="text-xs font-bold uppercase text-primary flex items-center gap-1.5 mb-1">
-                      <RefreshCw className={cn("h-3 w-3", isTasaLoading && "animate-spin")} /> Tasa de Cambio (BCV)
+                      <DollarSign className="h-3 w-3" /> Tasa de Cambio (BCV)
                     </Label>
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-mono font-medium text-muted-foreground bg-muted px-2 py-1 rounded">Bs/USD</span>
-                      <Input 
-                        type="number" 
-                        value={customTasaBcv || ''} 
-                        onChange={e => setCustomTasaBcv(parseFloat(e.target.value) || 0)} 
-                        className="h-9 w-32 text-sm font-bold border-primary/30 bg-white focus-visible:ring-primary shadow-inner" 
+                      <Input
+                        type="number"
+                        value={customTasaBcv}
+                        onChange={e => setCustomTasaBcv(e.target.value ? Number(e.target.value) : '')}
+                        className="h-9 w-32 text-sm font-bold border-primary/30 bg-white focus-visible:ring-primary shadow-inner"
                         placeholder="Ej: 36.50"
                       />
                     </div>
@@ -763,38 +715,19 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
 
                 {/* Payment Totals */}
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 rounded-2xl bg-muted/30 border text-center flex flex-col justify-center">
+                  <div className="p-4 rounded-2xl bg-muted/30 border text-center">
                     <p className="text-[10px] text-muted-foreground uppercase font-bold">Total Operación</p>
-                    <p className="text-2xl font-headline text-primary">${totalOperacionUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                    
-                    {tipoDocumento === 'factura_fiscal' && (
-                      <div className="mt-2 pt-2 border-t border-muted-foreground/10 space-y-0.5">
-                        <div className="flex justify-between text-[10px]">
-                          <span className="text-muted-foreground">Gravable:</span>
-                          <span className="font-mono">${negotiatedPrice.toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between text-[10px]">
-                          <span className="text-muted-foreground">IVA (16%):</span>
-                          <span className="font-mono">${ivaAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                        </div>
-                        <div className="flex justify-between text-[10px]">
-                          <span className="text-muted-foreground">IGTF (3% Divisas):</span>
-                          <span className={cn("font-mono", igtfAmount > 0 ? "text-amber-600 font-bold" : "")}>
-                            ${igtfAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                          </span>
-                        </div>
-                      </div>
-                    )}
+                    <p className="text-2xl font-headline text-primary">${totalOperacionUsd.toLocaleString()}</p>
                   </div>
-                  <div className="p-4 rounded-2xl bg-muted/30 border text-center flex flex-col justify-center">
+                  <div className="p-4 rounded-2xl bg-muted/30 border text-center">
                     <p className="text-[10px] text-muted-foreground uppercase font-bold">
                       {totalPaidUsd > (totalOperacionUsd + 0.01) ? 'Vuelto a entregar' : 'Saldo Restante'}
                     </p>
                     <p className={cn("text-2xl font-headline transition-colors", totalPaidUsd > (totalOperacionUsd + 0.01) ? "text-red-600 font-bold" : remainingUsd > 0.01 ? "text-amber-500" : "text-green-600")}>
-                      ${Math.abs(totalOperacionUsd - totalPaidUsd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      ${Math.abs(totalOperacionUsd - totalPaidUsd).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </p>
                     <p className="text-[10px] text-muted-foreground font-mono">
-                      ≈ Bs. {Math.abs((totalOperacionUsd - totalPaidUsd) * effectiveTasa).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      ≈ Bs. {Math.abs((totalOperacionUsd - totalPaidUsd) * effectiveTasa).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </p>
                   </div>
                 </div>
@@ -986,7 +919,7 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
               </div>
             </div>
             <div className="flex gap-3 w-full">
-              <Button variant="outline" className="flex-1" onClick={() => { setAuthModalOpen(false); setAuthPin(['','','','']); }}>Cancelar</Button>
+              <Button variant="outline" className="flex-1" onClick={() => { setAuthModalOpen(false); setAuthPin(['', '', '', '']); }}>Cancelar</Button>
               <Button className="flex-1" onClick={handleVerifyPin} disabled={isVerifyingPin || !authUserId}>
                 {isVerifyingPin ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Autorizar'}
               </Button>

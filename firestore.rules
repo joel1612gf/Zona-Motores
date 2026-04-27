@@ -24,7 +24,14 @@ service cloud.firestore {
         allow write: if true;
       }
       
+      // First-level subcollections (vehicles, sales, caja, cuentas_bancarias, etc.)
       match /{subcollection}/{docId} {
+        allow read: if true;
+        allow write: if true;
+      }
+
+      // Second-level subcollections (e.g. cuentas_bancarias/{id}/transacciones/{txId})
+      match /{subcollection}/{docId}/{nested}/{nestedDocId} {
         allow read: if true;
         allow write: if true;
       }

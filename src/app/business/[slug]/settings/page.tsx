@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, Upload, Plus, X, Building2, MapPin, DollarSign, AlertCircle, CheckCircle2, Eye, EyeOff, Link as LinkIcon } from 'lucide-react';
+import { Loader2, Save, Upload, Plus, X, Building2, MapPin, DollarSign, AlertCircle, CheckCircle2, Eye, EyeOff, Link as LinkIcon, Landmark } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import Image from 'next/image';
@@ -40,9 +40,6 @@ export default function SettingsPage() {
   const [margenMinimo, setMargenMinimo] = useState(10);
   const [estructuraComision, setEstructuraComision] = useState(5);
   const [margenConsignacion, setMargenConsignacion] = useState(15);
-  const [metodosPago, setMetodosPago] = useState<string[]>([]);
-  const [metodosPagoDivisa, setMetodosPagoDivisa] = useState<string[]>([]);
-  const [nuevoMetodo, setNuevoMetodo] = useState('');
   const [tasaCambioManual, setTasaCambioManual] = useState('');
   const [tasaCambioAuto, setTasaCambioAuto] = useState(false);
   const [vehiculosExentosIva, setVehiculosExentosIva] = useState(true);
@@ -443,65 +440,26 @@ export default function SettingsPage() {
               <p className="text-xs text-muted-foreground">Este porcentaje se suma al precio original del dueño cuando le muestras el vehículo a un cliente.</p>
             </div>
 
-            {/* Payment Methods */}
-            <div className="space-y-3">
-              <div>
-                <Label>Métodos de Pago Aceptados</Label>
-                <p className="text-xs text-muted-foreground mt-0.5">Marca con el símbolo <span className="font-bold text-amber-600">$</span> los métodos que son en Dólares/Divisas (activará el IGTF 3% en facturas de ventas).</p>
+            {/* Payment Methods — Migrated to Banks Module */}
+            <div className="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-950/30 p-4 flex items-start gap-3">
+              <div className="p-2 bg-blue-500/10 rounded-lg shrink-0">
+                <Landmark className="h-5 w-5 text-blue-500" />
               </div>
-              <div className="flex flex-col gap-2">
-                {metodosPago.map(metodo => {
-                  const isDivisa = metodosPagoDivisa.includes(metodo);
-                  return (
-                    <div key={metodo} className="flex items-center justify-between p-2.5 rounded-lg border bg-muted/30">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">{metodo}</span>
-                        {isDivisa && (
-                          <span className="text-xs bg-amber-100 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5 font-semibold">$ Divisa</span>
-                        )}
-                        {!isDivisa && (
-                          <span className="text-xs bg-blue-50 text-blue-600 border border-blue-100 rounded-full px-2 py-0.5">Bs</span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {!isReadOnly && (
-                          <button
-                            onClick={() => toggleDivisaMetodo(metodo)}
-                            className={`text-xs px-2 py-1 rounded border transition-colors ${
-                              isDivisa 
-                                ? 'bg-amber-500 text-white border-amber-500 hover:bg-amber-600' 
-                                : 'bg-background text-muted-foreground border-border hover:border-amber-400 hover:text-amber-600'
-                            }`}
-                          >
-                            {isDivisa ? '✓ Divisa ($)' : 'Marcar como $'}
-                          </button>
-                        )}
-                        {!isReadOnly && (
-                          <button onClick={() => removeMetodoPago(metodo)} className="hover:text-destructive text-muted-foreground">
-                            <X className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-                {metodosPago.length === 0 && (
-                  <p className="text-sm text-muted-foreground">No hay métodos de pago configurados.</p>
-                )}
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-blue-800 dark:text-blue-300">
+                  Métodos de pago ahora en "Bancos"
+                </p>
+                <p className="text-xs text-blue-700 dark:text-blue-400 mt-0.5">
+                  La gestión de cuentas bancarias, efectivo y métodos de pago se movió al nuevo módulo <strong>Bancos</strong>.
+                  Desde allí puedes crear cuentas y habilitar los métodos disponibles para cobros y pagos.
+                </p>
               </div>
-              {!isReadOnly && (
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Nuevo método (ej: Zelle)"
-                    value={nuevoMetodo}
-                    onChange={e => setNuevoMetodo(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addMetodoPago())}
-                  />
-                  <Button variant="outline" size="icon" onClick={addMetodoPago} type="button">
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
+              <a
+                href={`/business/${concesionario?.slug}/banks`}
+                className="shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-800 transition-colors"
+              >
+                Ir a Bancos →
+              </a>
             </div>
 
             {/* IVA Exento Vehículos */}

@@ -28,7 +28,8 @@ export type BusinessModule =
   | 'commissions'
   | 'products'
   | 'reports'
-  | 'finance';
+  | 'finance'
+  | 'banks';
 
 /**
  * Permission matrix defining which modules each role can access.
@@ -52,6 +53,7 @@ export const ROLE_PERMISSIONS: Record<BusinessRole, Record<BusinessModule, Permi
     products: 'full',
     reports: 'full',
     finance: 'full',
+    banks: 'full',
   },
   encargado: {
     dashboard: 'read',
@@ -68,6 +70,7 @@ export const ROLE_PERMISSIONS: Record<BusinessRole, Record<BusinessModule, Permi
     products: 'full',
     reports: 'read',
     finance: 'full',
+    banks: 'full',
   },
   secretario: {
     dashboard: false,
@@ -84,6 +87,7 @@ export const ROLE_PERMISSIONS: Record<BusinessRole, Record<BusinessModule, Permi
     products: 'read',
     reports: false,
     finance: false,
+    banks: 'full',
   },
   vendedor: {
     dashboard: false,
@@ -100,6 +104,7 @@ export const ROLE_PERMISSIONS: Record<BusinessRole, Record<BusinessModule, Permi
     products: 'read',
     reports: false,
     finance: false,
+    banks: false,
   },
   cajero: {
     dashboard: false,
@@ -116,6 +121,7 @@ export const ROLE_PERMISSIONS: Record<BusinessRole, Record<BusinessModule, Permi
     products: 'read',
     reports: 'read',
     finance: 'read',
+    banks: false,
   },
 };
 
@@ -451,6 +457,113 @@ export type Compra = {
   porcentaje_retencion_aplicado?: number; // 75 or 100
   monto_retenido?: number; // iva_monto * porcentaje / 100
   neto_a_pagar?: number; // total_usd - monto_retenido
+};
+
+// ==================== BANKS MODULE ====================
+
+export type BankAccountType = 'banco_nacional' | 'efectivo_bs' | 'efectivo_usd' | 'zelle' | 'crypto' | 'otro';
+
+export const BANK_ACCOUNT_TYPE_LABELS: Record<BankAccountType, string> = {
+  banco_nacional: 'Banco Nacional',
+  efectivo_bs: 'Efectivo Bs',
+  efectivo_usd: 'Efectivo $',
+  zelle: 'Zelle',
+  crypto: 'Criptomoneda',
+  otro: 'Otro',
+};
+
+export const BANK_ACCOUNT_TYPE_ICONS: Record<BankAccountType, string> = {
+  banco_nacional: '🏦',
+  efectivo_bs: '💵',
+  efectivo_usd: '💵',
+  zelle: '⚡',
+  crypto: '₿',
+  otro: '💳',
+};
+
+/** Currency for each account type — banco_nacional and efectivo_bs are always VES, the rest USD */
+export const BANK_ACCOUNT_CURRENCY: Record<BankAccountType, 'USD' | 'VES'> = {
+  banco_nacional: 'VES',
+  efectivo_bs: 'VES',
+  efectivo_usd: 'USD',
+  zelle: 'USD',
+  crypto: 'USD',
+  otro: 'USD',
+};
+
+export type BankEntryMethod = 'pago_movil' | 'transferencia' | 'punto_de_venta' | 'efectivo_fisico' | 'zelle' | 'crypto';
+export type BankExitMethod = 'pago_movil' | 'transferencia' | 'efectivo_fisico' | 'zelle' | 'crypto';
+
+export const BANK_ENTRY_METHOD_LABELS: Record<BankEntryMethod, string> = {
+  pago_movil: 'Pago Móvil',
+  transferencia: 'Transferencia',
+  punto_de_venta: 'Punto de Venta',
+  efectivo_fisico: 'Efectivo Físico',
+  zelle: 'Zelle',
+  crypto: 'Criptomoneda',
+};
+
+export const BANK_EXIT_METHOD_LABELS: Record<BankExitMethod, string> = {
+  pago_movil: 'Pago Móvil',
+  transferencia: 'Transferencia',
+  efectivo_fisico: 'Efectivo Físico',
+  zelle: 'Zelle',
+  crypto: 'Criptomoneda',
+};
+
+export type BankAccount = {
+  id: string;
+  tipo: BankAccountType;
+  nombre: string;                  // Display name e.g. "BANCAMIGA", "EFECTIVO Bs"
+  banco?: string;                  // Bank name (for banco_nacional)
+  numero_cuenta?: string;          // Full account number
+  titular?: string;                // Account holder name
+  cedula_rif_titular?: string;     // Holder ID
+  telefono_pago_movil?: string;    // Phone number for Pago Móvil
+  moneda: 'USD' | 'VES';          // Derived from tipo, but stored explicitly
+  saldo_inicial: number;           // Opening balance set at creation
+  saldo_actual: number;            // Current balance (updated on each transaction)
+  // Enabled entry/exit methods
+  metodos_entrada: Partial<Record<BankEntryMethod, boolean>>;
+  metodos_salida: Partial<Record<BankExitMethod, boolean>>;
+  // IGTF flag: if true, payments received via this account trigger 3% IGTF on fiscal invoices
+  es_divisa: boolean;
+  activa: boolean;                 // Soft-delete
+  orden: number;                   // Display order in the grid
+  color?: string;                  // Optional accent color for card (hex)
+  notas?: string;                  // Internal notes
+  created_at: Timestamp;
+  updated_at?: Timestamp;
+};
+
+export type BankTransactionType = 'ingreso_venta' | 'egreso_compra' | 'ajuste_manual' | 'ingreso_manual' | 'egreso_manual';
+
+export const BANK_TRANSACTION_TYPE_LABELS: Record<BankTransactionType, string> = {
+  ingreso_venta: 'Ingreso por Venta',
+  egreso_compra: 'Egreso por Compra',
+  ajuste_manual: 'Ajuste de Saldo',
+  ingreso_manual: 'Ingreso Manual',
+  egreso_manual: 'Egreso Manual',
+};
+
+export type BankTransaction = {
+  id: string;
+  cuenta_id: string;               // Parent bank account ID
+  tipo: BankTransactionType;
+  flujo: 'entrada' | 'salida';     // Direction
+  monto: number;                   // Amount in account's currency
+  metodo_pago?: BankEntryMethod | BankExitMethod; // The payment method used
+  concepto: string;                // Description
+  referencia?: string;             // Reference number
+  // Links to other documents
+  venta_id?: string;
+  compra_id?: string;
+  // Audit
+  registrado_por_id: string;
+  registrado_por_nombre: string;
+  saldo_anterior: number;          // Balance before transaction
+  saldo_posterior: number;         // Balance after transaction
+  fecha: Timestamp;
 };
 
 // ==================== HELPERS ====================
