@@ -25,7 +25,7 @@ import {
 } from 'firebase/firestore';
 import {
   Landmark, TrendingUp, TrendingDown, Loader2, SlidersHorizontal,
-  ArrowUpCircle, ArrowDownCircle, RefreshCw, AlertCircle
+  ArrowUpCircle, ArrowDownCircle, RefreshCw, AlertCircle, Pencil
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { BankAccount, BankTransaction, BankEntryMethod, BankExitMethod } from '@/lib/business-types';
@@ -70,12 +70,13 @@ interface BankAccountDetailDialogProps {
   account: BankAccount | null;
   concesionarioId: string;
   onRefresh: () => void;
+  onEdit: (account: BankAccount) => void;
 }
 
 // ─── COMPONENT ─────────────────────────────────────────────────────────────
 
 export function BankAccountDetailDialog({
-  open, onOpenChange, account, concesionarioId, onRefresh
+  open, onOpenChange, account, concesionarioId, onRefresh, onEdit
 }: BankAccountDetailDialogProps) {
   const firestore = useFirestore();
   const { staff } = useBusinessAuth();
@@ -229,6 +230,14 @@ export function BankAccountDetailDialog({
               <Button
                 size="sm"
                 variant="outline"
+                className="h-8 rounded-xl text-xs gap-1.5 border-primary/20 text-primary hover:bg-primary/5"
+                onClick={() => onEdit(account)}
+              >
+                <Pencil className="h-3.5 w-3.5" /> Editar
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
                 className="h-8 rounded-xl text-xs gap-1.5 border-slate-300 dark:border-slate-700"
                 onClick={() => setAdjustOpen(true)}
               >
@@ -314,51 +323,38 @@ export function BankAccountDetailDialog({
               </ScrollArea>
             </TabsContent>
 
-            {/* CONFIG TAB — show enabled methods */}
+            {/* CONFIG TAB — show enabled status and currency info */}
             <TabsContent value="config" className="flex-1 overflow-auto mt-0 px-6 pb-6 pt-4">
-              <div className="space-y-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-widest text-green-600 dark:text-green-400 mb-2">
-                    ↓ Métodos de Entrada (Cobros)
-                  </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {ALL_ENTRY.map((m) => {
-                      const enabled = !!account.metodos_entrada[m];
-                      return (
-                        <div key={m} className={cn(
-                          'flex items-center gap-2 p-2.5 rounded-xl border text-xs',
-                          enabled
-                            ? 'border-green-300 bg-green-50 dark:bg-green-950/30 dark:border-green-800 text-green-700 dark:text-green-300 font-semibold'
-                            : 'border-slate-200 dark:border-slate-700 text-slate-400 line-through'
-                        )}>
-                          <div className={cn('w-1.5 h-1.5 rounded-full', enabled ? 'bg-green-500' : 'bg-slate-300')} />
-                          {BANK_ENTRY_METHOD_LABELS[m]}
-                        </div>
-                      );
-                    })}
+              <div className="space-y-6">
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-white/5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-bold">Estado de la Cuenta</p>
+                      <p className="text-xs text-muted-foreground">Define si la cuenta es visible en el sistema</p>
+                    </div>
+                    <Badge className={cn(
+                      'rounded-full px-3 py-1 font-black text-[10px]',
+                      account.activa ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-red-500/10 text-red-600 border-red-500/20'
+                    )} variant="outline">
+                      {account.activa ? 'ACTIVA' : 'INACTIVA'}
+                    </Badge>
+                  </div>
+                  <Separator className="opacity-50" />
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-bold">Moneda de Operación</p>
+                      <p className="text-xs text-muted-foreground">Moneda base para transacciones</p>
+                    </div>
+                    <Badge variant="outline" className="rounded-xl px-4 py-1 font-black bg-primary/5 border-primary/20 text-primary">
+                      {account.moneda}
+                    </Badge>
                   </div>
                 </div>
-                <Separator />
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-widest text-red-500 dark:text-red-400 mb-2">
-                    ↑ Métodos de Salida (Pagos)
+
+                <div className="p-4 rounded-2xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30">
+                  <p className="text-xs text-blue-700 dark:text-blue-300 font-medium leading-relaxed">
+                    ℹ️ Esta cuenta está configurada como un método de pago automático. Su nombre <strong>"{account.nombre}"</strong> aparecerá directamente en los asistentes de venta y compra.
                   </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {ALL_EXIT.map((m) => {
-                      const enabled = !!account.metodos_salida[m];
-                      return (
-                        <div key={m} className={cn(
-                          'flex items-center gap-2 p-2.5 rounded-xl border text-xs',
-                          enabled
-                            ? 'border-red-300 bg-red-50 dark:bg-red-950/30 dark:border-red-800 text-red-600 dark:text-red-300 font-semibold'
-                            : 'border-slate-200 dark:border-slate-700 text-slate-400 line-through'
-                        )}>
-                          <div className={cn('w-1.5 h-1.5 rounded-full', enabled ? 'bg-red-400' : 'bg-slate-300')} />
-                          {BANK_EXIT_METHOD_LABELS[m]}
-                        </div>
-                      );
-                    })}
-                  </div>
                 </div>
               </div>
             </TabsContent>

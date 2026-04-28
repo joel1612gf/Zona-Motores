@@ -20,7 +20,7 @@ const bankExitMethodSchema = z.enum([
 ]);
 
 export const bankAccountSchema = z.object({
-  tipo: z.enum(['banco_nacional', 'efectivo_bs', 'efectivo_usd', 'zelle', 'crypto', 'otro']),
+  tipo: z.enum(['banco', 'efectivo', 'otro']),
   nombre: z.string().min(1, 'El nombre es requerido').max(60),
   banco: z.string().max(60).optional(),
   numero_cuenta: z.string().max(30).optional(),

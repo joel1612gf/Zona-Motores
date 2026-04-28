@@ -461,33 +461,24 @@ export type Compra = {
 
 // ==================== BANKS MODULE ====================
 
-export type BankAccountType = 'banco_nacional' | 'efectivo_bs' | 'efectivo_usd' | 'zelle' | 'crypto' | 'otro';
+export type BankAccountType = 'banco' | 'efectivo' | 'otro';
 
 export const BANK_ACCOUNT_TYPE_LABELS: Record<BankAccountType, string> = {
-  banco_nacional: 'Banco Nacional',
-  efectivo_bs: 'Efectivo Bs',
-  efectivo_usd: 'Efectivo $',
-  zelle: 'Zelle',
-  crypto: 'Criptomoneda',
+  banco: 'Banco',
+  efectivo: 'Efectivo',
   otro: 'Otro',
 };
 
 export const BANK_ACCOUNT_TYPE_ICONS: Record<BankAccountType, string> = {
-  banco_nacional: '🏦',
-  efectivo_bs: '💵',
-  efectivo_usd: '💵',
-  zelle: '⚡',
-  crypto: '₿',
+  banco: '🏦',
+  efectivo: '💵',
   otro: '💳',
 };
 
-/** Currency for each account type — banco_nacional and efectivo_bs are always VES, the rest USD */
+/** Currency defaults — users can toggle in form */
 export const BANK_ACCOUNT_CURRENCY: Record<BankAccountType, 'USD' | 'VES'> = {
-  banco_nacional: 'VES',
-  efectivo_bs: 'VES',
-  efectivo_usd: 'USD',
-  zelle: 'USD',
-  crypto: 'USD',
+  banco: 'VES',
+  efectivo: 'USD',
   otro: 'USD',
 };
 

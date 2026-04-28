@@ -7,10 +7,11 @@ import {
   collection, query, orderBy, onSnapshot, getDocs
 } from 'firebase/firestore';
 import {
-  Landmark, Plus, RefreshCw, TrendingUp, TrendingDown, Wallet, AlertCircle
+  Landmark, Plus, RefreshCw, TrendingUp, TrendingDown, Wallet, AlertCircle, Banknote
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import type { BankAccount } from '@/lib/business-types';
 import { BankAccountCard } from '@/components/business/bank-account-card';
@@ -62,11 +63,29 @@ export default function BanksPage() {
     return () => unsub();
   }, [concesionario?.id, firestore, refreshKey]);
 
+  // ── UI FREEZE FIX ──────────────────────────────────────────────────────
+
+  useEffect(() => {
+    // If no main modals are open, force body pointer-events back to auto
+    // This fixes the issue where closing a dialog leaves the UI stuck
+    if (!formOpen && !detailOpen) {
+      const timeout = setTimeout(() => {
+        document.body.style.pointerEvents = 'auto';
+        document.body.style.overflow = 'auto';
+      }, 300); // Wait for animations to finish
+      return () => clearTimeout(timeout);
+    }
+  }, [formOpen, detailOpen]);
+
   const handleRefresh = () => setRefreshKey(k => k + 1);
 
   const handleEditAccount = (account: BankAccount) => {
-    setEditingAccount(account);
-    setFormOpen(true);
+    setDetailOpen(false);
+    // Force a small delay to ensure cleanup of previous modal
+    setTimeout(() => {
+      setEditingAccount(account);
+      setFormOpen(true);
+    }, 150);
   };
 
   const handleViewDetail = (account: BankAccount) => {
@@ -105,36 +124,34 @@ export default function BanksPage() {
     <div className="space-y-8">
 
       {/* ── HEADER ─────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-blue-500/10 rounded-2xl">
-            <Landmark className="h-7 w-7 text-blue-500" />
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        <div className="space-y-1">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-primary rounded-2xl shadow-lg shadow-primary/25">
+              <Landmark className="h-6 w-6 text-primary-foreground" />
+            </div>
+            <h1 className="text-3xl font-bold font-headline tracking-tight">Bancos</h1>
           </div>
-          <div>
-            <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-              Bancos
-            </h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Gestión de cuentas bancarias y tesorería
-            </p>
-          </div>
+          <p className="text-muted-foreground font-medium">
+            Gestión de cuentas bancarias y tesorería
+          </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3 w-full md:w-auto">
           <Button
-            variant="ghost"
+            variant="outline"
             size="icon"
-            className="rounded-xl"
+            className="rounded-2xl h-12 w-12 border-primary/20 hover:bg-primary/5"
             onClick={handleRefresh}
           >
-            <RefreshCw className="h-4 w-4" />
+            <RefreshCw className="h-5 w-5 text-primary" />
           </Button>
           {canManage && (
             <Button
               onClick={() => { setEditingAccount(null); setFormOpen(true); }}
-              className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white gap-2 shadow-lg shadow-blue-500/25"
+              className="flex-1 md:flex-none rounded-2xl h-12 px-6 shadow-xl shadow-primary/20 gap-2 font-bold"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-5 w-5" />
               Nueva Cuenta
             </Button>
           )}
@@ -143,45 +160,80 @@ export default function BanksPage() {
 
       {/* ── SUMMARY CARDS ──────────────────────────────────────────────── */}
       {!isLoading && accounts.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
           {/* Total USD */}
-          <div className="relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-blue-600 to-blue-800 text-white shadow-lg shadow-blue-500/20">
-            <div className="absolute -right-4 -top-4 w-24 h-24 bg-white/10 rounded-full" />
-            <p className="text-xs font-semibold uppercase tracking-widest text-blue-200 mb-1">Total USD</p>
-            <p className="text-3xl font-black tracking-tight">
-              {formatBalance(totalUSD, 'USD')}
-            </p>
-            <div className="flex items-center gap-1 mt-2 text-blue-200 text-xs">
-              <Wallet className="h-3.5 w-3.5" />
-              <span>{activeAccounts.filter(a => a.moneda === 'USD').length} cuentas activas</span>
-            </div>
-          </div>
+          <Card className="border-none shadow-2xl bg-gradient-to-br from-blue-600/90 to-blue-800/90 backdrop-blur-md ring-1 ring-white/20 rounded-[2rem] overflow-hidden group">
+            <CardContent className="p-6 relative">
+              {/* Background Icon Watermark */}
+              <Banknote className="absolute -right-4 -bottom-4 h-32 w-32 text-white/10 -rotate-12 group-hover:scale-110 group-hover:rotate-0 transition-all duration-700" />
+              
+              <div className="relative z-10">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
+                    <TrendingUp className="h-5 w-5 text-white" />
+                  </div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-blue-100/70">Total USD</p>
+                </div>
+                <p className="text-3xl font-black tracking-tight text-white mb-1">
+                  {formatBalance(totalUSD, 'USD')}
+                </p>
+                <div className="flex items-center gap-2 text-blue-100/80 text-xs font-medium">
+                  <div className="h-1 w-1 rounded-full bg-blue-300 animate-pulse" />
+                  {activeAccounts.filter(a => a.moneda === 'USD').length} cuentas activas
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Total VES */}
-          <div className="relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-emerald-600 to-emerald-800 text-white shadow-lg shadow-emerald-500/20">
-            <div className="absolute -right-4 -top-4 w-24 h-24 bg-white/10 rounded-full" />
-            <p className="text-xs font-semibold uppercase tracking-widest text-emerald-200 mb-1">Total Bolívares</p>
-            <p className="text-3xl font-black tracking-tight">
-              {formatBalance(totalVES, 'VES')}
-            </p>
-            <div className="flex items-center gap-1 mt-2 text-emerald-200 text-xs">
-              <Wallet className="h-3.5 w-3.5" />
-              <span>{activeAccounts.filter(a => a.moneda === 'VES').length} cuentas activas</span>
-            </div>
-          </div>
+          <Card className="border-none shadow-2xl bg-card/60 backdrop-blur-md ring-1 ring-border rounded-[2rem] overflow-hidden group">
+            <CardContent className="p-6 relative">
+              {/* Background Icon Watermark */}
+              <Landmark className="absolute -right-4 -bottom-4 h-32 w-32 text-primary/5 -rotate-12 group-hover:scale-110 group-hover:rotate-0 transition-all duration-700" />
+
+              <div className="relative z-10">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="p-2 bg-primary/10 rounded-xl">
+                    <TrendingDown className="h-5 w-5 text-primary" />
+                  </div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Total Bolívares</p>
+                </div>
+                <p className="text-3xl font-black tracking-tight text-primary mb-1">
+                  {formatBalance(totalVES, 'VES')}
+                </p>
+                <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium">
+                  <div className="h-1 w-1 rounded-full bg-emerald-500 animate-pulse" />
+                  {activeAccounts.filter(a => a.moneda === 'VES').length} cuentas activas
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Total accounts */}
-          <div className="relative overflow-hidden rounded-2xl p-5 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white/40 dark:border-white/10 shadow-lg">
-            <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-1">Cuentas Totales</p>
-            <p className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">
-              {accounts.length}
-            </p>
-            <div className="flex items-center gap-3 mt-2 text-xs text-slate-500">
-              <span className="text-green-600 font-semibold">{activeAccounts.length} activas</span>
-              <span>·</span>
-              <span className="text-slate-400">{accounts.length - activeAccounts.length} inactivas</span>
-            </div>
-          </div>
+          <Card className="border-none shadow-2xl bg-card/60 backdrop-blur-md ring-1 ring-border rounded-[2rem] overflow-hidden group">
+            <CardContent className="p-6 relative">
+              <div className="absolute -right-6 -top-6 w-24 h-24 bg-primary/5 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700" />
+              <div className="flex justify-between items-start mb-4">
+                <div className="p-2 bg-primary/10 rounded-xl">
+                  <Wallet className="h-5 w-5 text-primary" />
+                </div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Cuentas Totales</p>
+              </div>
+              <p className="text-3xl font-black tracking-tight text-foreground mb-1">
+                {accounts.length}
+              </p>
+              <div className="flex items-center gap-3 text-xs font-medium">
+                <span className="text-emerald-500 flex items-center gap-1">
+                   <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                   {activeAccounts.length} activas
+                </span>
+                <span className="text-muted-foreground">·</span>
+                <span className="text-slate-400">
+                  {accounts.length - activeAccounts.length} inactivas
+                </span>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 
@@ -238,16 +290,22 @@ export default function BanksPage() {
             <button
               onClick={() => { setEditingAccount(null); setFormOpen(true); }}
               className={cn(
-                'flex flex-col items-center justify-center gap-3 rounded-[1.5rem] border-2 border-dashed',
-                'border-slate-300 dark:border-slate-700 text-slate-400 dark:text-slate-500',
-                'hover:border-blue-400 hover:text-blue-500 dark:hover:border-blue-600 dark:hover:text-blue-400',
-                'transition-all duration-300 min-h-[240px] hover:bg-blue-50/50 dark:hover:bg-blue-950/20'
+                'group flex flex-col items-center justify-center gap-4 rounded-[2.5rem] border-2 border-dashed',
+                'border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500',
+                'hover:border-primary hover:bg-primary/5 transition-all duration-500 min-h-[300px]',
+                'relative overflow-hidden'
               )}
             >
-              <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800 group-hover:bg-blue-100">
-                <Plus className="h-6 w-6" />
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="relative p-5 rounded-[2rem] bg-slate-50 dark:bg-slate-900 group-hover:bg-primary/10 group-hover:scale-110 transition-all duration-500 shadow-inner">
+                <Plus className="h-8 w-8 text-slate-400 group-hover:text-primary transition-colors" />
               </div>
-              <p className="text-sm font-semibold">Agregar Cuenta</p>
+              <div className="relative text-center space-y-1">
+                <p className="text-sm font-black text-slate-600 dark:text-slate-400 group-hover:text-primary transition-colors uppercase tracking-widest">
+                  Nueva Cuenta
+                </p>
+                <p className="text-[10px] text-slate-400 font-medium">Click para registrar</p>
+              </div>
             </button>
           )}
         </div>
@@ -267,6 +325,7 @@ export default function BanksPage() {
         account={detailAccount}
         concesionarioId={concesionario?.id ?? ''}
         onRefresh={handleRefresh}
+        onEdit={handleEditAccount}
       />
     </div>
   );
