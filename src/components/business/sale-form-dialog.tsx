@@ -2,23 +2,21 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useBusinessAuth } from '@/context/business-auth-context';
-import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp, getDoc, Timestamp, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp, getDoc, Timestamp } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Car, User, DollarSign, ArrowRight, ArrowLeft, AlertCircle, CheckCircle2, Search, Lock, FileText, Receipt, Printer, Download, ShieldAlert, Package, LayoutGrid, Plus, Trash2, Wallet } from 'lucide-react';
+import { Loader2, Car, User, DollarSign, ArrowRight, ArrowLeft, AlertCircle, CheckCircle2, Search, Lock, FileText, Receipt, Printer, Download, ShieldAlert, Package, LayoutGrid, Plus, Trash2, Wallet, RefreshCw } from 'lucide-react';
 import type { StockVehicle, BankAccount } from '@/lib/business-types';
-import { ROLE_LABELS, verifySHA256 } from '@/lib/business-types';
+import { ROLE_LABELS, verifySHA256, BANK_ENTRY_METHOD_LABELS } from '@/lib/business-types';
 import { cn } from '@/lib/utils';
 import { SaleDocumentsPrint } from './sale-documents-print';
 import type { PaymentSplit } from '@/lib/finance-schemas';
-import { PaymentEngine } from './payment-engine';
-
 
 // ---------- Helpers ----------
 const padNum = (n: number, len: number) => String(n).padStart(len, '0');
@@ -95,72 +93,222 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
 
   // Step 5 - Payment & Documentation
   const [tipoDocumento, setTipoDocumento] = useState<'factura_fiscal' | 'nota_entrega'>('nota_entrega');
-  const [customTasaBcv, setCustomTasaBcv] = useState<number | ''>('');
+  const [customTasaBcv, setCustomTasaBcv] = useState<number>(0);
+  const [isTasaLoading, setIsTasaLoading] = useState(false);
   const [paymentMode, setPaymentMode] = useState<'completo' | 'combinado'>('completo');
   const [paymentSplits, setPaymentSplits] = useState<PaymentSplit[]>([]);
   const [registrarCaja, setRegistrarCaja] = useState(true);
   const [docsAlerta, setDocsAlerta] = useState(false);
 
-  // Load exchange rate from config
+  // Bank accounts
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  
+  // Modal state for bank account selection
+  const [accountSelectModalOpen, setAccountSelectModalOpen] = useState(false);
+  const [accountSelectMethod, setAccountSelectMethod] = useState<string>('');
+  const [accountSelectSplitIndex, setAccountSelectSplitIndex] = useState<number | null>(null);
+
+  // Modal state for method selection in combined payment
+  const [methodSelectModalOpen, setMethodSelectModalOpen] = useState(false);
+
+  // Exchange rate logic matching PurchaseOrderDialog
   useEffect(() => {
-    const tasa = concesionario?.configuracion?.tasa_cambio_manual;
-    if (tasa) {
-      setCustomTasaBcv(tasa);
+    if (!open || !concesionario) return;
+
+    const cfg = concesionario.configuracion as Record<string, any> | undefined;
+    const manualRate = typeof cfg?.tasa_cambio_manual === 'number' ? cfg.tasa_cambio_manual : 0;
+    const autoEnabled = cfg?.tasa_cambio_auto === true;
+
+    if (autoEnabled) {
+      setIsTasaLoading(true);
+      fetch('/api/business/exchange-rate')
+        .then(r => r.json())
+        .then(data => { 
+          if (data.tasa) setCustomTasaBcv(data.tasa); 
+          else setCustomTasaBcv(manualRate); 
+        })
+        .catch(err => { console.error('Error fetching rate:', err); setCustomTasaBcv(manualRate || 36); })
+        .finally(() => setIsTasaLoading(false));
+    } else {
+      setCustomTasaBcv(manualRate || 36);
     }
-  }, [concesionario?.configuracion?.tasa_cambio_manual]);
+    
+    // Fetch bank accounts
+    const fetchBankAccounts = async () => {
+      try {
+        const qAccounts = query(
+          collection(firestore, `concesionarios/${concesionario.id}/cuentas_bancarias`),
+          where('activa', '==', true)
+        );
+        const snap = await getDocs(qAccounts);
+        const accounts = snap.docs.map(d => ({ id: d.id, ...d.data() } as BankAccount))
+          .sort((a, b) => a.nombre.localeCompare(b.nombre));
+        setBankAccounts(accounts);
+      } catch (e) {
+        console.error("Error fetching bank accounts:", e);
+      }
+    };
+    fetchBankAccounts();
+  }, [open, concesionario, firestore]);
 
   const effectiveTasa = Number(customTasaBcv) || 1;
-  const totalOperacionUsd = Number(precioVenta) || 0;
+  const negotiatedPrice = Number(precioVenta) || 0;
+  
+  // Tax Calculations
+  // IVA is 16% of the negotiated price
+  const ivaAmount = tipoDocumento === 'factura_fiscal' ? negotiatedPrice * 0.16 : 0;
+  const baseFiscalDebt = negotiatedPrice + ivaAmount;
+
+  // IGTF (3%) logic:
+  // Legally, IGTF is 3% of the total amount handed over in foreign currency.
+  // If a user enters $100 in the split, the tax is $3.
+  const igtfAmount = useMemo(() => {
+    if (tipoDocumento !== 'factura_fiscal') return 0;
+    
+    return paymentSplits
+      .filter(s => s.currency === 'USD')
+      .reduce((acc, s) => acc + (s.amount * 0.03), 0);
+  }, [tipoDocumento, paymentSplits]);
+  
+  const totalOperacionUsd = baseFiscalDebt + igtfAmount;
   const totalPaidUsd = paymentSplits.reduce((acc, s) => acc + (s.equivalentUsd || 0), 0);
   const remainingUsd = Math.max(0, totalOperacionUsd - totalPaidUsd);
-  const isPaymentValid = totalPaidUsd >= (totalOperacionUsd - 0.01) && paymentSplits.length > 0;
+  const isPaymentValid = remainingUsd < 0.01 && paymentSplits.length > 0;
+  
+  const uniqueMethods = useMemo(() => {
+    if (bankAccounts.length === 0) return concesionario?.configuracion?.metodos_pago || ['Efectivo', 'Zelle'];
+    const methods = new Set<string>();
+    bankAccounts.forEach(acc => {
+      if (acc.metodos_entrada) {
+        Object.entries(acc.metodos_entrada).forEach(([m, enabled]) => {
+          if (enabled) methods.add(m);
+        });
+      }
+    });
+    return Array.from(methods);
+  }, [bankAccounts, concesionario?.configuracion?.metodos_pago]);
 
-  const metodosPago = concesionario?.configuracion?.metodos_pago || ['Efectivo', 'Zelle'];
-  const metodosPagoDivisa = concesionario?.configuracion?.metodos_pago_divisa || [];
+  const metodosPago = uniqueMethods;
+
+  const getMethodLabel = (m: string) => {
+    return BANK_ENTRY_METHOD_LABELS[m as keyof typeof BANK_ENTRY_METHOD_LABELS] || m;
+  };
+
+  // Group methods for the UI
+  const primaryMethods = metodosPago.filter(m => ['pago_movil', 'punto_de_venta', 'transferencia', 'efectivo_fisico'].includes(m));
+  const otherMethods = metodosPago.filter(m => !['pago_movil', 'punto_de_venta', 'transferencia', 'efectivo_fisico'].includes(m));
 
   // Currency logic helpers
-  const isMethodDivisa = (method: string) => metodosPagoDivisa.includes(method);
+  const isMethodDivisa = (method: string) => {
+    const matchingAccounts = bankAccounts.filter(a => a.metodos_entrada?.[method as keyof typeof a.metodos_entrada]);
+    if (matchingAccounts.length > 0) {
+      // If any matching account is USD, treat the method as Divisa
+      return matchingAccounts.some(a => a.moneda === 'USD');
+    }
+    // Fallback to legacy config
+    const legacyDivisas = concesionario?.configuracion?.metodos_pago_divisa || [];
+    return legacyDivisas.includes(method);
+  };
 
-  const calculateSplit = (method: string, amount: number, rate: number): PaymentSplit => {
-    const isUSD = isMethodDivisa(method);
+  const calculateSplit = (method: string, amount: number, rate: number, accountId?: string, accountName?: string, overrideCurrency?: 'USD' | 'VES'): PaymentSplit => {
+    let isUSD = false;
+    if (overrideCurrency) {
+      isUSD = overrideCurrency === 'USD';
+    } else if (accountId) {
+      const acc = bankAccounts.find(a => a.id === accountId);
+      isUSD = acc ? acc.moneda === 'USD' : isMethodDivisa(method);
+    } else {
+      isUSD = isMethodDivisa(method);
+    }
+
     return {
       method,
       currency: isUSD ? 'USD' : 'VES',
       amount: amount,
       exchangeRate: rate,
-      igtfAmount: (isUSD && method === 'Efectivo') ? amount * 0.03 : 0,
-      equivalentUsd: isUSD ? amount : amount / rate
+      equivalentUsd: isUSD ? amount : amount / rate,
+      igtfAmount: 0,
+      accountId,
+      accountName
     };
   };
 
   const handleAddSplit = () => {
-    const defaultMethod = metodosPago[0] || 'Efectivo';
-    const isUSD = isMethodDivisa(defaultMethod);
-    const suggestedAmount = isUSD ? remainingUsd : remainingUsd * effectiveTasa;
-    setPaymentSplits([...paymentSplits, calculateSplit(defaultMethod, suggestedAmount, effectiveTasa)]);
+    setMethodSelectModalOpen(true);
   };
 
   const handleUpdateSplit = (i: number, field: keyof PaymentSplit, val: any) => {
     const newSplits = [...paymentSplits];
-    const current = newSplits[i];
+    const current = newSplits[i] || calculateSplit(val, 0, effectiveTasa); // Fallback for new splits
     let method = current.method;
     let amount = current.amount;
+    let overrideCurrency = current.currency as 'USD' | 'VES';
     if (field === 'method') {
       method = val;
       const isWasUSD = current.currency === 'USD';
       const isNowUSD = isMethodDivisa(val);
       if (isWasUSD && !isNowUSD) amount = amount * effectiveTasa;
       else if (!isWasUSD && isNowUSD) amount = amount / effectiveTasa;
+      overrideCurrency = isNowUSD ? 'USD' : 'VES';
     }
     if (field === 'amount') amount = Number(val);
-    newSplits[i] = calculateSplit(method, amount, effectiveTasa);
+    newSplits[i] = calculateSplit(method, amount, effectiveTasa, current.accountId, current.accountName, overrideCurrency);
     setPaymentSplits(newSplits);
   };
 
-  const handleSetFullPayment = (method: string) => {
-    const isUSD = isMethodDivisa(method);
-    const amount = isUSD ? totalOperacionUsd : totalOperacionUsd * effectiveTasa;
-    setPaymentSplits([calculateSplit(method, amount, effectiveTasa)]);
+  // Pre-process method selection to check for bank accounts
+  const triggerMethodSelection = (method: string, targetIndex?: number) => {
+    const matchingAccounts = bankAccounts.filter(a => a.metodos_entrada?.[method as keyof typeof a.metodos_entrada] && a.activa);
+    
+    if (matchingAccounts.length === 1) {
+      // Auto-select if only 1 matching account
+      if (targetIndex !== undefined) {
+        const newSplits = [...paymentSplits];
+        const currentAmount = newSplits[targetIndex]?.amount || 0;
+        newSplits[targetIndex] = calculateSplit(method, currentAmount, effectiveTasa, matchingAccounts[0].id, matchingAccounts[0].nombre, matchingAccounts[0].moneda as 'USD' | 'VES');
+        setPaymentSplits(newSplits);
+      } else {
+        handleSetFullPayment(method, matchingAccounts[0].id, matchingAccounts[0].nombre, matchingAccounts[0].moneda as 'USD' | 'VES');
+      }
+    } else if (matchingAccounts.length > 1) {
+      // Open modal to choose account
+      setAccountSelectMethod(method);
+      setAccountSelectSplitIndex(targetIndex === undefined ? null : targetIndex);
+      setAccountSelectModalOpen(true);
+    } else {
+      // No accounts (or legacy), just proceed normally
+      if (targetIndex !== undefined) {
+        handleUpdateSplit(targetIndex, 'method', method);
+      } else {
+        handleSetFullPayment(method);
+      }
+    }
+  };
+
+  const handleSetFullPayment = (method: string, accountId?: string, accountName?: string, overrideCurrency?: 'USD' | 'VES') => {
+    let isUSD = false;
+    if (overrideCurrency) {
+      isUSD = overrideCurrency === 'USD';
+    } else if (accountId) {
+      const acc = bankAccounts.find(a => a.id === accountId);
+      isUSD = acc ? acc.moneda === 'USD' : isMethodDivisa(method);
+    } else {
+      isUSD = isMethodDivisa(method);
+    }
+    
+    if (tipoDocumento === 'factura_fiscal') {
+      const baseFiscalDebt = negotiatedPrice * 1.16;
+      if (isUSD) {
+        const totalToPay = baseFiscalDebt / 0.97;
+        setPaymentSplits([calculateSplit(method, totalToPay, effectiveTasa, accountId, accountName, overrideCurrency)]);
+      } else {
+        const amountVES = baseFiscalDebt * effectiveTasa;
+        setPaymentSplits([calculateSplit(method, amountVES, effectiveTasa, accountId, accountName, overrideCurrency)]);
+      }
+    } else {
+      const amount = isUSD ? negotiatedPrice : negotiatedPrice * effectiveTasa;
+      setPaymentSplits([calculateSplit(method, amount, effectiveTasa, accountId, accountName, overrideCurrency)]);
+    }
   };
 
   const handleRemoveSplit = (i: number) => {
@@ -276,7 +424,7 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
       setSelectedVehicleId(preInvoice.item_id);
       setPrecioVenta(preInvoice.precio_negociado);
       setVendedorId(preInvoice.vendedor_id);
-      setStep('pago'); // Skip directly to payment
+      setStep('cliente'); // Redirect to client step as requested
     } else {
       if (currentRole === 'vendedor' && staff) setVendedorId(staff.id);
     }
@@ -288,6 +436,7 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
     setParteDePago(false); setCompradorNombre(''); setCompradorCedula(''); setCompradorTelefono('');
     setPaymentSplits([]); setRegistrarCaja(true); setTipoDocumento('nota_entrega'); setDocsAlerta(false);
     setNumFactura(''); setNumControl(''); setPrintDoc(null); setClientMode('cargar'); setClientSearchQuery('');
+    setPaymentMode('completo');
   };
 
   const handleNext = () => {
@@ -471,7 +620,7 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
 
   const ventaDataForDocs = selectedVehicle ? {
     compradorNombre, compradorCedula, compradorTelefono, metodoPago: paymentSplits.map(s => s.method).join(', '),
-    precioVenta: Number(precioVenta), numFactura, numControl, tipoDocumento, esDivisa: paymentSplits.some(s => s.currency === 'USD' && metodosPagoDivisa.includes(s.method)),
+    precioVenta: Number(precioVenta), numFactura, numControl, tipoDocumento, esDivisa: paymentSplits.some(s => s.currency === 'USD' && isMethodDivisa(s.method)),
     vendedorNombre: staffList.find(s => s.id === vendedorId)?.nombre || '',
     fecha: ventaFecha,
     vehiculo: {
@@ -694,15 +843,15 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
                 <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-primary/5 border-2 border-primary/20 shadow-sm">
                   <div className="flex-1">
                     <Label className="text-xs font-bold uppercase text-primary flex items-center gap-1.5 mb-1">
-                      <DollarSign className="h-3 w-3" /> Tasa de Cambio (BCV)
+                      <RefreshCw className={cn("h-3 w-3", isTasaLoading && "animate-spin")} /> Tasa de Cambio (BCV)
                     </Label>
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-mono font-medium text-muted-foreground bg-muted px-2 py-1 rounded">Bs/USD</span>
-                      <Input
-                        type="number"
-                        value={customTasaBcv}
-                        onChange={e => setCustomTasaBcv(e.target.value ? Number(e.target.value) : '')}
-                        className="h-9 w-32 text-sm font-bold border-primary/30 bg-white focus-visible:ring-primary shadow-inner"
+                      <Input 
+                        type="number" 
+                        value={customTasaBcv || ''} 
+                        onChange={e => setCustomTasaBcv(parseFloat(e.target.value) || 0)} 
+                        className="h-9 w-32 text-sm font-bold border-primary/30 bg-white focus-visible:ring-primary shadow-inner" 
                         placeholder="Ej: 36.50"
                       />
                     </div>
@@ -715,19 +864,38 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
 
                 {/* Payment Totals */}
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 rounded-2xl bg-muted/30 border text-center">
+                  <div className="p-4 rounded-2xl bg-muted/30 border text-center flex flex-col justify-center">
                     <p className="text-[10px] text-muted-foreground uppercase font-bold">Total Operación</p>
-                    <p className="text-2xl font-headline text-primary">${totalOperacionUsd.toLocaleString()}</p>
+                    <p className="text-2xl font-headline text-primary">${totalOperacionUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    
+                    {tipoDocumento === 'factura_fiscal' && (
+                      <div className="mt-2 pt-2 border-t border-muted-foreground/10 space-y-0.5">
+                        <div className="flex justify-between text-[10px]">
+                          <span className="text-muted-foreground">Gravable:</span>
+                          <span className="font-mono">${negotiatedPrice.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between text-[10px]">
+                          <span className="text-muted-foreground">IVA (16%):</span>
+                          <span className="font-mono">${ivaAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex justify-between text-[10px]">
+                          <span className="text-muted-foreground">IGTF (3% Divisas):</span>
+                          <span className={cn("font-mono", igtfAmount > 0 ? "text-amber-600 font-bold" : "")}>
+                            ${igtfAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="p-4 rounded-2xl bg-muted/30 border text-center">
+                  <div className="p-4 rounded-2xl bg-muted/30 border text-center flex flex-col justify-center">
                     <p className="text-[10px] text-muted-foreground uppercase font-bold">
                       {totalPaidUsd > (totalOperacionUsd + 0.01) ? 'Vuelto a entregar' : 'Saldo Restante'}
                     </p>
                     <p className={cn("text-2xl font-headline transition-colors", totalPaidUsd > (totalOperacionUsd + 0.01) ? "text-red-600 font-bold" : remainingUsd > 0.01 ? "text-amber-500" : "text-green-600")}>
-                      ${Math.abs(totalOperacionUsd - totalPaidUsd).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      ${Math.abs(totalOperacionUsd - totalPaidUsd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                     <p className="text-[10px] text-muted-foreground font-mono">
-                      ≈ Bs. {Math.abs((totalOperacionUsd - totalPaidUsd) * effectiveTasa).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      ≈ Bs. {Math.abs((totalOperacionUsd - totalPaidUsd) * effectiveTasa).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                   </div>
                 </div>
@@ -738,7 +906,13 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
                     <Button key={m.id} variant={paymentMode === m.id ? 'default' : 'outline'} className="flex-1 gap-2" onClick={() => {
                       setPaymentMode(m.id as any);
                       if (m.id === 'completo') {
-                        handleSetFullPayment(metodosPago[0] || 'Efectivo');
+                        const defaultMethod = metodosPago[0] || 'Efectivo';
+                        const defaultMatches = bankAccounts.filter(a => a.metodos_entrada?.[defaultMethod as keyof typeof a.metodos_entrada] && a.activa);
+                        if (defaultMatches.length === 1) {
+                          handleSetFullPayment(defaultMethod, defaultMatches[0].id, defaultMatches[0].nombre, defaultMatches[0].moneda as 'USD' | 'VES');
+                        } else {
+                          handleSetFullPayment(defaultMethod);
+                        }
                       } else { setPaymentSplits([]); }
                     }}>
                       <m.icon className="h-4 w-4" />{m.label}
@@ -751,40 +925,83 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
                   {paymentMode === 'completo' && (
                     <div className="p-3 rounded-xl bg-primary/5 border border-primary/20 space-y-3">
                       <Label className="text-xs font-bold text-primary uppercase">Seleccionar Método de Pago</Label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {metodosPago.map(m => (
-                          <button key={m} onClick={() => handleSetFullPayment(m)}
-                            className={cn("p-3 rounded-lg border text-sm font-medium transition-all text-left flex flex-col", paymentSplits[0]?.method === m ? "bg-primary text-white border-primary shadow-md" : "bg-white hover:bg-muted/50")}>
-                            <span>{m}</span>
-                            <span className={cn("text-[10px]", paymentSplits[0]?.method === m ? "text-white/80" : "text-muted-foreground")}>
-                              {isMethodDivisa(m) ? 'Dólares (USD)' : 'Bolívares (VES)'}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
+                      {primaryMethods.length > 0 && (
+                        <div className="grid grid-cols-2 gap-2">
+                          {primaryMethods.map(m => (
+                            <button key={m} onClick={() => triggerMethodSelection(m)}
+                              className={cn("p-3 rounded-lg border text-sm font-medium transition-all text-left flex flex-col", paymentSplits[0]?.method === m ? "bg-primary text-white border-primary shadow-md" : "bg-white hover:bg-muted/50")}>
+                              <span>{getMethodLabel(m)}</span>
+                              <span className={cn("text-[10px]", paymentSplits[0]?.method === m ? "text-white/80" : "text-muted-foreground")}>
+                              </span>
+                              {paymentSplits[0]?.method === m && paymentSplits[0]?.accountName && (
+                                <span className="text-[9px] truncate font-bold text-white mt-1 border-t border-white/20 pt-1">
+                                  {paymentSplits[0].accountName}
+                                </span>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {otherMethods.length > 0 && (
+                        <>
+                          <Label className="text-xs font-bold text-primary/70 uppercase">Otros Métodos</Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {otherMethods.map(m => (
+                              <button key={m} onClick={() => triggerMethodSelection(m)}
+                                className={cn("p-3 rounded-lg border text-sm font-medium transition-all text-left flex flex-col", paymentSplits[0]?.method === m ? "bg-primary text-white border-primary shadow-md" : "bg-white hover:bg-muted/50")}>
+                                <span>{getMethodLabel(m)}</span>
+                                <span className={cn("text-[10px]", paymentSplits[0]?.method === m ? "text-white/80" : "text-muted-foreground")}>
+                                </span>
+                                {paymentSplits[0]?.method === m && paymentSplits[0]?.accountName && (
+                                  <span className="text-[9px] truncate font-bold text-white mt-1 border-t border-white/20 pt-1">
+                                    {paymentSplits[0].accountName}
+                                  </span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
 
                   {paymentSplits.map((split, i) => (
-                    <div key={i} className="flex items-end gap-2 p-3 rounded-xl bg-card border animate-in zoom-in-95">
-                      <div className="flex-1 space-y-1">
-                        <Label className="text-[10px] uppercase">Método</Label>
-                        <Select value={split.method} onValueChange={v => handleUpdateSplit(i, 'method', v)}>
-                          <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {metodosPago.map(m => <SelectItem key={m} value={m}>{m} ({isMethodDivisa(m) ? 'USD' : 'Bs'})</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="w-32 space-y-1">
-                        <Label className="text-[10px] uppercase">Monto ({split.currency})</Label>
-                        <div className="relative">
-                          <Input type="number" value={split.amount || ''} onChange={e => handleUpdateSplit(i, 'amount', e.target.value)} className="h-9 font-bold pr-8" />
-                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground">{split.currency === 'VES' ? 'Bs' : '$'}</span>
+                    <div key={i} className="p-3 rounded-xl bg-card border animate-in zoom-in-95 space-y-2">
+                      <div className="flex items-end gap-2">
+                        <div className="flex-1 space-y-1">
+                          <Label className="text-[10px] uppercase">Método</Label>
+                          <Select value={split.method} onValueChange={v => triggerMethodSelection(v, i)}>
+                            <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {primaryMethods.length > 0 && (
+                                <SelectGroup>
+                                  <SelectLabel>Principales</SelectLabel>
+                                  {primaryMethods.map(m => <SelectItem key={m} value={m}>{getMethodLabel(m)}</SelectItem>)}
+                                </SelectGroup>
+                              )}
+                              {otherMethods.length > 0 && (
+                                <SelectGroup>
+                                  <SelectLabel>Otros</SelectLabel>
+                                  {otherMethods.map(m => <SelectItem key={m} value={m}>{getMethodLabel(m)}</SelectItem>)}
+                                </SelectGroup>
+                              )}
+                            </SelectContent>
+                          </Select>
                         </div>
+                        <div className="w-32 space-y-1">
+                          <Label className="text-[10px] uppercase">Monto ({split.currency})</Label>
+                          <div className="relative">
+                            <Input type="number" value={split.amount || ''} onChange={e => handleUpdateSplit(i, 'amount', e.target.value)} className="h-9 font-bold pr-8" />
+                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground">{split.currency === 'VES' ? 'Bs' : '$'}</span>
+                          </div>
+                        </div>
+                        {paymentMode === 'combinado' && (
+                          <Button variant="ghost" size="icon" className="h-9 w-9 text-red-500" onClick={() => handleRemoveSplit(i)}><Trash2 className="h-4 w-4" /></Button>
+                        )}
                       </div>
-                      {paymentMode === 'combinado' && (
-                        <Button variant="ghost" size="icon" className="h-9 w-9 text-red-500" onClick={() => handleRemoveSplit(i)}><Trash2 className="h-4 w-4" /></Button>
+                      {split.accountName && (
+                        <p className="text-[10px] font-bold text-primary/80 uppercase">{split.accountName}</p>
                       )}
                     </div>
                   ))}
@@ -919,12 +1136,113 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
               </div>
             </div>
             <div className="flex gap-3 w-full">
-              <Button variant="outline" className="flex-1" onClick={() => { setAuthModalOpen(false); setAuthPin(['', '', '', '']); }}>Cancelar</Button>
+              <Button variant="outline" className="flex-1" onClick={() => { setAuthModalOpen(false); setAuthPin(['','','','']); }}>Cancelar</Button>
               <Button className="flex-1" onClick={handleVerifyPin} disabled={isVerifyingPin || !authUserId}>
                 {isVerifyingPin ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Autorizar'}
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mini-Modal for Bank Account Selection */}
+      <Dialog open={accountSelectModalOpen} onOpenChange={setAccountSelectModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Seleccionar Cuenta Bancaria</DialogTitle>
+            <DialogDescription>
+              El método <strong className="text-primary">{accountSelectMethod}</strong> está asociado a varias cuentas. Selecciona cuál utilizar.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2 py-4 max-h-[60vh] overflow-y-auto">
+            {bankAccounts
+              .filter(a => a.metodos_entrada?.[accountSelectMethod as keyof typeof a.metodos_entrada] && a.activa)
+              .map(acc => (
+                <button
+                  key={acc.id}
+                  onClick={() => {
+                    if (accountSelectSplitIndex !== null) {
+                      const newSplits = [...paymentSplits];
+                      const currentAmount = newSplits[accountSelectSplitIndex]?.amount || 0;
+                      newSplits[accountSelectSplitIndex] = {
+                        ...calculateSplit(accountSelectMethod, currentAmount, effectiveTasa, acc.id, acc.nombre),
+                        currency: acc.moneda
+                      };
+                      setPaymentSplits(newSplits);
+                    } else {
+                      handleSetFullPayment(accountSelectMethod, acc.id, acc.nombre);
+                    }
+                    setAccountSelectModalOpen(false);
+                  }}
+                  className="flex flex-col text-left p-3 rounded-lg border hover:bg-primary/5 hover:border-primary transition-all"
+                >
+                  <span className="font-bold text-sm">{acc.nombre}</span>
+                  <span className="text-xs text-muted-foreground">{acc.banco} • {acc.moneda}</span>
+                </button>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAccountSelectModalOpen(false)}>Cancelar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal for Method Selection (Combined) */}
+      <Dialog open={methodSelectModalOpen} onOpenChange={setMethodSelectModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Añadir Método de Pago</DialogTitle>
+            <DialogDescription>
+              Selecciona el método de pago a agregar al pago combinado.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2 py-4">
+            {primaryMethods.length > 0 && (
+              <div className="grid grid-cols-2 gap-2">
+                {primaryMethods.map(m => (
+                  <button
+                    key={m}
+                    onClick={() => {
+                      triggerMethodSelection(m, paymentSplits.length);
+                      setMethodSelectModalOpen(false);
+                    }}
+                    className="p-3 rounded-lg border text-sm font-medium transition-all text-left flex flex-col bg-white hover:bg-muted/50"
+                  >
+                    <span>{getMethodLabel(m)}</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {isMethodDivisa(m) ? 'Dólares (USD)' : 'Bolívares (VES)'}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+            
+            {otherMethods.length > 0 && (
+              <>
+                <Label className="text-xs font-bold text-muted-foreground uppercase mt-2">Otros Métodos</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {otherMethods.map(m => (
+                    <button
+                      key={m}
+                      onClick={() => {
+                        triggerMethodSelection(m, paymentSplits.length);
+                        setMethodSelectModalOpen(false);
+                      }}
+                      className="p-3 rounded-lg border text-sm font-medium transition-all text-left flex flex-col bg-white hover:bg-muted/50"
+                    >
+                      <span>{getMethodLabel(m)}</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {isMethodDivisa(m) ? 'Dólares (USD)' : 'Bolívares (VES)'}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMethodSelectModalOpen(false)}>Cancelar</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

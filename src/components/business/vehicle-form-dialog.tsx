@@ -35,7 +35,6 @@ import {
   Settings,
   AlertTriangle,
   Info,
-  RefreshCcw,
   Volume2,
   Check,
   CircleAlert,
@@ -364,7 +363,7 @@ export function VehicleFormDialog({ open, onOpenChange, editingVehicle, concesio
             vehicleType, is4x4, isArmored, armorLevel, description, images: uploadedImages,
             status: estadoStock === 'publico_web' ? 'active' : 'paused',
             isDealership: true, dealershipId: concesionarioId, dealershipSlug: concesionario.slug,
-            dealershipName: concesionario.nombre_empresa || concesionario.nombre,
+            dealershipName: concesionario.nombre_empresa || (concesionario as any).nombre,
             es_consignacion: esConsignacion,
             location: (concesionario as any).ubicacion || null, updatedAt: serverTimestamp(),
             seller: { isSaaSBusiness: true, uid: concesionario.owner_uid },
@@ -375,7 +374,7 @@ export function VehicleFormDialog({ open, onOpenChange, editingVehicle, concesio
         }
       }
 
-      setSavedVehicleId(finalVehicleId);
+      setSavedVehicleId(finalVehicleId || null);
       setSavedVehicleData({ id: finalVehicleId, ...vehicleData } as StockVehicle);
       setShowSuccess(true);
       toast({ title: 'Unidad Registrada', description: `${make} ${model} guardado con éxito.` });
