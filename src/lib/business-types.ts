@@ -489,7 +489,7 @@ export const BANK_ENTRY_METHOD_LABELS: Record<BankEntryMethod, string> = {
   pago_movil: 'Pago Móvil',
   transferencia: 'Transferencia',
   punto_de_venta: 'Punto de Venta',
-  efectivo_fisico: 'Efectivo Físico',
+  efectivo_fisico: 'Efectivo',
   zelle: 'Zelle',
   crypto: 'Criptomoneda',
 };
@@ -497,7 +497,7 @@ export const BANK_ENTRY_METHOD_LABELS: Record<BankEntryMethod, string> = {
 export const BANK_EXIT_METHOD_LABELS: Record<BankExitMethod, string> = {
   pago_movil: 'Pago Móvil',
   transferencia: 'Transferencia',
-  efectivo_fisico: 'Efectivo Físico',
+  efectivo_fisico: 'Efectivo',
   zelle: 'Zelle',
   crypto: 'Criptomoneda',
 };

@@ -175,32 +175,99 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
   const remainingUsd = Math.max(0, totalOperacionUsd - totalPaidUsd);
   const isPaymentValid = remainingUsd < 0.01 && paymentSplits.length > 0;
   
-  const uniqueMethods = useMemo(() => {
-    if (bankAccounts.length === 0) return concesionario?.configuracion?.metodos_pago || ['Efectivo', 'Zelle'];
-    const methods = new Set<string>();
-    bankAccounts.forEach(acc => {
-      if (acc.metodos_entrada) {
-        Object.entries(acc.metodos_entrada).forEach(([m, enabled]) => {
-          if (enabled) methods.add(m);
-        });
-      }
-    });
-    return Array.from(methods);
-  }, [bankAccounts, concesionario?.configuracion?.metodos_pago]);
-
-  const metodosPago = uniqueMethods;
-
   const getMethodLabel = (m: string) => {
     return BANK_ENTRY_METHOD_LABELS[m as keyof typeof BANK_ENTRY_METHOD_LABELS] || m;
   };
 
-  // Group methods for the UI
-  const primaryMethods = metodosPago.filter(m => ['pago_movil', 'punto_de_venta', 'transferencia', 'efectivo_fisico'].includes(m));
-  const otherMethods = metodosPago.filter(m => !['pago_movil', 'punto_de_venta', 'transferencia', 'efectivo_fisico'].includes(m));
+  const paymentOptions = useMemo(() => {
+    if (bankAccounts.length === 0) {
+      return (concesionario?.configuracion?.metodos_pago || ['Efectivo', 'Zelle']).map(m => ({
+        id: m,
+        label: getMethodLabel(m),
+        type: 'standard' as const,
+        method: m,
+        accountId: undefined
+      }));
+    }
 
-  // Currency logic helpers
+    const standardOptions: { id: string, label: string, type: 'standard' | 'account', method?: string, accountId?: string }[] = [];
+    const specificOptions: { id: string, label: string, type: 'standard' | 'account', method?: string, accountId?: string }[] = [];
+    const standardMethods = new Set<string>();
+
+    bankAccounts.forEach(acc => {
+      if (acc.tipo === 'otro') {
+        specificOptions.push({
+          id: `acc_${acc.id}`,
+          label: acc.nombre,
+          type: 'account',
+          accountId: acc.id,
+          method: Object.keys(acc.metodos_entrada || {}).find(m => acc.metodos_entrada[m as keyof typeof acc.metodos_entrada])
+        });
+      } else if (acc.metodos_entrada) {
+        Object.entries(acc.metodos_entrada).forEach(([m, enabled]) => {
+          if (enabled) standardMethods.add(m);
+        });
+      }
+    });
+
+    const order = ['pago_movil', 'transferencia', 'punto_de_venta', 'efectivo_fisico'];
+    order.forEach(m => {
+      if (standardMethods.has(m)) {
+        standardOptions.push({
+          id: m,
+          label: getMethodLabel(m),
+          type: 'standard',
+          method: m,
+          accountId: undefined
+        });
+      }
+    });
+
+    // Add remaining standard methods
+    Array.from(standardMethods).forEach(m => {
+      if (!order.includes(m)) {
+        standardOptions.push({
+          id: m,
+          label: getMethodLabel(m),
+          type: 'standard',
+          method: m,
+          accountId: undefined
+        });
+      }
+    });
+
+    return [...standardOptions, ...specificOptions];
+  }, [bankAccounts, concesionario?.configuracion?.metodos_pago]);
+
+  // Process option selection
+  const handleSelectOption = (optionId: string, targetIndex?: number) => {
+    const option = paymentOptions.find(o => o.id === optionId);
+    if (!option) return;
+
+    if (option.type === 'account') {
+      const acc = bankAccounts.find(a => a.id === option.accountId);
+      if (!acc) return;
+      const method = option.method || 'transferencia';
+      
+      if (targetIndex !== undefined) {
+        const newSplits = [...paymentSplits];
+        const currentAmount = newSplits[targetIndex]?.amount || 0;
+        newSplits[targetIndex] = calculateSplit(method, currentAmount, effectiveTasa, acc.id, acc.nombre, acc.moneda as 'USD' | 'VES');
+        setPaymentSplits(newSplits);
+      } else {
+        handleSetFullPayment(method, acc.id, acc.nombre, acc.moneda as 'USD' | 'VES');
+      }
+    } else {
+      triggerMethodSelection(option.method!, targetIndex);
+    }
+  };
+
+  // Currency logic helpers - EXCLUDE 'otro' accounts from standard check
   const isMethodDivisa = (method: string) => {
-    const matchingAccounts = bankAccounts.filter(a => a.metodos_entrada?.[method as keyof typeof a.metodos_entrada]);
+    const matchingAccounts = bankAccounts.filter(a => 
+      a.tipo !== 'otro' && 
+      a.metodos_entrada?.[method as keyof typeof a.metodos_entrada]
+    );
     if (matchingAccounts.length > 0) {
       // If any matching account is USD, treat the method as Divisa
       return matchingAccounts.some(a => a.moneda === 'USD');
@@ -496,19 +563,23 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
   };
 
   const handleSubmit = async () => {
-    if (!selectedVehicleId || !compradorNombre || !precioVenta || !isPaymentValid || !vendedorId) {
+    if (!selectedVehicleId || !compradorNombre || !precioVenta || !isPaymentValid || !vendedorId || !concesionario) {
       toast({ title: 'Faltan datos', description: 'Completa todos los campos obligatorios.', variant: 'destructive' }); return;
     }
     setIsSaving(true);
     try {
+      const { runTransaction } = await import('firebase/firestore');
       const vehicle = selectedVehicle!;
       const vStaff = staffList.find(s => s.id === vendedorId);
       const vendedorNombre = vStaff?.nombre || 'Desconocido';
+      
       let commRate = concesionario?.configuracion.estructura_comision || 0;
       if (vStaff?.commission_percentage != null) commRate = vStaff.commission_percentage;
+      
       const salePrice = Number(precioVenta);
       const comision = (salePrice * commRate) / 100;
       const totalBasis = (vehicle.costo_compra || 0) + (vehicle.gastos_adecuacion || []).reduce((a, g) => a + (g.monto || 0), 0);
+      
       const gananciaNeta = vehicle.es_consignacion
         ? (vehicle.consignacion_info?.comision_acordada || 0) / 100 * salePrice - comision
         : salePrice - totalBasis - comision;
@@ -516,72 +587,184 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
       const metodoPagoStr = paymentSplits.map(s => s.method).join(', ');
       const totalIgtf = paymentSplits.reduce((acc, s) => acc + (s.igtfAmount || 0), 0);
 
+      // We'll need the client ID
       let cId = compradorId;
       const clientsRef = collection(firestore, 'concesionarios', concesionarioId, 'clientes');
 
+      // Pre-fetch client if we have a CID
       if (!cId && compradorCedula) {
         const q = query(clientsRef, where('cedula_rif', '==', compradorCedula));
         const snap = await getDocs(q);
         if (!snap.empty) cId = snap.docs[0].id;
       }
 
-      const clientUpdateData = {
-        nombre: compradorNombre, apellido: compradorApellido, cedula_rif: compradorCedula, telefono: compradorTelefono, email: compradorEmail,
-        updated_at: serverTimestamp(), total_invertido: (existingClients.find(c => c.id === cId)?.total_invertido || 0) + salePrice,
-        ultima_compra_fecha: serverTimestamp(), traspaso_pendiente: true, traspaso_fecha_limite: Timestamp.fromMillis(Date.now() + 30 * 24 * 60 * 60 * 1000),
-      };
-
-      if (cId) { await updateDoc(doc(firestore, 'concesionarios', concesionarioId, 'clientes', cId), clientUpdateData); }
-      else {
-        const newClient = await addDoc(clientsRef, { ...clientUpdateData, compras_ids: [], tags: ['Comprador de Carros'], created_at: serverTimestamp() });
-        cId = newClient.id;
-      }
-
-      const concDoc = await getDoc(doc(firestore, 'concesionarios', concesionarioId));
-      const lastNum = (concDoc.data()?.configuracion?.ultimo_numero_factura_ventas || 0) as number;
-      const next = lastNum + 1;
-      const facN = padNum(next, 7);
-      const ctrlN = `00-${padNum(next, 7)}`;
-
       const now = new Date();
-      const ventaData = {
-        vehiculo_id: vehicle.id,
-        vehiculo_nombre: `${vehicle.year} ${vehicle.make} ${vehicle.model}${vehicle.placa ? ` (${vehicle.placa})` : ''}`,
-        comprador_id: cId, comprador_nombre: `${compradorNombre} ${compradorApellido}`, comprador_telefono: compradorTelefono, comprador_cedula: compradorCedula,
-        vendedor_staff_id: vendedorId, vendedor_nombre: vendedorNombre, precio_venta: salePrice, metodo_pago: metodoPagoStr, pagos_combinados: paymentSplits,
-        igtf_total: totalIgtf, comision_vendedor: comision, ganancia_neta: gananciaNeta, fecha: serverTimestamp(), tipo_venta: 'vehiculo' as const,
-        tipo_documento_emitido: tipoDocumento, numero_factura_venta: facN, numero_control_venta: ctrlN,
-        vehiculo_info: {
-          make: vehicle.make, model: vehicle.model, year: vehicle.year, placa: vehicle.placa || vehicle.info_extra?.placa || '',
-          exteriorColor: vehicle.exteriorColor || '', serial_carroceria: vehicle.info_extra?.serial_carroceria || '', serial_motor: vehicle.info_extra?.serial_motor || '',
-          clase: vehicle.info_extra?.clase || '', tipo: vehicle.info_extra?.tipo || '', mileage: vehicle.mileage || 0,
-        },
-      };
+      let finalFacN = '';
+      let finalCtrlN = '';
 
-      const saleDoc = await addDoc(collection(firestore, 'concesionarios', concesionarioId, 'ventas'), ventaData);
-      await updateDoc(doc(firestore, 'concesionarios', concesionarioId, 'clientes', cId), {
-        compras_ids: [...(existingClients.find(c => c.id === cId)?.compras_ids || []), saleDoc.id]
-      });
-      await updateDoc(doc(firestore, 'concesionarios', concesionarioId, 'inventario', vehicle.id), { estado_stock: 'vendido', fecha_venta: serverTimestamp(), updated_at: serverTimestamp() });
-      await updateDoc(doc(firestore, 'concesionarios', concesionarioId), { 'configuracion.ultimo_numero_factura_ventas': next });
+      await runTransaction(firestore, async (transaction) => {
+        // --- 1. ALL READS FIRST ---
+        
+        // A. Read Concessionaire Settings
+        const concRef = doc(firestore, 'concesionarios', concesionarioId);
+        const concSnap = await transaction.get(concRef);
+        const lastNum = (concSnap.data()?.configuracion?.ultimo_numero_factura_ventas || 0) as number;
+        const next = lastNum + 1;
+        finalFacN = padNum(next, 7);
+        finalCtrlN = `00-${padNum(next, 7)}`;
 
-      if (registrarCaja && staff) {
-        await addDoc(collection(firestore, 'concesionarios', concesionarioId, 'caja'), {
-          tipo: 'ingreso', monto: salePrice, descripcion: `Venta: ${ventaData.vehiculo_nombre}`,
-          metodo_pago: metodoPagoStr, cajero_staff_id: staff.id, cajero_nombre: staff.nombre, fecha: serverTimestamp(),
+        // B. Read Client if exists
+        let clientSnap = null;
+        if (cId) {
+          const clientRef = doc(firestore, 'concesionarios', concesionarioId, 'clientes', cId);
+          clientSnap = await transaction.get(clientRef);
+        }
+
+        // C. Read all involved Bank Accounts
+        const bankSnaps: Record<string, any> = {};
+        for (const split of paymentSplits) {
+          if (split.accountId && !bankSnaps[split.accountId]) {
+            const accRef = doc(firestore, 'concesionarios', concesionarioId, 'cuentas_bancarias', split.accountId);
+            const accSnap = await transaction.get(accRef);
+            if (accSnap.exists()) {
+              bankSnaps[split.accountId] = accSnap.data();
+            }
+          }
+        }
+
+        // D. Read Vehicle Stock (just to be safe and consistent)
+        const vehicleRef = doc(firestore, 'concesionarios', concesionarioId, 'inventario', vehicle.id);
+        const vehicleSnap = await transaction.get(vehicleRef);
+
+        // --- 2. ALL WRITES SECOND ---
+
+        // Prepare Data Docs
+        const saleDocRef = doc(collection(firestore, 'concesionarios', concesionarioId, 'ventas'));
+        const vehNombre = `${vehicle.year} ${vehicle.make} ${vehicle.model}${vehicle.placa ? ` (${vehicle.placa})` : ''}`;
+        
+        const ventaData = {
+          vehiculo_id: vehicle.id,
+          vehiculo_nombre: vehNombre,
+          comprador_id: cId || '',
+          comprador_nombre: `${compradorNombre} ${compradorApellido}`, comprador_telefono: compradorTelefono, comprador_cedula: compradorCedula,
+          vendedor_staff_id: vendedorId, vendedor_nombre: vendedorNombre, precio_venta: salePrice, metodo_pago: metodoPagoStr, pagos_combinados: paymentSplits,
+          igtf_total: totalIgtf, comision_vendedor: comision, ganancia_neta: gananciaNeta, fecha: serverTimestamp(), tipo_venta: 'vehiculo' as const,
+          tipo_documento_emitido: tipoDocumento, numero_factura_venta: finalFacN, numero_control_venta: finalCtrlN,
+          vehiculo_info: {
+            make: vehicle.make, model: vehicle.model, year: vehicle.year, placa: vehicle.placa || vehicle.info_extra?.placa || '',
+            exteriorColor: vehicle.exteriorColor || '', serial_carroceria: vehicle.info_extra?.serial_carroceria || '', serial_motor: vehicle.info_extra?.serial_motor || '',
+            clase: vehicle.info_extra?.clase || '', tipo: vehicle.info_extra?.tipo || '', mileage: vehicle.mileage || 0,
+          },
+        };
+
+        const clientUpdateData: any = {
+          nombre: compradorNombre, apellido: compradorApellido, cedula_rif: compradorCedula, telefono: compradorTelefono, email: compradorEmail,
+          updated_at: serverTimestamp(),
+          ultima_compra_fecha: serverTimestamp(), traspaso_pendiente: true, traspaso_fecha_limite: Timestamp.fromMillis(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        };
+
+        // A. Update/Create Client
+        if (clientSnap) {
+          const clientRef = doc(firestore, 'concesionarios', concesionarioId, 'clientes', cId!);
+          const currentInvertido = clientSnap.data()?.total_invertido || 0;
+          const currentCompras = clientSnap.data()?.compras_ids || [];
+          transaction.update(clientRef, {
+            ...clientUpdateData,
+            total_invertido: currentInvertido + salePrice,
+            compras_ids: [...currentCompras, saleDocRef.id]
+          });
+        } else {
+          const newClientRef = doc(collection(firestore, 'concesionarios', concesionarioId, 'clientes'));
+          cId = newClientRef.id;
+          ventaData.comprador_id = cId;
+          transaction.set(newClientRef, {
+            ...clientUpdateData,
+            total_invertido: salePrice,
+            compras_ids: [saleDocRef.id],
+            tags: ['Comprador de Carros'],
+            created_at: serverTimestamp()
+          });
+        }
+
+        // B. Prepare Bank Balance Final Updates
+        const bankFinalUpdates: Record<string, { nextSaldo: number, prevSaldo: number }> = {};
+        for (const split of paymentSplits) {
+          if (split.accountId && bankSnaps[split.accountId]) {
+            if (!bankFinalUpdates[split.accountId]) {
+              bankFinalUpdates[split.accountId] = { 
+                prevSaldo: bankSnaps[split.accountId].saldo_actual || 0,
+                nextSaldo: bankSnaps[split.accountId].saldo_actual || 0 
+              };
+            }
+            const current = bankFinalUpdates[split.accountId];
+            const splitPrevSaldo = current.nextSaldo;
+            current.nextSaldo += split.amount;
+
+            // Create individual transaction records for each split
+            const txRef = doc(collection(firestore, 'concesionarios', concesionarioId, 'cuentas_bancarias', split.accountId, 'transacciones'));
+            transaction.set(txRef, {
+              cuenta_id: split.accountId,
+              tipo: 'ingreso_venta',
+              flujo: 'entrada',
+              monto: split.amount,
+              metodo_pago: split.method,
+              concepto: `Venta: ${ventaData.vehiculo_nombre} (Fac. ${finalFacN})`,
+              referencia: '',
+              registrado_por_id: staff?.id || 'admin',
+              registrado_por_nombre: staff?.nombre || 'Administrador',
+              saldo_anterior: splitPrevSaldo,
+              saldo_posterior: current.nextSaldo,
+              fecha: serverTimestamp(),
+              venta_id: saleDocRef.id
+            });
+          }
+        }
+
+        // C. Apply Accumulated Bank Balance Updates
+        for (const [accId, updates] of Object.entries(bankFinalUpdates)) {
+          const accRef = doc(firestore, 'concesionarios', concesionarioId, 'cuentas_bancarias', accId);
+          transaction.update(accRef, {
+            saldo_actual: updates.nextSaldo,
+            updated_at: serverTimestamp()
+          });
+        }
+
+        // Final updates
+        transaction.set(saleDocRef, ventaData);
+        transaction.update(doc(firestore, 'concesionarios', concesionarioId, 'inventario', vehicle.id), {
+          estado_stock: 'vendido',
+          fecha_venta: serverTimestamp(),
+          updated_at: serverTimestamp()
         });
-      }
+        transaction.update(concRef, {
+          'configuracion.ultimo_numero_factura_ventas': next
+        });
+
+        if (registrarCaja && staff) {
+          const cajaRef = doc(collection(firestore, 'concesionarios', concesionarioId, 'caja'));
+          transaction.set(cajaRef, {
+            tipo: 'ingreso',
+            monto: salePrice,
+            descripcion: `Venta: ${ventaData.vehiculo_nombre}`,
+            metodo_pago: metodoPagoStr,
+            cajero_staff_id: staff.id,
+            cajero_nombre: staff.nombre,
+            fecha: serverTimestamp(),
+            venta_id: saleDocRef.id
+          });
+        }
+      });
 
       if (preInvoice?.id) {
         const { deleteDoc } = await import('firebase/firestore');
         await deleteDoc(doc(firestore, 'concesionarios', concesionarioId, 'pre_invoices', preInvoice.id));
       }
 
-      setNumFactura(facN); setNumControl(ctrlN); setVentaFecha(now);
+      setNumFactura(finalFacN); setNumControl(finalCtrlN); setVentaFecha(now);
       setStep('exito'); onSave();
     } catch (e: any) {
-      console.error(e);
-      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+      console.error('Error in sale transaction:', e);
+      toast({ title: 'Error al registrar venta', description: e.message, variant: 'destructive' });
     } finally { setIsSaving(false); }
   };
 
@@ -900,18 +1083,23 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
                   </div>
                 </div>
 
-                {/* Payment Mode Selector */}
+                  {/* Payment Mode Selector */}
                 <div className="flex gap-2 mb-2">
                   {[{ id: 'completo', label: 'Pago Completo', icon: Wallet }, { id: 'combinado', label: 'Pago Combinado', icon: LayoutGrid }].map(m => (
                     <Button key={m.id} variant={paymentMode === m.id ? 'default' : 'outline'} className="flex-1 gap-2" onClick={() => {
                       setPaymentMode(m.id as any);
                       if (m.id === 'completo') {
-                        const defaultMethod = metodosPago[0] || 'Efectivo';
-                        const defaultMatches = bankAccounts.filter(a => a.metodos_entrada?.[defaultMethod as keyof typeof a.metodos_entrada] && a.activa);
-                        if (defaultMatches.length === 1) {
-                          handleSetFullPayment(defaultMethod, defaultMatches[0].id, defaultMatches[0].nombre, defaultMatches[0].moneda as 'USD' | 'VES');
+                        const defaultOpt = paymentOptions[0];
+                        const defaultMethod = defaultOpt?.method || 'Efectivo';
+                        if (defaultOpt?.type === 'account') {
+                          handleSetFullPayment(defaultMethod, defaultOpt.accountId, defaultOpt.label, bankAccounts.find(a => a.id === defaultOpt.accountId)?.moneda as 'USD' | 'VES');
                         } else {
-                          handleSetFullPayment(defaultMethod);
+                          const defaultMatches = bankAccounts.filter(a => a.metodos_entrada?.[defaultMethod as keyof typeof a.metodos_entrada] && a.activa);
+                          if (defaultMatches.length === 1) {
+                            handleSetFullPayment(defaultMethod, defaultMatches[0].id, defaultMatches[0].nombre, defaultMatches[0].moneda as 'USD' | 'VES');
+                          } else {
+                            handleSetFullPayment(defaultMethod);
+                          }
                         }
                       } else { setPaymentSplits([]); }
                     }}>
@@ -925,44 +1113,38 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
                   {paymentMode === 'completo' && (
                     <div className="p-3 rounded-xl bg-primary/5 border border-primary/20 space-y-3">
                       <Label className="text-xs font-bold text-primary uppercase">Seleccionar Método de Pago</Label>
-                      {primaryMethods.length > 0 && (
-                        <div className="grid grid-cols-2 gap-2">
-                          {primaryMethods.map(m => (
-                            <button key={m} onClick={() => triggerMethodSelection(m)}
-                              className={cn("p-3 rounded-lg border text-sm font-medium transition-all text-left flex flex-col", paymentSplits[0]?.method === m ? "bg-primary text-white border-primary shadow-md" : "bg-white hover:bg-muted/50")}>
-                              <span>{getMethodLabel(m)}</span>
-                              <span className={cn("text-[10px]", paymentSplits[0]?.method === m ? "text-white/80" : "text-muted-foreground")}>
+                      
+                      {/* Grid of options using paymentOptions */}
+                      <div className="grid grid-cols-2 gap-2">
+                        {paymentOptions.map(opt => (
+                          <button 
+                            key={opt.id} 
+                            onClick={() => handleSelectOption(opt.id)}
+                            className={cn(
+                              "p-3 rounded-lg border text-sm font-medium transition-all text-left flex flex-col", 
+                              (paymentSplits[0]?.accountId === opt.accountId && opt.type === 'account') || 
+                              (paymentSplits[0]?.method === opt.method && opt.type === 'standard')
+                                ? "bg-primary text-white border-primary shadow-md" 
+                                : "bg-white hover:bg-muted/50"
+                            )}
+                          >
+                            <span>{opt.label}</span>
+                            <span className={cn("text-[10px]", 
+                              (paymentSplits[0]?.accountId === opt.accountId && opt.type === 'account') || 
+                              (paymentSplits[0]?.method === opt.method && opt.type === 'standard')
+                                ? "text-white/80" 
+                                : "text-muted-foreground"
+                            )}>
+                              {opt.type === 'account' ? 'Cuenta Específica' : 'Método Estándar'}
+                            </span>
+                            {paymentSplits[0]?.method === opt.method && paymentSplits[0]?.accountName && opt.type === 'standard' && (
+                              <span className="text-[9px] truncate font-bold text-white mt-1 border-t border-white/20 pt-1">
+                                {paymentSplits[0].accountName}
                               </span>
-                              {paymentSplits[0]?.method === m && paymentSplits[0]?.accountName && (
-                                <span className="text-[9px] truncate font-bold text-white mt-1 border-t border-white/20 pt-1">
-                                  {paymentSplits[0].accountName}
-                                </span>
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-
-                      {otherMethods.length > 0 && (
-                        <>
-                          <Label className="text-xs font-bold text-primary/70 uppercase">Otros Métodos</Label>
-                          <div className="grid grid-cols-2 gap-2">
-                            {otherMethods.map(m => (
-                              <button key={m} onClick={() => triggerMethodSelection(m)}
-                                className={cn("p-3 rounded-lg border text-sm font-medium transition-all text-left flex flex-col", paymentSplits[0]?.method === m ? "bg-primary text-white border-primary shadow-md" : "bg-white hover:bg-muted/50")}>
-                                <span>{getMethodLabel(m)}</span>
-                                <span className={cn("text-[10px]", paymentSplits[0]?.method === m ? "text-white/80" : "text-muted-foreground")}>
-                                </span>
-                                {paymentSplits[0]?.method === m && paymentSplits[0]?.accountName && (
-                                  <span className="text-[9px] truncate font-bold text-white mt-1 border-t border-white/20 pt-1">
-                                    {paymentSplits[0].accountName}
-                                  </span>
-                                )}
-                              </button>
-                            ))}
-                          </div>
-                        </>
-                      )}
+                            )}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
 
@@ -971,21 +1153,21 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
                       <div className="flex items-end gap-2">
                         <div className="flex-1 space-y-1">
                           <Label className="text-[10px] uppercase">Método</Label>
-                          <Select value={split.method} onValueChange={v => triggerMethodSelection(v, i)}>
+                          <Select 
+                            value={
+                              paymentOptions.find(o => o.accountId === split.accountId)?.id || 
+                              paymentOptions.find(o => o.method === split.method)?.id || 
+                              ""
+                            } 
+                            onValueChange={v => handleSelectOption(v, i)}
+                          >
                             <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                             <SelectContent>
-                              {primaryMethods.length > 0 && (
-                                <SelectGroup>
-                                  <SelectLabel>Principales</SelectLabel>
-                                  {primaryMethods.map(m => <SelectItem key={m} value={m}>{getMethodLabel(m)}</SelectItem>)}
-                                </SelectGroup>
-                              )}
-                              {otherMethods.length > 0 && (
-                                <SelectGroup>
-                                  <SelectLabel>Otros</SelectLabel>
-                                  {otherMethods.map(m => <SelectItem key={m} value={m}>{getMethodLabel(m)}</SelectItem>)}
-                                </SelectGroup>
-                              )}
+                              {paymentOptions.map(opt => (
+                                <SelectItem key={opt.id} value={opt.id}>
+                                  {opt.label}
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         </div>
@@ -1197,48 +1379,23 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-2 py-4">
-            {primaryMethods.length > 0 && (
-              <div className="grid grid-cols-2 gap-2">
-                {primaryMethods.map(m => (
-                  <button
-                    key={m}
-                    onClick={() => {
-                      triggerMethodSelection(m, paymentSplits.length);
-                      setMethodSelectModalOpen(false);
-                    }}
-                    className="p-3 rounded-lg border text-sm font-medium transition-all text-left flex flex-col bg-white hover:bg-muted/50"
-                  >
-                    <span>{getMethodLabel(m)}</span>
-                    <span className="text-[10px] text-muted-foreground">
-                      {isMethodDivisa(m) ? 'Dólares (USD)' : 'Bolívares (VES)'}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-            
-            {otherMethods.length > 0 && (
-              <>
-                <Label className="text-xs font-bold text-muted-foreground uppercase mt-2">Otros Métodos</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {otherMethods.map(m => (
-                    <button
-                      key={m}
-                      onClick={() => {
-                        triggerMethodSelection(m, paymentSplits.length);
-                        setMethodSelectModalOpen(false);
-                      }}
-                      className="p-3 rounded-lg border text-sm font-medium transition-all text-left flex flex-col bg-white hover:bg-muted/50"
-                    >
-                      <span>{getMethodLabel(m)}</span>
-                      <span className="text-[10px] text-muted-foreground">
-                        {isMethodDivisa(m) ? 'Dólares (USD)' : 'Bolívares (VES)'}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
+            <div className="grid grid-cols-2 gap-2">
+              {paymentOptions.map(opt => (
+                <button
+                  key={opt.id}
+                  onClick={() => {
+                    handleSelectOption(opt.id, paymentSplits.length);
+                    setMethodSelectModalOpen(false);
+                  }}
+                  className="p-3 rounded-lg border text-sm font-medium transition-all text-left flex flex-col bg-white hover:bg-muted/50"
+                >
+                  <span>{opt.label}</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {opt.type === 'account' ? 'Cuenta Específica' : 'Método Estándar'}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setMethodSelectModalOpen(false)}>Cancelar</Button>

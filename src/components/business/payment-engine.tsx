@@ -24,6 +24,14 @@ interface SplitRow extends PaymentSplit {
   accountName: string;
 }
 
+interface PaymentOption {
+  id: string; // BankEntryMethod OR accountId
+  label: string;
+  type: 'standard' | 'specific_account';
+  method?: BankEntryMethod;
+  accountId?: string;
+}
+
 interface PaymentEngineProps {
   /** Total amount to collect in USD */
   totalUsd: number;
@@ -38,27 +46,61 @@ interface PaymentEngineProps {
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 /**
- * Returns the entry methods that have at least one active bank account supporting them.
- * Result is deduplicated and sorted for display.
+ * Returns available payment options. 
+ * Standard methods are grouped, but accounts of type 'otro' are individual options.
  */
-function getAvailableEntryMethods(accounts: BankAccount[]): BankEntryMethod[] {
-  const set = new Set<BankEntryMethod>();
+function getPaymentOptions(accounts: BankAccount[]): PaymentOption[] {
+  const options: PaymentOption[] = [];
+  const standardMethods = new Set<BankEntryMethod>();
+
+  // 1. Identify standard methods used by 'banco' or 'efectivo' accounts
   for (const acc of accounts) {
     if (!acc.activa) continue;
-    for (const [method, enabled] of Object.entries(acc.metodos_entrada)) {
-      if (enabled) set.add(method as BankEntryMethod);
+    
+    if (acc.tipo === 'otro') {
+      // 'Otro' type accounts become independent options
+      options.push({
+        id: acc.id,
+        label: acc.nombre,
+        type: 'specific_account',
+        accountId: acc.id,
+        // Find the first enabled entry method for this account to use as fallback
+        method: (Object.keys(acc.metodos_entrada) as BankEntryMethod[]).find(m => acc.metodos_entrada[m])
+      });
+    } else {
+      // Standard accounts contribute to standard method groups
+      for (const [method, enabled] of Object.entries(acc.metodos_entrada)) {
+        if (enabled) standardMethods.add(method as BankEntryMethod);
+      }
     }
   }
-  // Preferred display order
+
+  // 2. Add standard methods in preferred order
   const order: BankEntryMethod[] = [
     'pago_movil', 'transferencia', 'punto_de_venta', 'efectivo_fisico', 'zelle', 'crypto'
   ];
-  return order.filter(m => set.has(m));
+  
+  for (const m of order) {
+    if (standardMethods.has(m)) {
+      options.push({
+        id: m,
+        label: BANK_ENTRY_METHOD_LABELS[m],
+        type: 'standard',
+        method: m
+      });
+    }
+  }
+
+  return options;
 }
 
-/** Returns accounts that accept a given entry method */
-function getAccountsForMethod(accounts: BankAccount[], method: BankEntryMethod): BankAccount[] {
-  return accounts.filter(acc => acc.activa && acc.metodos_entrada[method]);
+/** Returns accounts that accept a given entry method and are NOT of type 'otro' (unless specified) */
+function getAccountsForMethod(accounts: BankAccount[], method: BankEntryMethod, includeOthers = false): BankAccount[] {
+  return accounts.filter(acc => 
+    acc.activa && 
+    acc.metodos_entrada[method] && 
+    (includeOthers || acc.tipo !== 'otro')
+  );
 }
 
 /** Builds a PaymentSplit from a row's current values */
@@ -90,7 +132,7 @@ function buildSplit(
 export function PaymentEngine({ totalUsd, tasaBcv, bankAccounts, onValidChange }: PaymentEngineProps) {
   const [rows, setRows] = useState<SplitRow[]>([]);
 
-  const availableMethods = useMemo(() => getAvailableEntryMethods(bankAccounts), [bankAccounts]);
+  const paymentOptions = useMemo(() => getPaymentOptions(bankAccounts), [bankAccounts]);
 
   // Derive splits from rows to expose upward
   const splits = useMemo<PaymentSplit[]>(() => {
@@ -115,18 +157,34 @@ export function PaymentEngine({ totalUsd, tasaBcv, bankAccounts, onValidChange }
   // ── Handlers ──────────────────────────────────────────────────────────────
 
   const handleAddRow = () => {
-    const defaultMethod = availableMethods[0] ?? '';
-    const accountsForDefault = defaultMethod ? getAccountsForMethod(bankAccounts, defaultMethod) : [];
-    const defaultAccount = accountsForDefault[0];
-    const isUSD = defaultAccount?.es_divisa ?? false;
+    const defaultOption = paymentOptions[0];
+    if (!defaultOption) return;
+
+    let accountId = '';
+    let entryMethod: BankEntryMethod | '' = '';
+    let accountName = '';
+
+    if (defaultOption.type === 'specific_account') {
+      accountId = defaultOption.accountId!;
+      entryMethod = defaultOption.method || '';
+      accountName = defaultOption.label;
+    } else {
+      entryMethod = defaultOption.method!;
+      const accounts = getAccountsForMethod(bankAccounts, entryMethod);
+      accountId = accounts[0]?.id ?? '';
+      accountName = accounts[0]?.nombre ?? '';
+    }
+
+    const account = bankAccounts.find(a => a.id === accountId);
+    const isUSD = account?.es_divisa ?? false;
     const defaultAmount = remainingUsd > 0
       ? (isUSD ? remainingUsd : remainingUsd * tasaBcv)
       : 0;
 
     setRows(prev => [...prev, {
-      entryMethod: defaultMethod,
-      accountId: defaultAccount?.id ?? '',
-      accountName: defaultAccount?.nombre ?? '',
+      entryMethod,
+      accountId,
+      accountName,
       method: '',
       currency: isUSD ? 'USD' : 'VES',
       amount: defaultAmount,
@@ -136,17 +194,37 @@ export function PaymentEngine({ totalUsd, tasaBcv, bankAccounts, onValidChange }
     }]);
   };
 
-  const handleMethodChange = (index: number, method: BankEntryMethod) => {
+  const handleOptionChange = (index: number, optionId: string) => {
+    const option = paymentOptions.find(o => o.id === optionId);
+    if (!option) return;
+
     setRows(prev => {
       const newRows = [...prev];
       const row = { ...newRows[index] };
-      const accounts = getAccountsForMethod(bankAccounts, method);
-      const firstAccount = accounts[0];
-      const isUSD = firstAccount?.es_divisa ?? false;
+      
+      let accountId = '';
+      let entryMethod: BankEntryMethod | '' = '';
+      let accountName = '';
 
-      row.entryMethod = method;
-      row.accountId = firstAccount?.id ?? '';
-      row.accountName = firstAccount?.nombre ?? '';
+      if (option.type === 'specific_account') {
+        accountId = option.accountId!;
+        entryMethod = option.method || '';
+        accountName = option.label;
+      } else {
+        entryMethod = option.method!;
+        const accounts = getAccountsForMethod(bankAccounts, entryMethod);
+        accountId = accounts[0]?.id ?? '';
+        accountName = accounts[0]?.nombre ?? '';
+      }
+
+      const account = bankAccounts.find(a => a.id === accountId);
+      const isUSD = account?.es_divisa ?? false;
+
+      row.entryMethod = entryMethod;
+      row.accountId = accountId;
+      row.accountName = accountName;
+      row.currency = isUSD ? 'USD' : 'VES';
+
       // Recalculate amount for the remaining balance in new currency
       const remaining = Math.max(0, totalUsd - splits.reduce((a, s, i) => i !== index ? a + (s.equivalentUsd || 0) : a, 0));
       row.amount = isUSD ? remaining : remaining * tasaBcv;
@@ -225,16 +303,20 @@ export function PaymentEngine({ totalUsd, tasaBcv, bankAccounts, onValidChange }
                 <div className="flex-1 space-y-1">
                   <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Método de Pago</Label>
                   <Select
-                    value={row.entryMethod}
-                    onValueChange={(v) => handleMethodChange(i, v as BankEntryMethod)}
+                    value={
+                      paymentOptions.find(o => o.accountId === row.accountId)?.id || 
+                      paymentOptions.find(o => o.method === row.entryMethod)?.id || 
+                      ""
+                    }
+                    onValueChange={(v) => handleOptionChange(i, v)}
                   >
                     <SelectTrigger className="h-10 text-sm font-medium">
                       <SelectValue placeholder="Seleccionar..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableMethods.map(m => (
-                        <SelectItem key={m} value={m}>
-                          {BANK_ENTRY_METHOD_LABELS[m]}
+                      {paymentOptions.map(opt => (
+                        <SelectItem key={opt.id} value={opt.id}>
+                          {opt.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
