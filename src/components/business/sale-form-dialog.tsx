@@ -11,7 +11,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Car, User, DollarSign, ArrowRight, ArrowLeft, AlertCircle, CheckCircle2, Search, Lock, FileText, Receipt, Printer, Download, ShieldAlert, Package, LayoutGrid, Plus, Trash2, Wallet, RefreshCw } from 'lucide-react';
+import { Loader2, Car, User, DollarSign, ArrowRight, ArrowLeft, AlertCircle, CheckCircle2, Search, Lock, FileText, Receipt, Printer, Download, ShieldAlert, Package, LayoutGrid, Plus, Trash2, Wallet, RefreshCw, ChevronDown } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import type { StockVehicle, BankAccount } from '@/lib/business-types';
 import { ROLE_LABELS, verifySHA256, BANK_ENTRY_METHOD_LABELS } from '@/lib/business-types';
 import { cn } from '@/lib/utils';
@@ -36,7 +37,7 @@ function numberToWords(amount: number): string {
 }
 
 // ---------- Types ----------
-type WizardStep = 'tipo' | 'vehiculo' | 'precio' | 'cliente' | 'pago' | 'exito' | 'documentos';
+type WizardStep = 'tipo' | 'vehiculo' | 'productos' | 'precio' | 'cliente' | 'pago' | 'exito' | 'documentos';
 
 interface SaleFormDialogProps {
   open: boolean;
@@ -47,9 +48,9 @@ interface SaleFormDialogProps {
 }
 
 const STEP_LABELS: Record<WizardStep, string> = {
-  tipo: 'Tipo', vehiculo: 'Vehículo', precio: 'Precio', cliente: 'Cliente', pago: 'Pago', exito: 'Éxito', documentos: 'Documentos',
+  tipo: 'Tipo', vehiculo: 'Vehículo', productos: 'Productos', precio: 'Precio', cliente: 'Cliente', pago: 'Pago', exito: 'Éxito', documentos: 'Documentos',
 };
-const WIZARD_STEPS: WizardStep[] = ['tipo', 'vehiculo', 'precio', 'cliente', 'pago', 'exito', 'documentos'];
+const WIZARD_STEPS: WizardStep[] = ['tipo', 'vehiculo', 'productos', 'precio', 'cliente', 'pago', 'exito', 'documentos'];
 
 // ---------- Main Component ----------
 export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, preInvoice }: SaleFormDialogProps) {
@@ -65,6 +66,14 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
   const [isLoadingVehicles, setIsLoadingVehicles] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
+
+  // Step 2 - Products (New)
+  const [availableProducts, setAvailableProducts] = useState<any[]>([]);
+  const [productItems, setProductItems] = useState<any[]>([]);
+  const [productSearchQuery, setProductSearchQuery] = useState('');
+  const [selectedProductId, setSelectedProductId] = useState('');
+  const [itemQty, setItemQty] = useState('1');
+  const [itemDiscount, setItemDiscount] = useState('0');
 
   // Step 3 - Price & Seller
   const [precioVenta, setPrecioVenta] = useState<number | ''>('');
@@ -152,16 +161,49 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
   }, [open, concesionario, firestore]);
 
   const effectiveTasa = Number(customTasaBcv) || 1;
-  const negotiatedPrice = Number(precioVenta) || 0;
   
+  const negotiatedPrice = useMemo(() => {
+    if (tipoVenta === 'producto') {
+      return productItems.reduce((acc, it) => acc + (it.subtotal_usd || 0), 0);
+    }
+    return Number(precioVenta) || 0;
+  }, [tipoVenta, productItems, precioVenta]);
+  
+  const [productSearchOpen, setProductSearchOpen] = useState(false);
+  const productDropdownRef = useRef<HTMLDivElement>(null);
+  const productInputRef = useRef<HTMLInputElement>(null);
+
+  // Close product dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (productDropdownRef.current && !productDropdownRef.current.contains(event.target as Node)) {
+        setProductSearchOpen(false);
+      }
+    };
+    if (productSearchOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      setTimeout(() => productInputRef.current?.focus(), 50);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [productSearchOpen]);
+
   // Tax Calculations
-  // IVA is 16% of the negotiated price
-  const ivaAmount = tipoDocumento === 'factura_fiscal' ? negotiatedPrice * 0.16 : 0;
+  const ivaAmount = useMemo(() => {
+    if (tipoDocumento !== 'factura_fiscal') return 0;
+    if (tipoVenta === 'producto') {
+      return productItems.reduce((acc, it) => {
+        if (it.aplica_iva) return acc + (it.subtotal_usd * 0.16);
+        return acc;
+      }, 0);
+    }
+    return negotiatedPrice * 0.16;
+  }, [tipoDocumento, tipoVenta, productItems, negotiatedPrice]);
+
   const baseFiscalDebt = negotiatedPrice + ivaAmount;
 
-  // IGTF (3%) logic:
-  // Legally, IGTF is 3% of the total amount handed over in foreign currency.
-  // If a user enters $100 in the split, the tax is $3.
+  // IGTF (3%) logic
   const igtfAmount = useMemo(() => {
     if (tipoDocumento !== 'factura_fiscal') return 0;
     
@@ -171,6 +213,53 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
   }, [tipoDocumento, paymentSplits]);
   
   const totalOperacionUsd = baseFiscalDebt + igtfAmount;
+
+  // Product helper functions
+  const filteredAvailableProducts = useMemo(() => {
+    if (!productSearchQuery) return availableProducts;
+    const low = productSearchQuery.toLowerCase();
+    return availableProducts.filter(p => 
+      p.nombre.toLowerCase().includes(low) || 
+      (p.codigo || '').toLowerCase().includes(low)
+    );
+  }, [availableProducts, productSearchQuery]);
+
+  const addProductItem = () => {
+    const prod = availableProducts.find(p => p.id === selectedProductId);
+    if (!prod) return;
+    
+    const qty = parseInt(itemQty) || 1;
+    if (qty > prod.stock_actual) {
+      toast({ title: 'Stock insuficiente', description: `Solo hay ${prod.stock_actual} unidades disponibles.`, variant: 'destructive' });
+      return;
+    }
+
+    const discount = parseFloat(itemDiscount) || 0;
+    const unitPrice = prod.precio_venta_usd;
+    const discountedUnitPrice = unitPrice - (unitPrice * (discount / 100));
+    
+    const newItem = {
+      id: `${prod.id}-${Date.now()}`,
+      producto_id: prod.id,
+      nombre: prod.nombre,
+      codigo: prod.codigo || '',
+      cantidad: qty,
+      precio_unitario: unitPrice,
+      descuento: discount,
+      precio_final: discountedUnitPrice,
+      subtotal_usd: qty * discountedUnitPrice,
+      aplica_iva: prod.aplica_iva || false
+    };
+
+    setProductItems(prev => [...prev, newItem]);
+    setSelectedProductId('');
+    setItemQty('1');
+    setItemDiscount('0');
+  };
+
+  const removeProductItem = (id: string) => {
+    setProductItems(prev => prev.filter(it => it.id !== id));
+  };
   const totalPaidUsd = paymentSplits.reduce((acc, s) => acc + (s.equivalentUsd || 0), 0);
   const remainingUsd = Math.max(0, totalOperacionUsd - totalPaidUsd);
   const isPaymentValid = remainingUsd < 0.01 && paymentSplits.length > 0;
@@ -472,24 +561,32 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
     return (negotiationInfo.status === 'critical' || negotiationInfo.status === 'very_low') && currentRole !== 'dueno' && currentRole !== 'encargado';
   }, [negotiationInfo, currentRole]);
 
-  // Load vehicles
+  // Load vehicles and products
   useEffect(() => {
     if (!open || !concesionarioId) return;
-    const fetchVehicles = async () => {
+    const fetchData = async () => {
       setIsLoadingVehicles(true);
       try {
-        const q = query(collection(firestore, 'concesionarios', concesionarioId, 'inventario'), where('estado_stock', '!=', 'vendido'));
-        const snap = await getDocs(q);
-        setAvailableVehicles(snap.docs.map(d => ({ id: d.id, ...d.data() } as StockVehicle)));
+        const qVehicles = query(collection(firestore, 'concesionarios', concesionarioId, 'inventario'), where('estado_stock', '!=', 'vendido'));
+        const snapVehicles = await getDocs(qVehicles);
+        setAvailableVehicles(snapVehicles.docs.map(d => ({ id: d.id, ...d.data() } as StockVehicle)));
+
+        const qProducts = query(collection(firestore, 'concesionarios', concesionarioId, 'productos'));
+        const snapProducts = await getDocs(qProducts);
+        setAvailableProducts(snapProducts.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (e) { console.error(e); } finally { setIsLoadingVehicles(false); }
     };
-    fetchVehicles();
+    fetchData();
     resetAll();
 
     if (preInvoice) {
       setTipoVenta(preInvoice.item_tipo);
-      setSelectedVehicleId(preInvoice.item_id);
-      setPrecioVenta(preInvoice.precio_negociado);
+      if (preInvoice.item_tipo === 'vehiculo') {
+        setSelectedVehicleId(preInvoice.item_id);
+        setPrecioVenta(preInvoice.precio_negociado);
+      } else {
+        // Handle pre-invoice for products if needed
+      }
       setVendedorId(preInvoice.vendedor_id);
       setStep('cliente'); // Redirect to client step as requested
     } else {
@@ -503,14 +600,22 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
     setParteDePago(false); setCompradorNombre(''); setCompradorCedula(''); setCompradorTelefono('');
     setPaymentSplits([]); setRegistrarCaja(true); setTipoDocumento('nota_entrega'); setDocsAlerta(false);
     setNumFactura(''); setNumControl(''); setPrintDoc(null); setClientMode('cargar'); setClientSearchQuery('');
-    setPaymentMode('completo');
+    setPaymentMode('completo'); setProductItems([]); setProductSearchQuery(''); setSelectedProductId('');
   };
 
   const handleNext = () => {
-    if (step === 'tipo') { if (tipoVenta === 'vehiculo') setStep('vehiculo'); }
+    if (step === 'tipo') { 
+      if (tipoVenta === 'vehiculo') setStep('vehiculo');
+      else if (tipoVenta === 'producto') setStep('productos');
+    }
     else if (step === 'vehiculo') {
       if (!selectedVehicleId) return;
       setStep('precio');
+    }
+    else if (step === 'productos') {
+      if (productItems.length === 0) { toast({ title: 'Agrega al menos un producto', variant: 'destructive' }); return; }
+      // Skipping Seller and Client steps for products
+      setStep('pago');
     }
     else if (step === 'precio') {
       if (!vendedorId) { toast({ title: 'Vendedor requerido', variant: 'destructive' }); return; }
@@ -530,10 +635,13 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
   };
 
   const handleBack = () => {
-    if (step === 'vehiculo') setStep('tipo');
+    if (step === 'vehiculo' || step === 'productos') setStep('tipo');
     else if (step === 'precio') setStep('vehiculo');
     else if (step === 'cliente' && !preInvoice) setStep('precio');
-    else if (step === 'pago') setStep('cliente');
+    else if (step === 'pago') {
+      if (tipoVenta === 'producto') setStep('productos');
+      else setStep('cliente');
+    }
     else if (step === 'documentos') setStep('exito');
   };
 
@@ -563,35 +671,31 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
   };
 
   const handleSubmit = async () => {
-    if (!selectedVehicleId || !compradorNombre || !precioVenta || !isPaymentValid || !vendedorId || !concesionario) {
-      toast({ title: 'Faltan datos', description: 'Completa todos los campos obligatorios.', variant: 'destructive' }); return;
+    if (tipoVenta === 'vehiculo' && (!selectedVehicleId || !compradorNombre || !precioVenta || !isPaymentValid || !vendedorId || !concesionario)) {
+      toast({ title: 'Faltan datos', description: 'Completa todos los campos obligatorios para la venta del vehículo.', variant: 'destructive' }); return;
     }
+    if (tipoVenta === 'producto' && (productItems.length === 0 || !isPaymentValid || !concesionario)) {
+      toast({ title: 'Faltan datos', description: 'Agrega productos y completa el pago para continuar.', variant: 'destructive' }); return;
+    }
+
     setIsSaving(true);
     try {
-      const { runTransaction } = await import('firebase/firestore');
-      const vehicle = selectedVehicle!;
-      const vStaff = staffList.find(s => s.id === vendedorId);
-      const vendedorNombre = vStaff?.nombre || 'Desconocido';
+      const { runTransaction, increment } = await import('firebase/firestore');
       
-      let commRate = concesionario?.configuracion.estructura_comision || 0;
-      if (vStaff?.commission_percentage != null) commRate = vStaff.commission_percentage;
-      
-      const salePrice = Number(precioVenta);
-      const comision = (salePrice * commRate) / 100;
-      const totalBasis = (vehicle.costo_compra || 0) + (vehicle.gastos_adecuacion || []).reduce((a, g) => a + (g.monto || 0), 0);
-      
-      const gananciaNeta = vehicle.es_consignacion
-        ? (vehicle.consignacion_info?.comision_acordada || 0) / 100 * salePrice - comision
-        : salePrice - totalBasis - comision;
-
+      // Basic info for any sale type
+      const vStaff = vendedorId ? staffList.find(s => s.id === vendedorId) : staff;
+      const vendedorNombre = vStaff?.nombre || 'Venta de Mostrador';
+      const salePrice = negotiatedPrice;
       const metodoPagoStr = paymentSplits.map(s => s.method).join(', ');
       const totalIgtf = paymentSplits.reduce((acc, s) => acc + (s.igtfAmount || 0), 0);
-
-      // We'll need the client ID
+      
       let cId = compradorId;
       const clientsRef = collection(firestore, 'concesionarios', concesionarioId, 'clientes');
 
-      // Pre-fetch client if we have a CID
+      // Use a default client name if none provided for products
+      const finalCompradorNombre = compradorNombre || (tipoVenta === 'producto' ? 'Consumidor Final' : '');
+      const finalCompradorApellido = compradorApellido || '';
+
       if (!cId && compradorCedula) {
         const q = query(clientsRef, where('cedula_rif', '==', compradorCedula));
         const snap = await getDocs(q);
@@ -604,8 +708,6 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
 
       await runTransaction(firestore, async (transaction) => {
         // --- 1. ALL READS FIRST ---
-        
-        // A. Read Concessionaire Settings
         const concRef = doc(firestore, 'concesionarios', concesionarioId);
         const concSnap = await transaction.get(concRef);
         const lastNum = (concSnap.data()?.configuracion?.ultimo_numero_factura_ventas || 0) as number;
@@ -613,80 +715,115 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
         finalFacN = padNum(next, 7);
         finalCtrlN = `00-${padNum(next, 7)}`;
 
-        // B. Read Client if exists
         let clientSnap = null;
         if (cId) {
           const clientRef = doc(firestore, 'concesionarios', concesionarioId, 'clientes', cId);
           clientSnap = await transaction.get(clientRef);
         }
 
-        // C. Read all involved Bank Accounts
         const bankSnaps: Record<string, any> = {};
         for (const split of paymentSplits) {
           if (split.accountId && !bankSnaps[split.accountId]) {
             const accRef = doc(firestore, 'concesionarios', concesionarioId, 'cuentas_bancarias', split.accountId);
             const accSnap = await transaction.get(accRef);
-            if (accSnap.exists()) {
-              bankSnaps[split.accountId] = accSnap.data();
-            }
+            if (accSnap.exists()) bankSnaps[split.accountId] = accSnap.data();
           }
         }
 
-        // D. Read Vehicle Stock (just to be safe and consistent)
-        const vehicleRef = doc(firestore, 'concesionarios', concesionarioId, 'inventario', vehicle.id);
-        const vehicleSnap = await transaction.get(vehicleRef);
-
         // --- 2. ALL WRITES SECOND ---
-
-        // Prepare Data Docs
         const saleDocRef = doc(collection(firestore, 'concesionarios', concesionarioId, 'ventas'));
-        const vehNombre = `${vehicle.year} ${vehicle.make} ${vehicle.model}${vehicle.placa ? ` (${vehicle.placa})` : ''}`;
         
-        const ventaData = {
-          vehiculo_id: vehicle.id,
-          vehiculo_nombre: vehNombre,
+        let ventaData: any = {
           comprador_id: cId || '',
-          comprador_nombre: `${compradorNombre} ${compradorApellido}`, comprador_telefono: compradorTelefono, comprador_cedula: compradorCedula,
-          vendedor_staff_id: vendedorId, vendedor_nombre: vendedorNombre, precio_venta: salePrice, metodo_pago: metodoPagoStr, pagos_combinados: paymentSplits,
-          igtf_total: totalIgtf, comision_vendedor: comision, ganancia_neta: gananciaNeta, fecha: serverTimestamp(), tipo_venta: 'vehiculo' as const,
-          tipo_documento_emitido: tipoDocumento, numero_factura_venta: finalFacN, numero_control_venta: finalCtrlN,
-          vehiculo_info: {
-            make: vehicle.make, model: vehicle.model, year: vehicle.year, placa: vehicle.placa || vehicle.info_extra?.placa || '',
-            exteriorColor: vehicle.exteriorColor || '', serial_carroceria: vehicle.info_extra?.serial_carroceria || '', serial_motor: vehicle.info_extra?.serial_motor || '',
-            clase: vehicle.info_extra?.clase || '', tipo: vehicle.info_extra?.tipo || '', mileage: vehicle.mileage || 0,
-          },
+          comprador_nombre: `${finalCompradorNombre} ${finalCompradorApellido}`.trim(),
+          comprador_telefono: compradorTelefono || '',
+          comprador_cedula: compradorCedula || '',
+          vendedor_staff_id: vendedorId || staff?.id || '',
+          vendedor_nombre: vendedorNombre,
+          precio_venta: salePrice,
+          metodo_pago: metodoPagoStr,
+          pagos_combinados: paymentSplits,
+          igtf_total: totalIgtf,
+          fecha: serverTimestamp(),
+          tipo_venta: tipoVenta,
+          tipo_documento_emitido: tipoDocumento,
+          numero_factura_venta: finalFacN,
+          numero_control_venta: finalCtrlN,
+          iva_total: ivaAmount,
+          total_con_impuestos: totalOperacionUsd
         };
 
-        const clientUpdateData: any = {
-          nombre: compradorNombre, apellido: compradorApellido, cedula_rif: compradorCedula, telefono: compradorTelefono, email: compradorEmail,
-          updated_at: serverTimestamp(),
-          ultima_compra_fecha: serverTimestamp(), traspaso_pendiente: true, traspaso_fecha_limite: Timestamp.fromMillis(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        };
+        if (tipoVenta === 'vehiculo') {
+          const vehicle = selectedVehicle!;
+          let commRate = vStaff?.commission_percentage ?? concesionario?.configuracion.estructura_comision ?? 0;
+          const comision = (salePrice * commRate) / 100;
+          const totalBasis = (vehicle.costo_compra || 0) + (vehicle.gastos_adecuacion || []).reduce((a, g) => a + (g.monto || 0), 0);
+          const gananciaNeta = vehicle.es_consignacion
+            ? (vehicle.consignacion_info?.comision_acordada || 0) / 100 * salePrice - comision
+            : salePrice - totalBasis - comision;
 
-        // A. Update/Create Client
-        if (clientSnap) {
-          const clientRef = doc(firestore, 'concesionarios', concesionarioId, 'clientes', cId!);
-          const currentInvertido = clientSnap.data()?.total_invertido || 0;
-          const currentCompras = clientSnap.data()?.compras_ids || [];
-          transaction.update(clientRef, {
-            ...clientUpdateData,
-            total_invertido: currentInvertido + salePrice,
-            compras_ids: [...currentCompras, saleDocRef.id]
+          ventaData = {
+            ...ventaData,
+            vehiculo_id: vehicle.id,
+            vehiculo_nombre: `${vehicle.year} ${vehicle.make} ${vehicle.model}${vehicle.placa ? ` (${vehicle.placa})` : ''}`,
+            comision_vendedor: comision,
+            ganancia_neta: gananciaNeta,
+            vehiculo_info: {
+              make: vehicle.make, model: vehicle.model, year: vehicle.year, placa: vehicle.placa || vehicle.info_extra?.placa || '',
+              exteriorColor: vehicle.exteriorColor || '', serial_carroceria: vehicle.info_extra?.serial_carroceria || '', serial_motor: vehicle.info_extra?.serial_motor || '',
+              clase: vehicle.info_extra?.clase || '', tipo: vehicle.info_extra?.tipo || '', mileage: vehicle.mileage || 0,
+            },
+          };
+
+          transaction.update(doc(firestore, 'concesionarios', concesionarioId, 'inventario', vehicle.id), {
+            estado_stock: 'vendido',
+            fecha_venta: serverTimestamp(),
+            updated_at: serverTimestamp()
           });
         } else {
-          const newClientRef = doc(collection(firestore, 'concesionarios', concesionarioId, 'clientes'));
-          cId = newClientRef.id;
-          ventaData.comprador_id = cId;
-          transaction.set(newClientRef, {
-            ...clientUpdateData,
-            total_invertido: salePrice,
-            compras_ids: [saleDocRef.id],
-            tags: ['Comprador de Carros'],
-            created_at: serverTimestamp()
+          // Product specific writes
+          ventaData.items = productItems;
+          ventaData.descripcion_resumen = `${productItems.length} Producto(s): ${productItems.slice(0, 2).map(i => i.nombre).join(', ')}${productItems.length > 2 ? '...' : ''}`;
+          
+          productItems.forEach(it => {
+            const prodRef = doc(firestore, 'concesionarios', concesionarioId, 'productos', it.producto_id);
+            transaction.update(prodRef, {
+              stock_actual: increment(-it.cantidad),
+              updated_at: serverTimestamp()
+            });
           });
         }
 
-        // B. Prepare Bank Balance Final Updates
+        // Client handling
+        if (cId || compradorCedula) {
+          const clientUpdateData: any = {
+            nombre: finalCompradorNombre, apellido: finalCompradorApellido, cedula_rif: compradorCedula, telefono: compradorTelefono, email: compradorEmail,
+            updated_at: serverTimestamp(), ultima_compra_fecha: serverTimestamp(),
+          };
+
+          if (clientSnap) {
+            const currentInvertido = clientSnap.data()?.total_invertido || 0;
+            const currentCompras = clientSnap.data()?.compras_ids || [];
+            transaction.update(doc(firestore, 'concesionarios', concesionarioId, 'clientes', cId!), {
+              ...clientUpdateData,
+              total_invertido: currentInvertido + salePrice,
+              compras_ids: [...currentCompras, saleDocRef.id]
+            });
+          } else if (compradorCedula) {
+            const newClientRef = doc(collection(firestore, 'concesionarios', concesionarioId, 'clientes'));
+            cId = newClientRef.id;
+            ventaData.comprador_id = cId;
+            transaction.set(newClientRef, {
+              ...clientUpdateData,
+              total_invertido: salePrice,
+              compras_ids: [saleDocRef.id],
+              tags: [tipoVenta === 'vehiculo' ? 'Comprador de Carros' : 'Comprador de Repuestos'],
+              created_at: serverTimestamp()
+            });
+          }
+        }
+
+        // Bank updates
         const bankFinalUpdates: Record<string, { nextSaldo: number, prevSaldo: number }> = {};
         for (const split of paymentSplits) {
           if (split.accountId && bankSnaps[split.accountId]) {
@@ -700,65 +837,35 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
             const splitPrevSaldo = current.nextSaldo;
             current.nextSaldo += split.amount;
 
-            // Create individual transaction records for each split
             const txRef = doc(collection(firestore, 'concesionarios', concesionarioId, 'cuentas_bancarias', split.accountId, 'transacciones'));
             transaction.set(txRef, {
-              cuenta_id: split.accountId,
-              tipo: 'ingreso_venta',
-              flujo: 'entrada',
-              monto: split.amount,
-              metodo_pago: split.method,
-              concepto: `Venta: ${ventaData.vehiculo_nombre} (Fac. ${finalFacN})`,
-              referencia: '',
-              registrado_por_id: staff?.id || 'admin',
-              registrado_por_nombre: staff?.nombre || 'Administrador',
-              saldo_anterior: splitPrevSaldo,
-              saldo_posterior: current.nextSaldo,
-              fecha: serverTimestamp(),
-              venta_id: saleDocRef.id
+              cuenta_id: split.accountId, tipo: 'ingreso_venta', flujo: 'entrada', monto: split.amount, metodo_pago: split.method,
+              concepto: `Venta (${tipoVenta}): ${ventaData.vehiculo_nombre || 'Productos'} (Fac. ${finalFacN})`,
+              registrado_por_id: staff?.id || 'admin', registrado_por_nombre: staff?.nombre || 'Administrador',
+              saldo_anterior: splitPrevSaldo, saldo_posterior: current.nextSaldo, fecha: serverTimestamp(), venta_id: saleDocRef.id
             });
           }
         }
 
-        // C. Apply Accumulated Bank Balance Updates
         for (const [accId, updates] of Object.entries(bankFinalUpdates)) {
-          const accRef = doc(firestore, 'concesionarios', concesionarioId, 'cuentas_bancarias', accId);
-          transaction.update(accRef, {
-            saldo_actual: updates.nextSaldo,
-            updated_at: serverTimestamp()
+          transaction.update(doc(firestore, 'concesionarios', concesionarioId, 'cuentas_bancarias', accId), {
+            saldo_actual: updates.nextSaldo, updated_at: serverTimestamp()
           });
         }
 
-        // Final updates
         transaction.set(saleDocRef, ventaData);
-        transaction.update(doc(firestore, 'concesionarios', concesionarioId, 'inventario', vehicle.id), {
-          estado_stock: 'vendido',
-          fecha_venta: serverTimestamp(),
-          updated_at: serverTimestamp()
-        });
-        transaction.update(concRef, {
-          'configuracion.ultimo_numero_factura_ventas': next
-        });
+        transaction.update(concRef, { 'configuracion.ultimo_numero_factura_ventas': next });
 
         if (registrarCaja && staff) {
-          const cajaRef = doc(collection(firestore, 'concesionarios', concesionarioId, 'caja'));
-          transaction.set(cajaRef, {
-            tipo: 'ingreso',
-            monto: salePrice,
-            descripcion: `Venta: ${ventaData.vehiculo_nombre}`,
-            metodo_pago: metodoPagoStr,
-            cajero_staff_id: staff.id,
-            cajero_nombre: staff.nombre,
-            fecha: serverTimestamp(),
-            venta_id: saleDocRef.id
+          transaction.set(doc(collection(firestore, 'concesionarios', concesionarioId, 'caja')), {
+            tipo: 'ingreso', monto: salePrice, 
+            descripcion: `Venta (${tipoVenta}): ${ventaData.vehiculo_nombre || ventaData.descripcion_resumen}`,
+            metodo_pago: metodoPagoStr, cajero_staff_id: staff.id, cajero_nombre: staff.nombre, fecha: serverTimestamp(), venta_id: saleDocRef.id
           });
         }
       });
 
-      if (preInvoice?.id) {
-        const { deleteDoc } = await import('firebase/firestore');
-        await deleteDoc(doc(firestore, 'concesionarios', concesionarioId, 'pre_invoices', preInvoice.id));
-      }
+      if (preInvoice?.id) await import('firebase/firestore').then(m => m.deleteDoc(doc(firestore, 'concesionarios', concesionarioId, 'pre_invoices', preInvoice.id)));
 
       setNumFactura(finalFacN); setNumControl(finalCtrlN); setVentaFecha(now);
       setStep('exito'); onSave();
@@ -862,23 +969,18 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
                 <div className="grid grid-cols-2 gap-4">
                   {[
                     { id: 'vehiculo', label: 'Vehículo', icon: Car, color: 'blue', available: true },
-                    { id: 'producto', label: 'Producto / Repuesto', icon: Package, color: 'gray', available: false },
+                    { id: 'producto', label: 'Producto / Repuesto', icon: Package, color: 'gray', available: true },
                   ].map(opt => (
                     <button
                       key={opt.id}
                       onClick={() => setTipoVenta(opt.id as any)}
-                      disabled={!opt.available}
                       className={cn(
                         "relative p-6 rounded-2xl border-2 transition-all flex flex-col items-center gap-3 text-center",
-                        tipoVenta === opt.id ? "border-primary bg-primary/5 shadow-lg shadow-primary/10" : "border-transparent bg-muted/40 hover:bg-muted/70",
-                        !opt.available && "opacity-50 cursor-not-allowed"
+                        tipoVenta === opt.id ? "border-primary bg-primary/5 shadow-lg shadow-primary/10" : "border-transparent bg-muted/40 hover:bg-muted/70"
                       )}
                     >
                       <opt.icon className={cn("h-12 w-12", tipoVenta === opt.id ? "text-primary" : "text-muted-foreground")} />
                       <span className="font-semibold text-base">{opt.label}</span>
-                      {!opt.available && (
-                        <span className="absolute top-2 right-2 text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">Próximamente</span>
-                      )}
                       {tipoVenta === opt.id && <CheckCircle2 className="absolute top-2 right-2 h-5 w-5 text-primary" />}
                     </button>
                   ))}
@@ -886,7 +988,163 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
               </div>
             )}
 
-            {/* ═══ STEP 2: VEHÍCULO ═══ */}
+            {/* ═══ STEP 2: PRODUCTOS ═══ */}
+            {step === 'productos' && (
+              <div className="space-y-4 animate-in fade-in slide-in-from-right-2 duration-300">
+                <h3 className="font-semibold text-lg flex items-center gap-2"><Package className="h-5 w-5 text-primary" /> Selección de Productos</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 p-4 bg-muted/30 rounded-2xl border">
+                  <div className="md:col-span-2 space-y-1.5">
+                    <Label className="text-xs uppercase font-bold text-muted-foreground">Buscar Producto</Label>
+                    <div className="relative" ref={productDropdownRef}>
+                      <Button
+                        variant="outline"
+                        type="button"
+                        className="w-full h-10 px-3 text-sm justify-between font-normal text-left bg-white border-slate-200 rounded-lg shadow-sm"
+                        onClick={() => setProductSearchOpen(!productSearchOpen)}
+                      >
+                        <span className="truncate flex items-center gap-2">
+                          {selectedProductId ? (
+                            <>
+                              <div className="w-2 h-2 rounded-full bg-primary" />
+                              {availableProducts.find((p) => p.id === selectedProductId)?.nombre}
+                            </>
+                          ) : (
+                            "Busca o elige un producto..."
+                          )}
+                        </span>
+                        <ChevronDown className={cn("h-4 w-4 opacity-50 shrink-0 transition-transform duration-300", productSearchOpen && "rotate-180")} />
+                      </Button>
+
+                      {productSearchOpen && (
+                        <div
+                          className="absolute top-full left-0 w-full z-[100] mt-1 bg-white text-popover-foreground rounded-xl border border-slate-200 shadow-xl animate-in fade-in-0 zoom-in-95 overflow-hidden"
+                        >
+                          <div className="p-2 border-b border-slate-100 bg-slate-50/50">
+                            <div className="relative">
+                              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                              <Input
+                                ref={productInputRef}
+                                placeholder="Escribe nombre o código..."
+                                value={productSearchQuery}
+                                onChange={(e) => setProductSearchQuery(e.target.value)}
+                                className="pl-8 h-8 text-xs bg-white border-slate-200 focus-visible:ring-primary/20 rounded-lg"
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Escape') setProductSearchOpen(false);
+                                }}
+                              />
+                            </div>
+                          </div>
+                          <ScrollArea className="h-[220px]">
+                            <div className="p-1 space-y-0.5">
+                              {filteredAvailableProducts.length === 0 ? (
+                                <div className="p-6 text-center space-y-1">
+                                  <Search className="h-6 w-6 text-slate-200 mx-auto" />
+                                  <p className="text-xs text-slate-400 italic">No se encontraron productos</p>
+                                </div>
+                              ) : (
+                                filteredAvailableProducts.map((p) => (
+                                  <Button
+                                    key={p.id}
+                                    variant="ghost"
+                                    disabled={p.stock_actual <= 0}
+                                    className={cn(
+                                      "w-full justify-start font-normal h-auto py-2 px-3 rounded-lg transition-all duration-200 text-slate-700 hover:text-primary disabled:opacity-50",
+                                      selectedProductId === p.id ? "bg-primary/10 text-primary font-semibold" : "hover:bg-primary/5"
+                                    )}
+                                    onClick={() => {
+                                      setSelectedProductId(p.id);
+                                      setProductSearchOpen(false);
+                                      setProductSearchQuery('');
+                                    }}
+                                  >
+                                    <div className="flex items-center gap-3 w-full">
+                                      <div className="flex flex-col items-start overflow-hidden flex-1">
+                                        <span className="truncate w-full text-left text-xs font-medium">{p.nombre}</span>
+                                        <span className="text-[9px] text-slate-400 font-mono uppercase tracking-wider">{p.codigo || 'SIN CÓDIGO'}</span>
+                                      </div>
+                                      <div className="flex flex-col items-end shrink-0">
+                                        <span className="text-[10px] font-bold text-primary">${Number(p.precio_venta_usd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span className={cn("text-[9px] font-medium px-1 rounded", p.stock_actual > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700")}>
+                                          {p.stock_actual} disp.
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </Button>
+                                ))
+                              )}
+                            </div>
+                          </ScrollArea>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs uppercase font-bold text-muted-foreground">Cant.</Label>
+                    <Input type="number" value={itemQty} onChange={e => setItemQty(e.target.value)} className="bg-white" min="1" />
+                  </div>
+                  <div className="space-y-1.5 flex items-end">
+                    <Button onClick={addProductItem} disabled={!selectedProductId} className="w-full">
+                      <Plus className="h-4 w-4 mr-2" /> Añadir
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="border rounded-2xl overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50 border-b">
+                      <tr className="text-left text-muted-foreground text-[10px] uppercase font-bold">
+                        <th className="p-3">Producto</th>
+                        <th className="p-3 text-center">Cant.</th>
+                        <th className="p-3 text-right">Precio</th>
+                        <th className="p-3 text-right">Subtotal</th>
+                        <th className="p-3"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {productItems.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="p-8 text-center text-muted-foreground italic">
+                            No hay productos en la lista
+                          </td>
+                        </tr>
+                      ) : productItems.map(it => (
+                        <tr key={it.id} className="hover:bg-muted/20 transition-colors">
+                          <td className="p-3 font-medium">
+                            {it.nombre}
+                            <div className="text-[10px] text-muted-foreground font-mono">{it.codigo}</div>
+                          </td>
+                          <td className="p-3 text-center font-bold">{it.cantidad}</td>
+                          <td className="p-3 text-right font-mono">${it.precio_final.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="p-3 text-right font-bold text-primary">${it.subtotal_usd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="p-3 text-right">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => removeProductItem(it.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    {productItems.length > 0 && (
+                      <tfoot className="bg-primary/5 font-bold border-t">
+                        <tr>
+                          <td colSpan={3} className="p-3 text-right uppercase text-[10px] align-middle">Total Productos</td>
+                          <td className="p-3 text-right">
+                            <div className="text-primary font-headline text-lg">
+                              ${negotiatedPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground font-mono">
+                              ≈ Bs. {(negotiatedPrice * effectiveTasa).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </div>
+                          </td>
+                          <td></td>
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
+              </div>
+            )}
             {step === 'vehiculo' && (
               <div className="space-y-5 animate-in fade-in slide-in-from-right-2 duration-300">
                 <h3 className="font-semibold text-lg flex items-center gap-2"><Car className="h-5 w-5 text-primary" /> Seleccionar Vehículo</h3>
