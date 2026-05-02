@@ -60,6 +60,7 @@ import { PurchaseOrderDialog } from '@/components/business/purchase-order-dialog
 import { PurchaseHistoryDialog } from '@/components/business/purchase-history-dialog';
 import { PurchaseEntrySwitcher } from '@/components/business/purchase-entry-switcher';
 import { DeliveryNoteDialog } from '@/components/business/delivery-note-dialog';
+import { useCart } from '@/context/cart-context';
 
 export default function ProductsPage() {
   const params = useParams();
@@ -85,6 +86,12 @@ export default function ProductsPage() {
   const [activeTab, setActiveTab] = useState('todos');
   const [tasaCambio, setTasaCambio] = useState<number>(0);
   const [isSellerMode, setIsSellerMode] = useState(false);
+
+  // Cart flow
+  const { addItem } = useCart();
+  const [quantityDialogOpen, setQuantityDialogOpen] = useState(false);
+  const [selectedForCart, setSelectedForCart] = useState<Producto | null>(null);
+  const [cartQuantity, setCartQuantity] = useState(1);
 
   const hasManageRole = currentRole === 'dueno' || currentRole === 'encargado' || currentRole === 'secretario';
   const roleCanSeeCosts = currentRole ? CAN_SEE_PURCHASE_COSTS[currentRole as BusinessRole] : false;
@@ -286,11 +293,9 @@ export default function ProductsPage() {
               <div className="hidden md:block">
                 <div className={cn(
                   "grid gap-4 px-6 py-3 mb-4 text-[10px] font-black uppercase tracking-widest text-slate-400",
-                  "grid-cols-[1fr_120px_120px]",
-                  canSeeCosts && "grid-cols-[1fr_120px_120px_120px]",
-                  !isReadOnly && canSeeCosts ? "grid-cols-[1fr_120px_120px_120px_100px_80px_100px]" : 
-                  !isReadOnly && !canSeeCosts ? "grid-cols-[1fr_120px_120px_100px_80px_100px]" :
-                  isReadOnly && canSeeCosts ? "grid-cols-[1fr_120px_120px_120px_100px_80px]" :
+                  canSeeCosts && (!isReadOnly || isSellerMode) ? "grid-cols-[1fr_120px_120px_120px_100px_80px_100px]" :
+                  canSeeCosts && !(!isReadOnly || isSellerMode) ? "grid-cols-[1fr_120px_120px_120px_100px_80px]" :
+                  !canSeeCosts && (!isReadOnly || isSellerMode) ? "grid-cols-[1fr_120px_120px_100px_80px_100px]" :
                   "grid-cols-[1fr_120px_120px_100px_80px]"
                 )}>
                   <div>Producto</div>
@@ -299,16 +304,16 @@ export default function ProductsPage() {
                   {canSeeCosts && <div className="text-right">Costo</div>}
                   <div className="text-center">Stock</div>
                   <div className="text-center">IVA</div>
-                  {!isReadOnly && <div className="text-right">Acciones</div>}
+                  {(!isReadOnly || isSellerMode) && <div className="text-right">Acciones</div>}
                 </div>
                 <div className="space-y-3">
                   {filteredProductos.map(p => {
                     const isLow = p.stock_actual <= p.stock_minimo;
                     const gridCols = cn(
                       "grid items-center gap-4 p-4 px-6 bg-white border border-slate-200 rounded-[1.5rem] hover:border-primary/20 hover:translate-y-[-2px] transition-all duration-300 shadow-sm group",
-                      !isReadOnly && canSeeCosts ? "grid-cols-[1fr_120px_120px_120px_100px_80px_100px]" : 
-                      !isReadOnly && !canSeeCosts ? "grid-cols-[1fr_120px_120px_100px_80px_100px]" :
-                      isReadOnly && canSeeCosts ? "grid-cols-[1fr_120px_120px_120px_100px_80px]" :
+                      canSeeCosts && (!isReadOnly || isSellerMode) ? "grid-cols-[1fr_120px_120px_120px_100px_80px_100px]" :
+                      canSeeCosts && !(!isReadOnly || isSellerMode) ? "grid-cols-[1fr_120px_120px_120px_100px_80px]" :
+                      !canSeeCosts && (!isReadOnly || isSellerMode) ? "grid-cols-[1fr_120px_120px_100px_80px_100px]" :
                       "grid-cols-[1fr_120px_120px_100px_80px]"
                     );
                     return (
@@ -363,7 +368,7 @@ export default function ProductsPage() {
                           )}
                         </div>
 
-                        {!isReadOnly && (
+                        {!isReadOnly ? (
                           <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all">
                             <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-primary/10 hover:text-primary" onClick={() => { setEditingProduct(p); setProductDialogOpen(true); }}>
                               <Pencil className="h-4 w-4" />
@@ -387,6 +392,21 @@ export default function ProductsPage() {
                                 </AlertDialogFooter>
                               </AlertDialogContent>
                             </AlertDialog>
+                          </div>
+                        ) : isSellerMode && (
+                          <div className="flex items-center justify-end opacity-0 group-hover:opacity-100 transition-all">
+                            <Button 
+                              variant="default" 
+                              size="sm" 
+                              className="rounded-xl shadow-lg shadow-primary/20 h-9 px-4 font-bold"
+                              onClick={() => {
+                                setSelectedForCart(p);
+                                setCartQuantity(1);
+                                setQuantityDialogOpen(true);
+                              }}
+                            >
+                              <ShoppingCart className="h-3.5 w-3.5 mr-1.5" /> Agregar
+                            </Button>
                           </div>
                         )}
                       </div>
@@ -446,7 +466,7 @@ export default function ProductsPage() {
                           </div>
                         </div>
                         
-                        {!isReadOnly && (
+                        {!isReadOnly ? (
                           <div className="flex gap-2">
                             <Button variant="outline" size="sm" className="rounded-xl h-9 px-4 border-slate-200 bg-white hover:bg-slate-50 font-bold" onClick={() => { setEditingProduct(p); setProductDialogOpen(true); }}>
                               <Pencil className="h-3.5 w-3.5 mr-1.5" /> Editar
@@ -469,6 +489,19 @@ export default function ProductsPage() {
                               </AlertDialogContent>
                             </AlertDialog>
                           </div>
+                        ) : isSellerMode && (
+                          <Button 
+                            variant="default" 
+                            size="sm" 
+                            className="rounded-xl shadow-lg shadow-primary/20 h-9 px-4 font-bold"
+                            onClick={() => {
+                              setSelectedForCart(p);
+                              setCartQuantity(1);
+                              setQuantityDialogOpen(true);
+                            }}
+                          >
+                            <ShoppingCart className="h-3.5 w-3.5 mr-1.5" /> Agregar
+                          </Button>
                         )}
                       </div>
                     </div>
@@ -491,6 +524,45 @@ export default function ProductsPage() {
       <PurchaseOrderDialog open={purchaseOpen} onOpenChange={setPurchaseOpen} onSaved={loadProductos} />
       <DeliveryNoteDialog open={deliveryNoteOpen} onOpenChange={setDeliveryNoteOpen} onSaved={loadProductos} />
       <PurchaseHistoryDialog open={purchaseHistoryOpen} onOpenChange={setPurchaseHistoryOpen} onPurchaseDeleted={loadProductos} />
+      
+      <AlertDialog open={quantityDialogOpen} onOpenChange={setQuantityDialogOpen}>
+        <AlertDialogContent className="bg-white/90 backdrop-blur-xl rounded-[2rem] border border-white/20 shadow-2xl max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-bold font-headline text-slate-900">Cantidad a vender</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-500">
+              <span className="block font-medium text-slate-700">{selectedForCart?.nombre}</span>
+              Stock disponible: {selectedForCart?.stock_actual}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <Label className="text-xs font-black uppercase tracking-widest text-slate-500 mb-2 block">Unidades</Label>
+            <Input 
+              type="number" 
+              min={1} 
+              value={cartQuantity} 
+              onChange={e => {
+                const val = parseInt(e.target.value);
+                if (!isNaN(val)) setCartQuantity(val);
+              }}
+              className="mt-2 rounded-xl h-12 text-center text-lg font-bold border-slate-200 focus:border-primary/50"
+            />
+          </div>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel className="rounded-xl border-slate-200 font-bold w-full m-0 h-12">Cancelar</AlertDialogCancel>
+            <Button 
+              className="rounded-xl font-bold w-full m-0 h-12 shadow-lg shadow-primary/20"
+              onClick={() => {
+                if (selectedForCart) {
+                  addItem(selectedForCart, cartQuantity);
+                  setQuantityDialogOpen(false);
+                }
+              }}
+            >
+              Confirmar
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

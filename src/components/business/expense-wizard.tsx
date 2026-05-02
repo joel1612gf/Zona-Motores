@@ -75,6 +75,8 @@ export function ExpenseWizard({ open, onOpenChange }: ExpenseWizardProps) {
       islr_concept: 'NONE',
       islr_percentage: 0,
       description: '',
+      tipo_pago: 'contado',
+      dias_credito: '15',
     },
   });
 
@@ -84,6 +86,8 @@ export function ExpenseWizard({ open, onOpenChange }: ExpenseWizardProps) {
   const controlNumber = form.watch('control_number');
   const base = form.watch('base_amount') || 0;
   const exempt = form.watch('exempt_amount') || 0;
+  const tipoPago = form.watch('tipo_pago');
+  const diasCredito = form.watch('dias_credito');
   
   // 1. Auto-fill IVA
   useEffect(() => {
@@ -197,6 +201,14 @@ export function ExpenseWizard({ open, onOpenChange }: ExpenseWizardProps) {
         const islrRetentionNumber = `ISLR-${yearMonth}-${String(islrSeq).padStart(4, '0')}`;
 
         const expenseRef = doc(collection(firestore, 'concesionarios', concesionario.id, 'gastos'));
+        
+        // Calculate due date if credit
+        let dueDate: Date | null = null;
+        if (values.tipo_pago === 'credito' && values.dias_credito) {
+          dueDate = new Date(values.date);
+          dueDate.setDate(dueDate.getDate() + parseInt(values.dias_credito));
+        }
+
         finalPayload = {
           ...values,
           islr_concept: values.islr_concept || 'NONE',
@@ -212,7 +224,9 @@ export function ExpenseWizard({ open, onOpenChange }: ExpenseWizardProps) {
           net_to_pay: netToPay,
           total_usd: selectedCurrency === 'USD' ? netToPay : netToPay / rate,
           exchange_rate: rate,
-          status: 'COMPLETADO',
+          saldo_pendiente: values.tipo_pago === 'credito' ? netToPay : 0,
+          status: values.tipo_pago === 'credito' ? 'PENDIENTE' : 'COMPLETADO',
+          due_date: dueDate || null,
           created_at: serverTimestamp(),
           created_by: staff?.id || concesionario.owner_uid,
           creado_por: staff?.nombre || 'Administrador',
@@ -231,15 +245,17 @@ export function ExpenseWizard({ open, onOpenChange }: ExpenseWizardProps) {
           last_islr_retention_seq: islrPercentage > 0 ? islrSeq : (settingsSnap.data()?.last_islr_retention_seq || 0),
         }, { merge: true });
 
-        const cashRef = doc(collection(firestore, 'concesionarios', concesionario.id, 'caja'));
-        transaction.set(cashRef, {
-          tipo: 'egreso',
-          monto: selectedCurrency === 'USD' ? netToPay : netToPay / rate,
-          descripcion: `PAGO GASTO: ${values.invoice_number} - ${selectedProvider?.nombre}`,
-          metodo_pago: values.currency === 'USD' ? 'Efectivo USD' : 'Transferencia VES',
-          fecha: serverTimestamp(),
-          referencia_pago: values.invoice_number,
-        });
+        if (values.tipo_pago === 'contado') {
+          const cashRef = doc(collection(firestore, 'concesionarios', concesionario.id, 'caja'));
+          transaction.set(cashRef, {
+            tipo: 'egreso',
+            monto: selectedCurrency === 'USD' ? netToPay : netToPay / rate,
+            descripcion: `PAGO GASTO: ${values.invoice_number} - ${selectedProvider?.nombre}`,
+            metodo_pago: values.currency === 'USD' ? 'Efectivo USD' : 'Transferencia VES',
+            fecha: serverTimestamp(),
+            referencia_pago: values.invoice_number,
+          });
+        }
       });
 
       setSuccessData(finalPayload);
@@ -393,6 +409,21 @@ export function ExpenseWizard({ open, onOpenChange }: ExpenseWizardProps) {
                     <SelectContent className="rounded-xl"><SelectItem value="VES">Bolívares (VES)</SelectItem><SelectItem value="USD">Dólares (USD)</SelectItem></SelectContent>
                   </Select><FormMessage /></FormItem>
                 )} />
+
+                <FormField control={form.control} name="tipo_pago" render={({ field }) => (
+                  <FormItem><FormLabel className="text-[10px] md:text-xs font-black uppercase tracking-widest text-muted-foreground">Tipo Pago</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl><SelectTrigger className="h-11 md:h-12 rounded-xl text-xs md:text-sm"><SelectValue placeholder="Pago" /></SelectTrigger></FormControl>
+                    <SelectContent className="rounded-xl"><SelectItem value="contado">Contado</SelectItem><SelectItem value="credito">Crédito</SelectItem></SelectContent>
+                  </Select><FormMessage /></FormItem>
+                )} />
+
+                {tipoPago === 'credito' && (
+                  <FormField control={form.control} name="dias_credito" render={({ field }) => (
+                    <FormItem><FormLabel className="text-[10px] md:text-xs font-black uppercase tracking-widest text-muted-foreground">Días Crédito</FormLabel>
+                    <FormControl><Input type="number" {...field} className="h-11 md:h-12 rounded-xl text-xs md:text-sm" /></FormControl><FormMessage /></FormItem>
+                  )} />
+                )}
 
                 <div className="sm:col-span-2 grid grid-cols-3 gap-2 md:gap-4 p-4 md:p-6 bg-primary/[0.03] rounded-[1.5rem] md:rounded-[2rem] border border-primary/10">
                   <FormField control={form.control} name="base_amount" render={({ field }) => (

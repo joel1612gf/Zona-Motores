@@ -81,15 +81,22 @@ function BusinessLayoutInner({ children, slug }: { children: ReactNode; slug: st
   );
 }
 
+import { CartProvider } from '@/context/cart-context';
+import { FloatingCart } from '@/components/business/floating-cart';
+
 export default function BusinessLayout({ children }: { children: ReactNode }) {
   const params = useParams();
   const slug = params.slug as string;
 
   return (
     <BusinessAuthProvider slug={slug}>
-      <BusinessLayoutInner slug={slug}>
-        {children}
-      </BusinessLayoutInner>
+      <CartProvider>
+        <BusinessLayoutInner slug={slug}>
+          {children}
+        </BusinessLayoutInner>
+        {/* Renderizamos el carrito flotante de forma global para el SaaS (no se mostrará en login porque ahí los items estarán en 0 o no hay concesionario) */}
+        <FloatingCart />
+      </CartProvider>
     </BusinessAuthProvider>
   );
 }

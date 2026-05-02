@@ -22,6 +22,8 @@ export const expenseSchema = z.object({
   islr_percentage: z.number().optional(),
   retention_iva_rate: z.enum(['0', '75', '100']).default('75'),
   description: z.string().min(5, 'Descripción demasiado corta'),
+  tipo_pago: z.enum(['contado', 'credito']).default('contado'),
+  dias_credito: z.string().optional(),
 });
 
 export type ExpenseFormValues = z.infer<typeof expenseSchema>;
@@ -62,11 +64,23 @@ export type PaymentSplit = z.infer<typeof paymentSplitSchema>;
 export const preInvoiceSchema = z.object({
   vendedor_id: z.string().min(1),
   vendedor_nombre: z.string().min(1),
-  item_id: z.string().min(1),
+  item_id: z.string().optional(),
   item_tipo: z.enum(['vehiculo', 'producto']),
   item_nombre: z.string().min(1),
   precio_negociado: z.number().min(0),
-});
+  items: z.array(z.object({
+    id: z.string(),
+    codigo: z.string(),
+    nombre: z.string(),
+    cantidad: z.number(),
+    precio_usd: z.number(),
+    aplica_iva: z.boolean(),
+  })).optional()
+}).refine(data => {
+  if (data.item_tipo === 'vehiculo' && !data.item_id) return false;
+  if (data.item_tipo === 'producto' && (!data.items || data.items.length === 0)) return false;
+  return true;
+}, { message: "Faltan datos requeridos según el tipo de venta (vehículo o producto)" });
 
 export type PreInvoiceFormValues = z.infer<typeof preInvoiceSchema>;
 

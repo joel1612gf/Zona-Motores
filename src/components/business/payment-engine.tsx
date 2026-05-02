@@ -11,7 +11,7 @@ import { Loader2, Plus, Trash2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { PaymentSplit } from '@/lib/finance-schemas';
 import type { BankAccount, BankEntryMethod } from '@/lib/business-types';
-import { BANK_ENTRY_METHOD_LABELS, BANK_ACCOUNT_TYPE_ICONS, BANK_ACCOUNT_TYPE_LABELS } from '@/lib/business-types';
+import { BANK_ENTRY_METHOD_LABELS, BANK_ACCOUNT_TYPE_LABELS } from '@/lib/business-types';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -41,6 +41,8 @@ interface PaymentEngineProps {
   bankAccounts: BankAccount[];
   /** Called whenever validity or split values change */
   onValidChange: (isValid: boolean, splits: PaymentSplit[], totalEquivalentUsd: number) => void;
+  /** Whether the document is fiscal. If false, IGTF is never applied. */
+  isFiscal?: boolean;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -107,7 +109,8 @@ function getAccountsForMethod(accounts: BankAccount[], method: BankEntryMethod, 
 function buildSplit(
   row: Pick<SplitRow, 'entryMethod' | 'accountId' | 'accountName' | 'amount'>,
   account: BankAccount | undefined,
-  tasaBcv: number
+  tasaBcv: number,
+  isFiscal: boolean
 ): PaymentSplit {
   const isUSD = account?.es_divisa ?? false;
   const currency = isUSD ? 'USD' : 'VES';
@@ -120,7 +123,7 @@ function buildSplit(
     currency,
     amount,
     exchangeRate: tasaBcv,
-    igtfAmount: isUSD ? amount * 0.03 : 0,
+    igtfAmount: (isUSD && isFiscal) ? amount * 0.03 : 0,
     equivalentUsd: isUSD ? amount : amount / tasaBcv,
     accountId: row.accountId || undefined,
     accountName: row.accountName || undefined,
@@ -129,7 +132,7 @@ function buildSplit(
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-export function PaymentEngine({ totalUsd, tasaBcv, bankAccounts, onValidChange }: PaymentEngineProps) {
+export function PaymentEngine({ totalUsd, tasaBcv, bankAccounts, onValidChange, isFiscal = true }: PaymentEngineProps) {
   const [rows, setRows] = useState<SplitRow[]>([]);
 
   const paymentOptions = useMemo(() => getPaymentOptions(bankAccounts), [bankAccounts]);
@@ -138,9 +141,9 @@ export function PaymentEngine({ totalUsd, tasaBcv, bankAccounts, onValidChange }
   const splits = useMemo<PaymentSplit[]>(() => {
     return rows.map(row => {
       const account = bankAccounts.find(a => a.id === row.accountId);
-      return buildSplit(row, account, tasaBcv);
+      return buildSplit(row, account, tasaBcv, isFiscal);
     });
-  }, [rows, bankAccounts, tasaBcv]);
+  }, [rows, bankAccounts, tasaBcv, isFiscal]);
 
   const totalPaidUsd = splits.reduce((acc, s) => acc + (s.equivalentUsd || 0), 0);
   const remainingUsd = Math.max(0, totalUsd - totalPaidUsd);
@@ -371,7 +374,6 @@ export function PaymentEngine({ totalUsd, tasaBcv, bankAccounts, onValidChange }
                             : 'border-muted bg-muted/30 text-muted-foreground hover:bg-muted/60 hover:border-primary/30'
                         )}
                       >
-                        <span className="text-base shrink-0">{BANK_ACCOUNT_TYPE_ICONS[acc.tipo]}</span>
                         <div className="min-w-0">
                           <p className="truncate font-bold">{acc.nombre}</p>
                           {acc.banco && (
@@ -387,12 +389,11 @@ export function PaymentEngine({ totalUsd, tasaBcv, bankAccounts, onValidChange }
               {/* Single account — just show a badge */}
               {row.entryMethod && !needsAccountSelect && selectedAccount && (
                 <div className="flex items-center gap-2 pl-1">
-                  <span className="text-sm">{BANK_ACCOUNT_TYPE_ICONS[selectedAccount.tipo]}</span>
                   <span className="text-xs text-muted-foreground">
                     {selectedAccount.nombre}
                     {selectedAccount.banco ? ` (${selectedAccount.banco})` : ''}
                   </span>
-                  {isUSD && (
+                  {isUSD && isFiscal && (
                     <span className="text-[10px] bg-amber-100 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5 font-bold ml-auto">
                       IGTF 3%
                     </span>

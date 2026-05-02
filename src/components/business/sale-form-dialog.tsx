@@ -164,7 +164,7 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
   
   const negotiatedPrice = useMemo(() => {
     if (tipoVenta === 'producto') {
-      return productItems.reduce((acc, it) => acc + (it.subtotal_usd || 0), 0);
+      return productItems.reduce((acc, it) => acc + (it.subtotal_usd ?? (it.precio_usd * it.cantidad) ?? 0), 0);
     }
     return Number(precioVenta) || 0;
   }, [tipoVenta, productItems, precioVenta]);
@@ -581,14 +581,26 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
 
     if (preInvoice) {
       setTipoVenta(preInvoice.item_tipo);
+      setVendedorId(preInvoice.vendedor_id || '');
+      
       if (preInvoice.item_tipo === 'vehiculo') {
         setSelectedVehicleId(preInvoice.item_id);
         setPrecioVenta(preInvoice.precio_negociado);
-      } else {
-        // Handle pre-invoice for products if needed
+        setStep('cliente');
+      } else if (preInvoice.item_tipo === 'producto') {
+        if (preInvoice.items && Array.isArray(preInvoice.items)) {
+          const normalizedItems = preInvoice.items.map((it: any) => ({
+            ...it,
+            producto_id: it.producto_id || it.id,
+            precio_unitario: it.precio_unitario ?? it.precio_usd,
+            precio_final: it.precio_final ?? it.precio_usd,
+            subtotal_usd: it.subtotal_usd ?? (it.precio_usd * it.cantidad),
+            descuento: it.descuento || 0
+          }));
+          setProductItems(normalizedItems);
+        }
+        setStep('pago'); // Productos saltan directo al pago
       }
-      setVendedorId(preInvoice.vendedor_id);
-      setStep('cliente'); // Redirect to client step as requested
     } else {
       if (currentRole === 'vendedor' && staff) setVendedorId(staff.id);
     }
@@ -637,9 +649,15 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
   const handleBack = () => {
     if (step === 'vehiculo' || step === 'productos') setStep('tipo');
     else if (step === 'precio') setStep('vehiculo');
-    else if (step === 'cliente' && !preInvoice) setStep('precio');
+    else if (step === 'cliente') {
+      if (preInvoice) onOpenChange(false);
+      else setStep('precio');
+    }
     else if (step === 'pago') {
-      if (tipoVenta === 'producto') setStep('productos');
+      if (tipoVenta === 'producto') {
+        if (preInvoice) onOpenChange(false);
+        else setStep('productos');
+      }
       else setStep('cliente');
     }
     else if (step === 'documentos') setStep('exito');
@@ -780,6 +798,32 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
             fecha_venta: serverTimestamp(),
             updated_at: serverTimestamp()
           });
+
+          // Auto-generate CXP debt when a consigned vehicle is sold
+          if (vehicle.es_consignacion && vehicle.consignacion_info) {
+            const ci = vehicle.consignacion_info as any;
+            const comisionPct = ci.comision_acordada || 0;
+            const comisionMonto = (salePrice * comisionPct) / 100;
+            const montoAPagar = salePrice - comisionMonto;
+            const vehicleLabel = `${vehicle.year} ${vehicle.make} ${vehicle.model}${vehicle.placa ? ` (${vehicle.placa})` : ''}`;
+            const consigRef = doc(collection(firestore, 'concesionarios', concesionarioId, 'consignaciones_por_pagar'));
+            transaction.set(consigRef, {
+              vehiculo_id: vehicle.id,
+              vehiculo_nombre: vehicleLabel,
+              propietario_nombre: ci.owner_name || 'Propietario',
+              propietario_telefono: ci.owner_phone || '',
+              precio_venta_final: salePrice,
+              comision_acordada_porcentaje: comisionPct,
+              comision_monto: comisionMonto,
+              monto_a_pagar: montoAPagar,
+              monto_pagado: 0,
+              saldo_pendiente: montoAPagar,
+              estado: 'pendiente',
+              is_fiscal: false,                // Always false — no IGTF or IVA on consignor payouts
+              venta_id: saleDocRef.id,
+              created_at: serverTimestamp(),
+            });
+          }
         } else {
           // Product specific writes
           ventaData.items = productItems;
@@ -908,12 +952,15 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
     finally { el.style.display = 'none'; el.style.position = 'absolute'; el.style.top = '0'; el.style.left = '0'; el.style.zIndex = '9999'; }
   };
 
-  const ventaDataForDocs = selectedVehicle ? {
-    compradorNombre, compradorCedula, compradorTelefono, metodoPago: paymentSplits.map(s => s.method).join(', '),
+  const ventaDataForDocs = selectedVehicle || productItems.length > 0 ? {
+    compradorNombre: compradorNombre || (tipoVenta === 'producto' ? 'Consumidor Final' : ''),
+    compradorCedula, compradorTelefono, metodoPago: paymentSplits.map(s => s.method).join(', '),
     precioVenta: Number(precioVenta), numFactura, numControl, tipoDocumento, esDivisa: paymentSplits.some(s => s.currency === 'USD' && isMethodDivisa(s.method)),
-    vendedorNombre: staffList.find(s => s.id === vendedorId)?.nombre || '',
+    vendedorNombre: staffList.find(s => s.id === vendedorId)?.nombre || (tipoVenta === 'producto' ? 'Mostrador' : ''),
     fecha: ventaFecha,
-    vehiculo: {
+    tipoVenta,
+    items: productItems,
+    vehiculo: selectedVehicle ? {
       make: selectedVehicle.make, model: selectedVehicle.model, year: selectedVehicle.year,
       placa: selectedVehicle.placa || selectedVehicle.info_extra?.placa || '',
       exteriorColor: selectedVehicle.exteriorColor || '',
@@ -921,7 +968,7 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
       serial_motor: selectedVehicle.info_extra?.serial_motor || '',
       clase: selectedVehicle.info_extra?.clase || '', tipo: selectedVehicle.info_extra?.tipo || '',
       mileage: selectedVehicle.mileage || 0,
-    },
+    } : undefined,
     precioEnLetras: numberToWords(Number(precioVenta)),
   } : null;
 

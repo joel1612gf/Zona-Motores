@@ -29,7 +29,8 @@ export type BusinessModule =
   | 'products'
   | 'reports'
   | 'finance'
-  | 'banks';
+  | 'banks'
+  | 'payables';
 
 /**
  * Permission matrix defining which modules each role can access.
@@ -54,6 +55,7 @@ export const ROLE_PERMISSIONS: Record<BusinessRole, Record<BusinessModule, Permi
     reports: 'full',
     finance: 'full',
     banks: 'full',
+    payables: 'full',
   },
   encargado: {
     dashboard: 'read',
@@ -71,6 +73,7 @@ export const ROLE_PERMISSIONS: Record<BusinessRole, Record<BusinessModule, Permi
     reports: 'read',
     finance: 'full',
     banks: 'full',
+    payables: 'full',
   },
   secretario: {
     dashboard: false,
@@ -88,6 +91,7 @@ export const ROLE_PERMISSIONS: Record<BusinessRole, Record<BusinessModule, Permi
     reports: false,
     finance: false,
     banks: 'full',
+    payables: false,
   },
   vendedor: {
     dashboard: false,
@@ -105,6 +109,7 @@ export const ROLE_PERMISSIONS: Record<BusinessRole, Record<BusinessModule, Permi
     reports: false,
     finance: false,
     banks: false,
+    payables: false,
   },
   cajero: {
     dashboard: false,
@@ -122,6 +127,7 @@ export const ROLE_PERMISSIONS: Record<BusinessRole, Record<BusinessModule, Permi
     reports: 'read',
     finance: 'read',
     banks: false,
+    payables: 'read',
   },
 };
 
@@ -247,6 +253,8 @@ export type StockVehicle = {
   // Stock-specific fields
   estado_stock: StockStatus;
   costo_compra: number;
+  saldo_pendiente?: number;
+  estado_pago?: 'pendiente' | 'pagada';
   gastos_adecuacion: GastoAdecuacion[];
   precio_venta: number;
   ganancia_neta_estimada: number; // precio_venta - costo_compra - sum(gastos)
@@ -527,7 +535,7 @@ export type BankAccount = {
   updated_at?: Timestamp;
 };
 
-export type BankTransactionType = 'ingreso_venta' | 'egreso_compra' | 'ajuste_manual' | 'ingreso_manual' | 'egreso_manual';
+export type BankTransactionType = 'ingreso_venta' | 'egreso_compra' | 'ajuste_manual' | 'ingreso_manual' | 'egreso_manual' | 'egreso_cxp' | 'egreso_igtf';
 
 export const BANK_TRANSACTION_TYPE_LABELS: Record<BankTransactionType, string> = {
   ingreso_venta: 'Ingreso por Venta',
@@ -535,6 +543,8 @@ export const BANK_TRANSACTION_TYPE_LABELS: Record<BankTransactionType, string> =
   ajuste_manual: 'Ajuste de Saldo',
   ingreso_manual: 'Ingreso Manual',
   egreso_manual: 'Egreso Manual',
+  egreso_cxp: 'Pago Cuenta por Pagar',
+  egreso_igtf: 'IGTF (3% Divisas)',
 };
 
 export type BankTransaction = {
@@ -555,6 +565,38 @@ export type BankTransaction = {
   saldo_anterior: number;          // Balance before transaction
   saldo_posterior: number;         // Balance after transaction
   fecha: Timestamp;
+};
+
+// ==================== ACCOUNTS PAYABLE (CXP) ====================
+
+/**
+ * Auto-generated when a consigned vehicle is sold.
+ * Lives in: concesionarios/{id}/consignaciones_por_pagar
+ * is_fiscal is always false — consignor payouts are exempt from IGTF and IVA retentions.
+ */
+export type ConsignacionPorPagar = {
+  id: string;
+  vehiculo_id: string;
+  vehiculo_nombre: string;                   // e.g. "2024 Toyota Hilux"
+  // Consignor info
+  propietario_nombre: string;
+  propietario_telefono?: string;
+  // Amounts (all in USD)
+  precio_venta_final: number;                // Final sale price achieved
+  comision_acordada_porcentaje: number;      // Commission % agreed at consignment entry
+  comision_monto: number;                    // precio_venta * comision / 100
+  monto_a_pagar: number;                     // precio_venta - comision_monto
+  monto_pagado: number;
+  saldo_pendiente: number;
+  // Status
+  estado: 'pendiente' | 'parcial' | 'pagada';
+  // Fiscal flag — ALWAYS false: consignor payouts are exempt from IGTF and IVA
+  is_fiscal: false;
+  // References
+  venta_id: string;
+  // Audit
+  created_at: Timestamp;
+  updated_at?: Timestamp;
 };
 
 // ==================== HELPERS ====================

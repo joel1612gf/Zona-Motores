@@ -18,7 +18,9 @@ interface SaleDocsPrintProps {
     vendedorNombre: string;
     fecha: Date;
     esDivisa: boolean;
-    vehiculo: {
+    tipoVenta?: 'vehiculo' | 'producto' | null;
+    items?: any[];
+    vehiculo?: {
       make: string; model: string; year: number;
       placa: string; exteriorColor: string;
       serial_carroceria: string; serial_motor: string;
@@ -40,7 +42,7 @@ export function SaleDocumentsPrint({ printDoc, concesionario, ventaData, rootId 
   if (!ventaData || !concesionario) return null;
 
   const { compradorNombre, compradorCedula, precioVenta, numFactura, numControl, fecha,
-    esDivisa, vehiculo, precioEnLetras, vendedorNombre } = ventaData;
+    esDivisa, vehiculo, items, tipoVenta, precioEnLetras, vendedorNombre, tipoDocumento } = ventaData;
 
   // IVA exento config (default: true — vehicles are exempt)
   const vehiculosExentosIva = concesionario.configuracion?.vehiculos_exentos_iva !== false;
@@ -98,8 +100,8 @@ export function SaleDocumentsPrint({ printDoc, concesionario, ventaData, rootId 
             </div>
             {/* Title */}
             <div style={{ textAlign: 'center', borderTop: '2px solid #1d4ed8', borderBottom: '2px solid #1d4ed8', padding: '6px 0', marginBottom: 14 }}>
-              <div style={{ fontSize: 13, fontWeight: 'bold' }}>FACTURA DE VENTA N°: {numFactura}</div>
-              <div style={{ fontSize: 11, color: '#4b5563' }}>N° CONTROL: {numControl}</div>
+              <div style={{ fontSize: 13, fontWeight: 'bold' }}>{tipoDocumento === 'factura_fiscal' ? 'FACTURA FISCAL' : 'NOTA DE ENTREGA'} N°: {numFactura}</div>
+              {tipoDocumento === 'factura_fiscal' && <div style={{ fontSize: 11, color: '#4b5563' }}>N° CONTROL: {numControl}</div>}
             </div>
             {/* Date + Client */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14, fontSize: 12 }}>
@@ -108,28 +110,43 @@ export function SaleDocumentsPrint({ printDoc, concesionario, ventaData, rootId 
               <div><strong>Cliente:</strong> {compradorNombre}</div>
               <div style={{ textAlign: 'right' }}><strong>Cédula/RIF:</strong> {compradorCedula || '—'}</div>
             </div>
-            {/* Vehicle table */}
+            {/* Table */}
             <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 14 }}>
               <thead>
                 <tr>
-                  <th style={thStyle}>DESCRIPCIÓN DEL VEHÍCULO</th>
+                  <th style={thStyle}>DESCRIPCIÓN</th>
+                  {tipoVenta === 'producto' && <th style={{ ...thStyle, textAlign: 'center', width: 60 }}>CANT.</th>}
                   <th style={{ ...thStyle, textAlign: 'right', width: 120 }}>PRECIO UNIT.</th>
                   <th style={{ ...thStyle, textAlign: 'right', width: 120 }}>TOTAL</th>
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td style={cellStyle}>
-                    <div style={{ fontWeight: 600 }}>Vehículo Usado - {vehiculo.make} {vehiculo.model}</div>
-                    <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
-                      Año: {vehiculo.year} &nbsp;|&nbsp; Color: {vehiculo.exteriorColor} &nbsp;|&nbsp; Placa: {vehiculo.placa || '—'}
-                    </div>
-                    <div style={{ fontSize: 11, color: '#6b7280' }}>Serial Carrocería: {vehiculo.serial_carroceria || '—'}</div>
-                    <div style={{ fontSize: 11, color: '#6b7280' }}>Serial Motor: {vehiculo.serial_motor || '—'}</div>
-                  </td>
-                  <td style={{ ...cellStyle, textAlign: 'right' }}>$ {FMT_MONEY(precioVenta)}</td>
-                  <td style={{ ...cellStyle, textAlign: 'right', fontWeight: 600 }}>$ {FMT_MONEY(precioVenta)}</td>
-                </tr>
+                {tipoVenta === 'producto' && items ? (
+                  items.map((it: any, i: number) => (
+                    <tr key={i}>
+                      <td style={cellStyle}>
+                        <div style={{ fontWeight: 600 }}>{it.nombre}</div>
+                        <div style={{ fontSize: 11, color: '#6b7280' }}>Cód: {it.codigo || '—'}</div>
+                      </td>
+                      <td style={{ ...cellStyle, textAlign: 'center' }}>{it.cantidad}</td>
+                      <td style={{ ...cellStyle, textAlign: 'right' }}>$ {FMT_MONEY(it.precio_final || 0)}</td>
+                      <td style={{ ...cellStyle, textAlign: 'right', fontWeight: 600 }}>$ {FMT_MONEY(it.subtotal_usd || 0)}</td>
+                    </tr>
+                  ))
+                ) : vehiculo ? (
+                  <tr>
+                    <td style={cellStyle}>
+                      <div style={{ fontWeight: 600 }}>Vehículo Usado - {vehiculo.make} {vehiculo.model}</div>
+                      <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+                        Año: {vehiculo.year} &nbsp;|&nbsp; Color: {vehiculo.exteriorColor} &nbsp;|&nbsp; Placa: {vehiculo.placa || '—'}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#6b7280' }}>Serial Carrocería: {vehiculo.serial_carroceria || '—'}</div>
+                      <div style={{ fontSize: 11, color: '#6b7280' }}>Serial Motor: {vehiculo.serial_motor || '—'}</div>
+                    </td>
+                    <td style={{ ...cellStyle, textAlign: 'right' }}>$ {FMT_MONEY(precioVenta)}</td>
+                    <td style={{ ...cellStyle, textAlign: 'right', fontWeight: 600 }}>$ {FMT_MONEY(precioVenta)}</td>
+                  </tr>
+                ) : null}
               </tbody>
             </table>
             {/* Totals — IVA exento aware */}
@@ -155,7 +172,7 @@ export function SaleDocumentsPrint({ printDoc, concesionario, ventaData, rootId 
         )}
 
         {/* ── DOC 2: CONTRATO COMPRA-VENTA ── */}
-        {(printDoc === 'contrato' || printDoc === null) && (
+        {(printDoc === 'contrato' || printDoc === null) && tipoVenta !== 'producto' && vehiculo && (
           <div id="sale-doc-contrato" className={`sale-doc-page${printDoc === null ? ' sale-page-break' : ''}`} style={{ padding: '12mm 15mm', height: '297mm', boxSizing: 'border-box', overflow: 'hidden', fontSize: 11.5, lineHeight: 1.55 }}>
             <div style={{ textAlign: 'center', marginBottom: 14 }}>
               {logoEl}
@@ -185,7 +202,7 @@ export function SaleDocumentsPrint({ printDoc, concesionario, ventaData, rootId 
         )}
 
         {/* ── DOC 3: ACTA DE ENTREGA ── */}
-        {(printDoc === 'acta' || printDoc === null) && (
+        {(printDoc === 'acta' || printDoc === null) && tipoVenta !== 'producto' && vehiculo && (
           <div id="sale-doc-acta" className="sale-doc-page" style={{ padding: '12mm 15mm', height: '297mm', boxSizing: 'border-box', overflow: 'hidden', fontSize: 11.5, lineHeight: 1.6 }}>
             <div style={{ textAlign: 'center', marginBottom: 14 }}>
               {logoEl}

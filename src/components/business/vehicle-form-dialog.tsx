@@ -331,6 +331,8 @@ export function VehicleFormDialog({ open, onOpenChange, editingVehicle, concesio
         vehicleType, make, model, year, transmission, engine, exteriorColor, mileage, description,
         images: uploadedImages, estado_stock: estadoStock, precio_venta: precioVenta,
         costo_compra: costoCompra, gastos_adecuacion: gastos,
+        saldo_pendiente: esConsignacion ? undefined : costoCompra,
+        estado_pago: esConsignacion ? undefined : 'pendiente',
         ganancia_neta_estimada: precioVenta - (esConsignacion ? 0 : costoCompra) - gastos.reduce((a, b) => a + (b.monto || 0), 0),
         es_consignacion: esConsignacion,
         consignacion_info: esConsignacion ? {
