@@ -180,7 +180,7 @@ export function DeliveryNoteDialog({ open, onOpenChange, onSaved }: DeliveryNote
 
   const handleNextStepZero = async () => {
     if (!concesionario?.id || !selectedProveedor || !numeroOrden.trim()) return;
-    
+
     setIsCheckingDuplicate(true);
     try {
       // Check if a note with same number exists for this provider
@@ -189,13 +189,13 @@ export function DeliveryNoteDialog({ open, onOpenChange, onSaved }: DeliveryNote
         where('proveedor_id', '==', selectedProveedor),
         where('numero_factura', '==', numeroOrden.trim())
       );
-      
+
       const snap = await getDocs(q);
       if (!snap.empty) {
         setDuplicateNote(snap.docs[0].data());
         return;
       }
-      
+
       setStep(1);
     } catch (e) {
       console.error(e);
@@ -531,7 +531,7 @@ export function DeliveryNoteDialog({ open, onOpenChange, onSaved }: DeliveryNote
                       )}
                     >
                       <div className={cn("w-2 h-2 rounded-full", invoiceCurrency === curr ? "bg-slate-600 animate-pulse" : "bg-slate-300")} />
-                      {curr === 'bs' ? 'Bolívares (VES)' : 'Dólares (USD)'}
+                      {curr === 'bs' ? 'Bolívares (Bs)' : 'Dólares ($)'}
                     </button>
                   ))}
                 </div>
@@ -908,8 +908,8 @@ export function DeliveryNoteDialog({ open, onOpenChange, onSaved }: DeliveryNote
                   };
 
                   const currentMargen = itemConPrecio.nuevo_margen ?? (
-                    prod?.costo_usd && prod?.precio_venta_usd && prod.costo_usd > 0 
-                      ? (1 - ((prod.aplica_iva ? prod.costo_usd * 1.16 : prod.costo_usd) / prod.precio_venta_usd)) * 100 
+                    prod?.costo_usd && prod?.precio_venta_usd && prod.costo_usd > 0
+                      ? (1 - ((prod.aplica_iva ? prod.costo_usd * 1.16 : prod.costo_usd) / prod.precio_venta_usd)) * 100
                       : 0
                   );
 
@@ -919,12 +919,12 @@ export function DeliveryNoteDialog({ open, onOpenChange, onSaved }: DeliveryNote
                     return f > 0 ? cIva / f : 0;
                   };
 
-                  const currentPriceUsd = itemConPrecio.nuevo_precio_usd !== undefined 
-                    ? itemConPrecio.nuevo_precio_usd 
-                    : (itemConPrecio.nuevo_margen !== undefined 
-                        ? getPriceFromMargen(itemConPrecio.nuevo_margen, item.costo_unitario_usd, item.aplica_iva) 
-                        : precioAnteriorUsd);
-                  
+                  const currentPriceUsd = itemConPrecio.nuevo_precio_usd !== undefined
+                    ? itemConPrecio.nuevo_precio_usd
+                    : (itemConPrecio.nuevo_margen !== undefined
+                      ? getPriceFromMargen(itemConPrecio.nuevo_margen, item.costo_unitario_usd, item.aplica_iva)
+                      : precioAnteriorUsd);
+
                   const currentPriceBs = currentPriceUsd * tasa;
 
                   return (
@@ -1204,7 +1204,7 @@ export function DeliveryNoteDialog({ open, onOpenChange, onSaved }: DeliveryNote
                 La nota de entrega se ha procesado correctamente. El inventario y los costos han sido actualizados.
               </p>
             </div>
-            
+
             <div className="flex flex-col items-center w-full max-w-sm gap-6 pt-2">
               <div className="w-full">
                 <div className="group relative overflow-hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 max-w-[220px] mx-auto">
@@ -1277,8 +1277,8 @@ export function DeliveryNoteDialog({ open, onOpenChange, onSaved }: DeliveryNote
             )}
 
             <div className="flex flex-col gap-3 pt-4">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => setDuplicateNote(null)}
                 className="h-12 rounded-2xl font-bold border-slate-200 dark:border-slate-800"
               >

@@ -62,7 +62,7 @@ export function ReportsFiscalPrint({ sales, concesionario, period, rootId = 'fis
           {sales.map((sale) => {
             const fiscal = calculateFiscalBreakdown(sale.precio_venta, sale.metodo_pago, isExempt);
             const totalBs = fiscal.totalAmount * bcvRate;
-            
+
             return (
               <tr key={sale.id} style={{ borderBottom: '1px solid #ddd' }}>
                 <td style={tdStyle}>{sale.fecha?.toDate().toLocaleDateString('es-VE')}</td>
