@@ -95,7 +95,7 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
   const [numeroControl, setNumeroControl] = useState('');
   const [fechaFactura, setFechaFactura] = useState('');
   const [invoiceCurrency, setInvoiceCurrency] = useState<'usd' | 'bs'>('bs');
-  const [items, setItems] = useState<(CompraItem & { _key: string })[]>([]);
+  const [items, setItems] = useState<(CompraItem & { _key: string, nuevo_margen?: number, nuevo_precio_usd?: number, descuento_porcentaje?: number })[]>([]);
   const [tipoPago, setTipoPago] = useState<'contado' | 'credito' | 'por_pagar'>('por_pagar');
   const [diasCredito, setDiasCredito] = useState('30');
   const [tasaCambio, setTasaCambio] = useState<number>(0);
@@ -103,6 +103,24 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
   const [isSaving, setIsSaving] = useState(false);
   const [printMode, setPrintMode] = useState<'both' | 'summary' | 'retention'>('both');
   const [editValues, setEditValues] = useState<Record<string, string>>({});
+  const [logoBase64, setLogoBase64] = useState<string | null>(null);
+
+  // Preload logo for reliable printing
+  useEffect(() => {
+    if (concesionario?.logo_url) {
+      fetch(concesionario.logo_url)
+        .then(res => res.blob())
+        .then(blob => {
+          const reader = new FileReader();
+          reader.onloadend = () => setLogoBase64(reader.result as string);
+          reader.readAsDataURL(blob);
+        })
+        .catch(err => {
+          console.error('Error preloading logo:', err);
+          setLogoBase64(null);
+        });
+    }
+  }, [concesionario?.logo_url]);
 
   // Discount state
   const [discountItemKey, setDiscountItemKey] = useState<string | null>(null);
@@ -558,7 +576,10 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] sm:max-w-3xl max-h-[90vh] overflow-hidden flex flex-col bg-slate-50/95 backdrop-blur-xl border-slate-200 shadow-2xl p-0 rounded-[2rem] dark:bg-slate-950/90 dark:border-slate-800">
+      <DialogContent className={cn(
+        "w-[95vw] sm:max-w-3xl max-h-[90vh] overflow-hidden flex flex-col bg-slate-50/95 backdrop-blur-xl border-slate-200 shadow-2xl p-0 rounded-[2rem] dark:bg-slate-950/90 dark:border-slate-800",
+        step === STEPS.length && "bg-white dark:bg-slate-950"
+      )}>
         {step < STEPS.length && (
           <DialogHeader className="p-6 pb-2 shrink-0 space-y-4">
             <DialogTitle className="flex items-center gap-3 text-2xl font-bold tracking-tight text-slate-700 dark:text-slate-300">
@@ -592,716 +613,716 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
           </DialogHeader>
         )}
 
-        <div className="flex-1 overflow-y-auto px-6 py-4 custom-scrollbar">
-          {/* STEP 0: Supplier & Data */}
-          {step === 0 && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="space-y-3">
-                <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                  <Search className="h-4 w-4 text-primary" /> Seleccionar Proveedor *
-                </Label>
-                <div className="flex gap-2">
-                  <div className="relative flex-1" ref={supplierDropdownRef}>
-                    <Button
-                      variant="outline"
-                      type="button"
-                      className="w-full h-12 px-4 text-sm justify-between font-normal text-left bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border-slate-200 dark:border-slate-800 hover:border-primary/50 transition-all rounded-xl shadow-sm"
-                      onClick={() => setSupplierSearchOpen(!supplierSearchOpen)}
-                    >
-                      <span className="truncate flex items-center gap-2">
-                        {selectedProveedor ? (
-                          <>
-                            <div className="w-2 h-2 rounded-full bg-primary" />
-                            {proveedores.find(p => p.id === selectedProveedor)?.nombre}
-                          </>
-                        ) : "Busca o elige un proveedor..."}
-                      </span>
-                      <ChevronDown className={cn("h-4 w-4 opacity-50 shrink-0 transition-transform duration-300", supplierSearchOpen && "rotate-180")} />
-                    </Button>
+        {step < STEPS.length && (
+          <div className="flex-1 overflow-y-auto px-6 py-4 custom-scrollbar">
+            {/* STEP 0: Supplier & Data */}
+            {step === 0 && (
+              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="space-y-3">
+                  <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                    <Search className="h-4 w-4 text-primary" /> Seleccionar Proveedor *
+                  </Label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1" ref={supplierDropdownRef}>
+                      <Button
+                        variant="outline"
+                        type="button"
+                        className="w-full h-12 px-4 text-sm justify-between font-normal text-left bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border-slate-200 dark:border-slate-800 hover:border-primary/50 transition-all rounded-xl shadow-sm"
+                        onClick={() => setSupplierSearchOpen(!supplierSearchOpen)}
+                      >
+                        <span className="truncate flex items-center gap-2">
+                          {selectedProveedor ? (
+                            <>
+                              <div className="w-2 h-2 rounded-full bg-primary" />
+                              {proveedores.find(p => p.id === selectedProveedor)?.nombre}
+                            </>
+                          ) : "Busca o elige un proveedor..."}
+                        </span>
+                        <ChevronDown className={cn("h-4 w-4 opacity-50 shrink-0 transition-transform duration-300", supplierSearchOpen && "rotate-180")} />
+                      </Button>
 
-                    {supplierSearchOpen && (
-                      <div className="absolute top-full left-0 w-full z-[100] mt-2 bg-white dark:bg-slate-900 text-popover-foreground rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl animate-in fade-in-0 zoom-in-95 overflow-hidden backdrop-blur-xl">
-                        <div className="p-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
-                          <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                            <Input
-                              ref={supplierInputRef}
-                              placeholder="Escribe nombre o RIF..."
-                              value={supplierSearchQuery}
-                              onChange={e => setSupplierSearchQuery(e.target.value)}
-                              className="pl-10 h-10 text-sm bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 focus-visible:ring-primary/20 rounded-xl"
-                            />
+                      {supplierSearchOpen && (
+                        <div className="absolute top-full left-0 w-full z-[100] mt-2 bg-white dark:bg-slate-900 text-popover-foreground rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl animate-in fade-in-0 zoom-in-95 overflow-hidden backdrop-blur-xl">
+                          <div className="p-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                            <div className="relative">
+                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                              <Input
+                                ref={supplierInputRef}
+                                placeholder="Escribe nombre o RIF..."
+                                value={supplierSearchQuery}
+                                onChange={e => setSupplierSearchQuery(e.target.value)}
+                                className="pl-10 h-10 text-sm bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 focus-visible:ring-primary/20 rounded-xl"
+                              />
+                            </div>
                           </div>
+                          <ScrollArea className="h-[280px]">
+                            <div className="p-2 space-y-1">
+                              {filteredProveedores.map(p => (
+                                <Button
+                                  key={p.id}
+                                  variant="ghost"
+                                  className={cn(
+                                    "w-full justify-start font-normal h-auto py-3 px-4 rounded-xl transition-all duration-200",
+                                    selectedProveedor === p.id ? "bg-primary/10 text-primary font-semibold" : "hover:bg-primary/5"
+                                  )}
+                                  onClick={() => { setSelectedProveedor(p.id); setSupplierSearchOpen(false); }}
+                                >
+                                  <div className="flex items-center gap-3 w-full">
+                                    <div className={cn(
+                                      "w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0",
+                                      selectedProveedor === p.id ? "bg-primary text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500"
+                                    )}>
+                                      {p.nombre.substring(0, 1).toUpperCase()}
+                                    </div>
+                                    <div className="flex flex-col items-start overflow-hidden flex-1">
+                                      <span className="truncate w-full text-left text-sm font-medium">{p.nombre}</span>
+                                      <span className="text-[10px] text-slate-400 font-mono uppercase tracking-wider">{p.rif}</span>
+                                    </div>
+                                    {selectedProveedor === p.id && <Check className="h-4 w-4 shrink-0 text-primary" />}
+                                  </div>
+                                </Button>
+                              ))}
+                            </div>
+                          </ScrollArea>
                         </div>
-                        <ScrollArea className="h-[280px]">
-                          <div className="p-2 space-y-1">
-                            {filteredProveedores.map(p => (
-                              <Button
-                                key={p.id}
-                                variant="ghost"
-                                className={cn(
-                                  "w-full justify-start font-normal h-auto py-3 px-4 rounded-xl transition-all duration-200",
-                                  selectedProveedor === p.id ? "bg-primary/10 text-primary font-semibold" : "hover:bg-primary/5"
-                                )}
-                                onClick={() => { setSelectedProveedor(p.id); setSupplierSearchOpen(false); }}
-                              >
-                                <div className="flex items-center gap-3 w-full">
-                                  <div className={cn(
-                                    "w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0",
-                                    selectedProveedor === p.id ? "bg-primary text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500"
-                                  )}>
-                                    {p.nombre.substring(0, 1).toUpperCase()}
-                                  </div>
-                                  <div className="flex flex-col items-start overflow-hidden flex-1">
-                                    <span className="truncate w-full text-left text-sm font-medium">{p.nombre}</span>
-                                    <span className="text-[10px] text-slate-400 font-mono uppercase tracking-wider">{p.rif}</span>
-                                  </div>
-                                  {selectedProveedor === p.id && <Check className="h-4 w-4 shrink-0 text-primary" />}
-                                </div>
-                              </Button>
-                            ))}
-                          </div>
-                        </ScrollArea>
+                      )}
+                    </div>
+                    <Button variant="outline" size="icon" className="shrink-0 h-12 w-12 rounded-xl border-slate-200 dark:border-slate-800" onClick={() => setNewSupplierDialogOpen(true)}>
+                      <Plus className="h-5 w-5 text-slate-400" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold text-slate-700 flex items-center gap-2">
+                      <Hash className="h-4 w-4 text-primary" /> N° de Factura
+                    </Label>
+                    <Input value={numeroFactura} onChange={e => setNumeroFactura(e.target.value)} className="h-11 rounded-xl bg-white/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 focus:ring-primary/20" placeholder="00001612" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold text-slate-700 flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4 text-primary" /> N° de Control
+                    </Label>
+                    <Input value={numeroControl} onChange={e => setNumeroControl(e.target.value)} className="h-11 rounded-xl bg-white/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 focus:ring-primary/20" placeholder="00-00001612" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold text-slate-700 flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-primary" /> Fecha de la Factura
+                    </Label>
+                    <Input type="date" value={fechaFactura} onChange={e => setFechaFactura(e.target.value)} className="h-11 rounded-xl bg-white/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 focus:ring-primary/20" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold text-slate-700 flex items-center gap-2">
+                      <RefreshCw className={cn("h-4 w-4 text-primary", isTasaLoading && "animate-spin")} /> Tasa BCV (Bs/$)
+                    </Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Bs</span>
+                      <Input type="number" step="0.01" value={tasaCambio || ''} onChange={e => setTasaCambio(parseFloat(e.target.value) || 0)} className="h-11 pl-9 rounded-xl bg-white/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 focus:ring-primary/20 font-bold" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-4">
+                  <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 text-primary" /> Moneda de la Factura
+                  </Label>
+                  <div className="flex gap-3">
+                    {['bs', 'usd'].map(curr => (
+                      <button
+                        key={curr}
+                        type="button"
+                        onClick={() => setInvoiceCurrency(curr as any)}
+                        className={cn(
+                          'flex-1 flex items-center justify-center gap-2 rounded-xl border-2 py-3 text-sm font-semibold transition-all duration-300 shadow-sm',
+                          invoiceCurrency === curr
+                            ? 'border-primary bg-primary/5 text-primary scale-[1.02] shadow-primary/10'
+                            : 'border-slate-200 dark:border-slate-800 text-slate-500 bg-white dark:bg-slate-950 hover:border-primary/30 dark:hover:border-primary/30'
+                        )}
+                      >
+                        <div className={cn("w-2 h-2 rounded-full", invoiceCurrency === curr ? "bg-primary animate-pulse" : "bg-slate-300")} />
+                        {curr === 'bs' ? 'Bolívares (Bs)' : 'Dólares ($)'}
+                      </button>
+                    ))}
+                  </div>
+                  {invoiceCurrency === 'bs' && (
+                    <div className="flex items-start gap-2 text-[11px] p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/30 font-medium">
+                      <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                      <p>
+                        {tasaCambio > 0
+                          ? `Los precios se convertirán a tasa de ${tasaCambio.toFixed(2)} Bs/$ automáticamente.`
+                          : "¡Atención! Sin tasa configurada los precios no se convertirán."}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* STEP 1: Products Listing */}
+            {step === 1 && (
+              <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+                <div className="rounded-2xl border border-slate-200 dark:border-slate-800 p-5 bg-slate-50/50 dark:bg-slate-900/50 backdrop-blur-sm space-y-5 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold flex items-center gap-2 text-slate-900 dark:text-white">
+                      <Plus className="h-4 w-4 text-primary" /> Agregar Producto
+                    </h3>
+                    <Badge variant="secondary" className="bg-primary/10 text-primary border-none font-bold">
+                      {items.length} {items.length === 1 ? 'Item' : 'Items'}
+                    </Badge>
+                  </div>
+
+                  <div className="space-y-2 relative">
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        <Input
+                          className="pl-10 h-11 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 rounded-xl"
+                          placeholder="Buscar producto por nombre o código..."
+                          value={searchQuery}
+                          onChange={e => { setSearchQuery(e.target.value); setSelectedProductId(''); }}
+                        />
+                      </div>
+                      <Button variant="outline" size="icon" className="h-11 w-11 shrink-0 rounded-xl border-slate-200 dark:border-slate-800" onClick={() => setNewProductDialogOpen(true)}>
+                        <Plus className="h-4 w-4 text-primary" />
+                      </Button>
+                    </div>
+                    {searchQuery && filteredProductos.length > 0 && !selectedProductId && (
+                      <div className="absolute z-[110] w-full mt-1 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900 max-h-56 overflow-y-auto shadow-2xl animate-in fade-in slide-in-from-top-2 backdrop-blur-xl">
+                        {filteredProductos.slice(0, 10).map(p => (
+                          <button
+                            key={p.id}
+                            className="w-full text-left px-4 py-3 text-sm hover:bg-primary/5 transition-colors flex items-center justify-between group border-b last:border-0 dark:border-slate-800"
+                            onClick={() => {
+                              setSelectedProductId(p.id);
+                              setSearchQuery(p.nombre);
+                              const cost = invoiceCurrency === 'bs' && tasaCambio > 0 ? (p.costo_usd * tasaCambio).toFixed(2) : String(p.costo_usd);
+                              setItemCosto(cost);
+                            }}
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-semibold text-slate-900 dark:text-white">{p.nombre}</span>
+                              <span className="text-[10px] text-slate-400 font-mono">{p.codigo}</span>
+                            </div>
+                            <span className="text-xs font-bold text-primary">${p.costo_usd.toFixed(2)}</span>
+                          </button>
+                        ))}
                       </div>
                     )}
                   </div>
-                  <Button variant="outline" size="icon" className="shrink-0 h-12 w-12 rounded-xl border-slate-200 dark:border-slate-800" onClick={() => setNewSupplierDialogOpen(true)}>
-                    <Plus className="h-5 w-5 text-slate-400" />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Cantidad</Label>
+                      <Input type="number" min={1} value={itemQty} onChange={e => setItemQty(e.target.value)} className="h-11 text-center font-bold rounded-xl" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Costo ({invoiceCurrency === 'bs' ? 'Bs' : '$'})</Label>
+                      <Input type="number" step="0.01" value={itemCosto} onChange={e => setItemCosto(e.target.value)} className="h-11 text-right font-bold rounded-xl" />
+                    </div>
+                  </div>
+                  <Button size="lg" onClick={addItem} variant="outline" className="w-full rounded-xl font-bold gap-2 border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 transition-all shadow-sm">
+                    <Plus className="h-5 w-5 text-primary" /> Añadir a la Lista
                   </Button>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold text-slate-700 flex items-center gap-2">
-                    <Hash className="h-4 w-4 text-primary" /> N° de Factura
-                  </Label>
-                  <Input value={numeroFactura} onChange={e => setNumeroFactura(e.target.value)} className="h-11 rounded-xl bg-white/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 focus:ring-primary/20" placeholder="00001612" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold text-slate-700 flex items-center gap-2">
-                    <ShieldCheck className="h-4 w-4 text-primary" /> N° de Control
-                  </Label>
-                  <Input value={numeroControl} onChange={e => setNumeroControl(e.target.value)} className="h-11 rounded-xl bg-white/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 focus:ring-primary/20" placeholder="00-00001612" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold text-slate-700 flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-primary" /> Fecha de la Factura
-                  </Label>
-                  <Input type="date" value={fechaFactura} onChange={e => setFechaFactura(e.target.value)} className="h-11 rounded-xl bg-white/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 focus:ring-primary/20" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold text-slate-700 flex items-center gap-2">
-                    <RefreshCw className={cn("h-4 w-4 text-primary", isTasaLoading && "animate-spin")} /> Tasa BCV (Bs/$)
-                  </Label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Bs</span>
-                    <Input type="number" step="0.01" value={tasaCambio || ''} onChange={e => setTasaCambio(parseFloat(e.target.value) || 0)} className="h-11 pl-9 rounded-xl bg-white/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 focus:ring-primary/20 font-bold" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-4">
-                <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                  <DollarSign className="h-4 w-4 text-primary" /> Moneda de la Factura
-                </Label>
-                <div className="flex gap-3">
-                  {['bs', 'usd'].map(curr => (
-                    <button
-                      key={curr}
-                      type="button"
-                      onClick={() => setInvoiceCurrency(curr as any)}
-                      className={cn(
-                        'flex-1 flex items-center justify-center gap-2 rounded-xl border-2 py-3 text-sm font-semibold transition-all duration-300 shadow-sm',
-                        invoiceCurrency === curr
-                          ? 'border-primary bg-primary/5 text-primary scale-[1.02] shadow-primary/10'
-                          : 'border-slate-200 dark:border-slate-800 text-slate-500 bg-white dark:bg-slate-950 hover:border-primary/30 dark:hover:border-primary/30'
-                      )}
-                    >
-                      <div className={cn("w-2 h-2 rounded-full", invoiceCurrency === curr ? "bg-primary animate-pulse" : "bg-slate-300")} />
-                      {curr === 'bs' ? 'Bolívares (Bs)' : 'Dólares ($)'}
-                    </button>
-                  ))}
-                </div>
-                {invoiceCurrency === 'bs' && (
-                  <div className="flex items-start gap-2 text-[11px] p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/30 font-medium">
-                    <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                    <p>
-                      {tasaCambio > 0
-                        ? `Los precios se convertirán a tasa de ${tasaCambio.toFixed(2)} Bs/$ automáticamente.`
-                        : "¡Atención! Sin tasa configurada los precios no se convertirán."}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* STEP 1: Products Listing */}
-          {step === 1 && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
-              <div className="rounded-2xl border border-slate-200 dark:border-slate-800 p-5 bg-slate-50/50 dark:bg-slate-900/50 backdrop-blur-sm space-y-5 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold flex items-center gap-2 text-slate-900 dark:text-white">
-                    <Plus className="h-4 w-4 text-primary" /> Agregar Producto
-                  </h3>
-                  <Badge variant="secondary" className="bg-primary/10 text-primary border-none font-bold">
-                    {items.length} {items.length === 1 ? 'Item' : 'Items'}
-                  </Badge>
-                </div>
-
-                <div className="space-y-2 relative">
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                      <Input
-                        className="pl-10 h-11 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 rounded-xl"
-                        placeholder="Buscar producto por nombre o código..."
-                        value={searchQuery}
-                        onChange={e => { setSearchQuery(e.target.value); setSelectedProductId(''); }}
-                      />
-                    </div>
-                    <Button variant="outline" size="icon" className="h-11 w-11 shrink-0 rounded-xl border-slate-200 dark:border-slate-800" onClick={() => setNewProductDialogOpen(true)}>
-                      <Plus className="h-4 w-4 text-primary" />
-                    </Button>
-                  </div>
-                  {searchQuery && filteredProductos.length > 0 && !selectedProductId && (
-                    <div className="absolute z-[110] w-full mt-1 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900 max-h-56 overflow-y-auto shadow-2xl animate-in fade-in slide-in-from-top-2 backdrop-blur-xl">
-                      {filteredProductos.slice(0, 10).map(p => (
-                        <button
-                          key={p.id}
-                          className="w-full text-left px-4 py-3 text-sm hover:bg-primary/5 transition-colors flex items-center justify-between group border-b last:border-0 dark:border-slate-800"
-                          onClick={() => {
-                            setSelectedProductId(p.id);
-                            setSearchQuery(p.nombre);
-                            const cost = invoiceCurrency === 'bs' && tasaCambio > 0 ? (p.costo_usd * tasaCambio).toFixed(2) : String(p.costo_usd);
-                            setItemCosto(cost);
-                          }}
-                        >
-                          <div className="flex flex-col">
-                            <span className="font-semibold text-slate-900 dark:text-white">{p.nombre}</span>
-                            <span className="text-[10px] text-slate-400 font-mono">{p.codigo}</span>
-                          </div>
-                          <span className="text-xs font-bold text-primary">${p.costo_usd.toFixed(2)}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Cantidad</Label>
-                    <Input type="number" min={1} value={itemQty} onChange={e => setItemQty(e.target.value)} className="h-11 text-center font-bold rounded-xl" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Costo ({invoiceCurrency === 'bs' ? 'Bs' : '$'})</Label>
-                    <Input type="number" step="0.01" value={itemCosto} onChange={e => setItemCosto(e.target.value)} className="h-11 text-right font-bold rounded-xl" />
-                  </div>
-                </div>
-                <Button size="lg" onClick={addItem} variant="outline" className="w-full rounded-xl font-bold gap-2 border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 transition-all shadow-sm">
-                  <Plus className="h-5 w-5 text-primary" /> Añadir a la Lista
-                </Button>
-              </div>
-
-              <div className="space-y-3">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">Detalle de Items</h4>
-                {items.length === 0 ? (
-                  <div className="text-center py-10 bg-slate-50/50 dark:bg-slate-900/30 rounded-2xl border-2 border-dashed border-slate-100 dark:border-slate-800 italic text-slate-400 text-sm">No hay productos en la lista.</div>
-                ) : (
-                  <div className="rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-950 shadow-sm">
-                    <table className="w-full text-sm">
-                      <thead className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800">
-                        <tr>
-                          <th className="text-left p-4 font-bold text-slate-500">Producto</th>
-                          <th className="text-center p-4 font-bold text-slate-500 w-20">Cant</th>
-                          <th className="text-right p-4 font-bold text-slate-500 w-32">Costo ({invoiceCurrency === 'bs' ? 'Bs' : '$'})</th>
-                          <th className="text-right p-4 font-bold text-slate-500 w-32">Subtotal</th>
-                          <th className="text-center p-4 font-bold text-slate-500 w-20">IVA</th>
-                          <th className="p-4 w-12"></th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                        {items.map((item, idx) => (
-                          <tr key={item._key} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors group">
-                            <td className="p-4">
-                              <div className="flex flex-col">
-                                <span className="font-semibold">{item.nombre}</span>
-                                <span className="text-[10px] text-slate-400 font-mono">{item.codigo}</span>
-                                {item.descuento_porcentaje && item.descuento_porcentaje > 0 && (
-                                  <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-tighter">Dto: {item.descuento_porcentaje}%</span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="p-4 text-center">
-                              {editingItemKey === item._key ? (
-                                <Input
-                                  type="number"
-                                  className="w-16 h-8 text-center text-xs font-bold rounded-lg"
-                                  value={editQty}
-                                  onChange={e => setEditQty(e.target.value)}
-                                  autoFocus
-                                />
-                              ) : (
-                                <Badge variant="outline" className="rounded-md font-bold px-2.5 py-0.5 bg-slate-50 dark:bg-slate-900">
-                                  {item.cantidad}
-                                </Badge>
-                              )}
-                            </td>
-                            <td className="p-4 text-right font-medium">
-                              {editingItemKey === item._key ? (
-                                <div className="relative">
-                                  <span className="absolute left-1 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">{invoiceCurrency === 'bs' ? 'Bs' : '$'}</span>
-                                  <Input
-                                    type="number"
-                                    className="w-24 h-8 text-right text-xs font-bold rounded-lg pl-5"
-                                    value={editCost}
-                                    onChange={e => setEditCost(e.target.value)}
-                                  />
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">Detalle de Items</h4>
+                  {items.length === 0 ? (
+                    <div className="text-center py-10 bg-slate-50/50 dark:bg-slate-900/30 rounded-2xl border-2 border-dashed border-slate-100 dark:border-slate-800 italic text-slate-400 text-sm">No hay productos en la lista.</div>
+                  ) : (
+                    <div className="rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-950 shadow-sm">
+                      <table className="w-full text-sm">
+                        <thead className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800">
+                          <tr>
+                            <th className="text-left p-4 font-bold text-slate-500">Producto</th>
+                            <th className="text-center p-4 font-bold text-slate-500 w-20">Cant</th>
+                            <th className="text-right p-4 font-bold text-slate-500 w-32">Costo ({invoiceCurrency === 'bs' ? 'Bs' : '$'})</th>
+                            <th className="text-right p-4 font-bold text-slate-500 w-32">Subtotal</th>
+                            <th className="text-center p-4 font-bold text-slate-500 w-20">IVA</th>
+                            <th className="p-4 w-12"></th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                          {items.map((item, idx) => (
+                            <tr key={item._key} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors group">
+                              <td className="p-4">
+                                <div className="flex flex-col">
+                                  <span className="font-semibold">{item.nombre}</span>
+                                  <span className="text-[10px] text-slate-400 font-mono">{item.codigo}</span>
+                                  {item.descuento_porcentaje && item.descuento_porcentaje > 0 && (
+                                    <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-tighter">Dto: {item.descuento_porcentaje}%</span>
+                                  )}
                                 </div>
-                              ) : discountItemKey === item._key ? (
-                                <div className="relative flex items-center justify-end">
+                              </td>
+                              <td className="p-4 text-center">
+                                {editingItemKey === item._key ? (
                                   <Input
                                     type="number"
                                     className="w-16 h-8 text-center text-xs font-bold rounded-lg"
-                                    placeholder="0%"
-                                    value={discountValue}
-                                    onChange={e => setDiscountValue(e.target.value)}
+                                    value={editQty}
+                                    onChange={e => setEditQty(e.target.value)}
                                     autoFocus
-                                    onKeyDown={e => e.key === 'Enter' && applyDiscount()}
                                   />
-                                  <span className="ml-1 text-[10px] font-bold text-slate-400">%</span>
-                                </div>
-                              ) : (
-                                invoiceCurrency === 'bs' && tasaCambio > 0
-                                  ? (item.costo_unitario_usd * tasaCambio).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                                  : item.costo_unitario_usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                              )}
-                            </td>
-                            <td className="p-4 text-right font-bold text-slate-900 dark:text-white">
-                              {invoiceCurrency === 'bs' && tasaCambio > 0
-                                ? `Bs ${(item.subtotal_usd * tasaCambio).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
-                                : `$ ${item.subtotal_usd.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-                            </td>
-                            <td className="p-4 text-center">
-                              <button onClick={() => setItems(prev => prev.map((it, i) => i === idx ? { ...it, aplica_iva: !it.aplica_iva } : it))} className={cn("px-2.5 py-1 rounded-md text-[10px] font-black tracking-tight border transition-all shadow-sm", item.aplica_iva ? 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700' : 'bg-slate-50 text-slate-400 border-transparent')}>
-                                {item.aplica_iva ? '16%' : 'EX'}
-                              </button>
-                            </td>
-                            <td className="p-4 text-center">
-                              <div className="flex items-center justify-center gap-1">
-                                {editingItemKey === item._key ? (
-                                  <>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 text-slate-600 hover:bg-slate-50 rounded-lg"
-                                      onClick={saveEdit}
-                                    >
-                                      <Check className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 text-slate-400 hover:bg-slate-50 rounded-lg"
-                                      onClick={() => setEditingItemKey(null)}
-                                    >
-                                      <Plus className="h-4 w-4 rotate-45" />
-                                    </Button>
-                                  </>
-                                ) : discountItemKey === item._key ? (
-                                  <>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 text-emerald-500 hover:bg-emerald-50 rounded-lg"
-                                      onClick={applyDiscount}
-                                    >
-                                      <Check className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 text-slate-400 hover:bg-slate-50 rounded-lg"
-                                      onClick={() => setDiscountItemKey(null)}
-                                    >
-                                      <Plus className="h-4 w-4 rotate-45" />
-                                    </Button>
-                                  </>
                                 ) : (
-                                  <>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-all"
-                                      onClick={() => startEditing(item)}
-                                    >
-                                      <Pencil className="h-3.5 w-3.5" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-all"
-                                      onClick={() => {
-                                        setDiscountItemKey(item._key);
-                                        setDiscountValue(String(item.descuento_porcentaje || ''));
-                                      }}
-                                    >
-                                      <Percent className="h-3.5 w-3.5" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 text-slate-300 hover:text-destructive hover:bg-destructive/5 rounded-lg transition-all"
-                                      onClick={() => {
-                                        setItems(prev => prev.filter(i => i._key !== item._key));
-                                      }}
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                  </>
+                                  <Badge variant="outline" className="rounded-md font-bold px-2.5 py-0.5 bg-slate-50 dark:bg-slate-900">
+                                    {item.cantidad}
+                                  </Badge>
+                                )}
+                              </td>
+                              <td className="p-4 text-right font-medium">
+                                {editingItemKey === item._key ? (
+                                  <div className="relative">
+                                    <span className="absolute left-1 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">{invoiceCurrency === 'bs' ? 'Bs' : '$'}</span>
+                                    <Input
+                                      type="number"
+                                      className="w-24 h-8 text-right text-xs font-bold rounded-lg pl-5"
+                                      value={editCost}
+                                      onChange={e => setEditCost(e.target.value)}
+                                    />
+                                  </div>
+                                ) : discountItemKey === item._key ? (
+                                  <div className="relative flex items-center justify-end">
+                                    <Input
+                                      type="number"
+                                      className="w-16 h-8 text-center text-xs font-bold rounded-lg"
+                                      placeholder="0%"
+                                      value={discountValue}
+                                      onChange={e => setDiscountValue(e.target.value)}
+                                      autoFocus
+                                      onKeyDown={e => e.key === 'Enter' && applyDiscount()}
+                                    />
+                                    <span className="ml-1 text-[10px] font-bold text-slate-400">%</span>
+                                  </div>
+                                ) : (
+                                  invoiceCurrency === 'bs' && tasaCambio > 0
+                                    ? (item.costo_unitario_usd * tasaCambio).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                    : item.costo_unitario_usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                )}
+                              </td>
+                              <td className="p-4 text-right font-bold text-slate-900 dark:text-white">
+                                {invoiceCurrency === 'bs' && tasaCambio > 0
+                                  ? `Bs ${(item.subtotal_usd * tasaCambio).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                                  : `$ ${item.subtotal_usd.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                              </td>
+                              <td className="p-4 text-center">
+                                <button onClick={() => setItems(prev => prev.map((it, i) => i === idx ? { ...it, aplica_iva: !it.aplica_iva } : it))} className={cn("px-2.5 py-1 rounded-md text-[10px] font-black tracking-tight border transition-all shadow-sm", item.aplica_iva ? 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700' : 'bg-slate-50 text-slate-400 border-transparent')}>
+                                  {item.aplica_iva ? '16%' : 'EX'}
+                                </button>
+                              </td>
+                              <td className="p-4 text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  {editingItemKey === item._key ? (
+                                    <>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-slate-600 hover:bg-slate-50 rounded-lg"
+                                        onClick={saveEdit}
+                                      >
+                                        <Check className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-slate-400 hover:bg-slate-50 rounded-lg"
+                                        onClick={() => setEditingItemKey(null)}
+                                      >
+                                        <Plus className="h-4 w-4 rotate-45" />
+                                      </Button>
+                                    </>
+                                  ) : discountItemKey === item._key ? (
+                                    <>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-emerald-500 hover:bg-emerald-50 rounded-lg"
+                                        onClick={applyDiscount}
+                                      >
+                                        <Check className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-slate-400 hover:bg-slate-50 rounded-lg"
+                                        onClick={() => setDiscountItemKey(null)}
+                                      >
+                                        <Plus className="h-4 w-4 rotate-45" />
+                                      </Button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-all"
+                                        onClick={() => startEditing(item)}
+                                      >
+                                        <Pencil className="h-3.5 w-3.5" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-all"
+                                        onClick={() => {
+                                          setDiscountItemKey(item._key);
+                                          setDiscountValue(String(item.descuento_porcentaje || ''));
+                                        }}
+                                      >
+                                        <Percent className="h-3.5 w-3.5" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-slate-300 hover:text-destructive hover:bg-destructive/5 rounded-lg transition-all"
+                                        onClick={() => {
+                                          setItems(prev => prev.filter(i => i._key !== item._key));
+                                        }}
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-slate-50/50 dark:bg-slate-900/50 font-bold border-t border-slate-200 dark:border-slate-800">
+                          <tr>
+                            <td colSpan={3} className="p-4 text-right text-slate-500 uppercase text-xs tracking-wider">Subtotal Estimado (+ IVA)</td>
+                            <td className="p-4 text-right text-lg text-slate-700 dark:text-slate-200 whitespace-nowrap">
+                              <div className="flex flex-col items-end leading-tight">
+                                <span>
+                                  {invoiceCurrency === 'bs' && tasaCambio > 0
+                                    ? `Bs ${(total * tasaCambio).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                    : `$ ${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                                </span>
+                                {ivaTotal > 0 && (
+                                  <span className="text-[10px] text-slate-400 font-medium">
+                                    Incluye {invoiceCurrency === 'bs' && tasaCambio > 0
+                                      ? `Bs ${(ivaTotal * tasaCambio).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                                      : `$${ivaTotal.toFixed(2)}`} de IVA (16%)
+                                  </span>
                                 )}
                               </div>
                             </td>
+                            <td colSpan={2}></td>
                           </tr>
-                        ))}
-                      </tbody>
-                      <tfoot className="bg-slate-50/50 dark:bg-slate-900/50 font-bold border-t border-slate-200 dark:border-slate-800">
-                        <tr>
-                          <td colSpan={3} className="p-4 text-right text-slate-500 uppercase text-xs tracking-wider">Subtotal Estimado (+ IVA)</td>
-                          <td className="p-4 text-right text-lg text-slate-700 dark:text-slate-200 whitespace-nowrap">
-                            <div className="flex flex-col items-end leading-tight">
-                              <span>
-                                {invoiceCurrency === 'bs' && tasaCambio > 0
-                                  ? `Bs ${(total * tasaCambio).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                                  : `$ ${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                              </span>
-                              {ivaTotal > 0 && (
-                                <span className="text-[10px] text-slate-400 font-medium">
-                                  Incluye {invoiceCurrency === 'bs' && tasaCambio > 0
-                                    ? `Bs ${(ivaTotal * tasaCambio).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
-                                    : `$${ivaTotal.toFixed(2)}`} de IVA (16%)
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td colSpan={2}></td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* STEP 2: Prices Management */}
-          {step === 2 && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
-              <div className="flex items-center justify-between px-1">
-                <div className="space-y-1">
-                  <h3 className="text-lg font-bold text-slate-700 dark:text-white flex items-center gap-2">
-                    <DollarSign className="h-5 w-5 text-primary" /> Estrategia de Precios
-                  </h3>
-                  <p className="text-xs text-slate-500 italic">Ajusta los márgenes de ganancia para tus productos recibidos.</p>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )}
                 </div>
-                <Badge variant="outline" className="h-7 px-3 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-500 font-medium uppercase tracking-widest text-[9px]">
-                  MODO: {invoiceCurrency === 'bs' ? 'VES' : 'USD'}
-                </Badge>
               </div>
+            )}
 
-              <div className="grid grid-cols-1 gap-4">
-                {items.map((item, idx) => {
-                  const prod = productos.find(p => p.id === item.producto_id);
-                  const isBs = invoiceCurrency === 'bs';
-                  const tasa = tasaCambio > 0 ? tasaCambio : 1;
+            {/* STEP 2: Prices Management */}
+            {step === 2 && (
+              <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+                <div className="flex items-center justify-between px-1">
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-bold text-slate-700 dark:text-white flex items-center gap-2">
+                      <DollarSign className="h-5 w-5 text-primary" /> Estrategia de Precios
+                    </h3>
+                    <p className="text-xs text-slate-500 italic">Ajusta los márgenes de ganancia para tus productos recibidos.</p>
+                  </div>
+                  <Badge variant="outline" className="h-7 px-3 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-500 font-medium uppercase tracking-widest text-[9px]">
+                    MODO: {invoiceCurrency === 'bs' ? 'VES' : 'USD'}
+                  </Badge>
+                </div>
 
-                  const costoUnitarioBs = item.costo_unitario_usd * tasa;
-                  const precioAnteriorUsd = prod?.precio_venta_usd || 0;
-                  const precioAnteriorBs = precioAnteriorUsd * tasa;
-                  const itemConPrecio = item as any;
+                <div className="grid grid-cols-1 gap-4">
+                  {items.map((item, idx) => {
+                    const prod = productos.find(p => p.id === item.producto_id);
+                    const isBs = invoiceCurrency === 'bs';
+                    const tasa = tasaCambio > 0 ? tasaCambio : 1;
 
-                  // Use the same formula as delivery note: Margin applied after IVA if applies
-                  const costWithIvaUsd = item.aplica_iva ? item.costo_unitario_usd * 1.16 : item.costo_unitario_usd;
+                    const costoUnitarioBs = item.costo_unitario_usd * tasa;
+                    const precioAnteriorUsd = prod?.precio_venta_usd || 0;
+                    const precioAnteriorBs = precioAnteriorUsd * tasa;
+                    const itemConPrecio = item as any;
 
-                  const handleMargenChange = (val: string) => {
-                    const margen = parseFloat(val) || 0;
-                    const factor = (1 - margen / 100);
-                    const newPriceUsd = factor > 0 ? costWithIvaUsd / factor : 0;
+                    // Use the same formula as delivery note: Margin applied after IVA if applies
+                    const costWithIvaUsd = item.aplica_iva ? item.costo_unitario_usd * 1.16 : item.costo_unitario_usd;
 
-                    const newItems = [...items];
-                    newItems[idx] = { ...newItems[idx], nuevo_margen: margen, nuevo_precio_usd: newPriceUsd } as any;
-                    setItems(newItems);
-                  };
+                    const handleMargenChange = (val: string) => {
+                      const margen = parseFloat(val) || 0;
+                      const factor = (1 - margen / 100);
+                      const newPriceUsd = factor > 0 ? costWithIvaUsd / factor : 0;
 
-                  const handlePrecioUsdChange = (val: string) => {
-                    const priceUsd = parseFloat(val) || 0;
-                    const margen = priceUsd > 0 ? (1 - (costWithIvaUsd / priceUsd)) * 100 : 0;
+                      const newItems = [...items];
+                      newItems[idx] = { ...newItems[idx], nuevo_margen: margen, nuevo_precio_usd: newPriceUsd } as any;
+                      setItems(newItems);
+                    };
 
-                    const newItems = [...items];
-                    newItems[idx] = { ...newItems[idx], nuevo_margen: margen, nuevo_precio_usd: priceUsd } as any;
-                    setItems(newItems);
-                  };
+                    const handlePrecioUsdChange = (val: string) => {
+                      const priceUsd = parseFloat(val) || 0;
+                      const margen = priceUsd > 0 ? (1 - (costWithIvaUsd / priceUsd)) * 100 : 0;
 
-                  const handlePrecioBsChange = (val: string) => {
-                    const priceBs = parseFloat(val) || 0;
-                    const priceUsd = tasa > 0 ? priceBs / tasa : priceBs;
-                    const margen = priceUsd > 0 ? (1 - (costWithIvaUsd / priceUsd)) * 100 : 0;
+                      const newItems = [...items];
+                      newItems[idx] = { ...newItems[idx], nuevo_margen: margen, nuevo_precio_usd: priceUsd } as any;
+                      setItems(newItems);
+                    };
 
-                    const newItems = [...items];
-                    newItems[idx] = { ...newItems[idx], nuevo_margen: margen, nuevo_precio_usd: priceUsd } as any;
-                    setItems(newItems);
-                  };
+                    const handlePrecioBsChange = (val: string) => {
+                      const priceBs = parseFloat(val) || 0;
+                      const priceUsd = tasa > 0 ? priceBs / tasa : priceBs;
+                      const margen = priceUsd > 0 ? (1 - (costWithIvaUsd / priceUsd)) * 100 : 0;
 
-                  const currentMargen = itemConPrecio.nuevo_margen ?? (
-                    prod?.costo_usd && prod?.precio_venta_usd && prod.costo_usd > 0
-                      ? (1 - ((prod.aplica_iva ? prod.costo_usd * 1.16 : prod.costo_usd) / prod.precio_venta_usd)) * 100
-                      : 30
-                  );
+                      const newItems = [...items];
+                      newItems[idx] = { ...newItems[idx], nuevo_margen: margen, nuevo_precio_usd: priceUsd } as any;
+                      setItems(newItems);
+                    };
 
-                  const getPriceFromMargen = (m: number, baseUsd: number, aplicaIva: boolean) => {
-                    const cIva = aplicaIva ? baseUsd * 1.16 : baseUsd;
-                    const f = (1 - m / 100);
-                    return f > 0 ? cIva / f : 0;
-                  };
+                    const currentMargen = itemConPrecio.nuevo_margen ?? (
+                      prod?.costo_usd && prod?.precio_venta_usd && prod.costo_usd > 0
+                        ? (1 - ((prod.aplica_iva ? prod.costo_usd * 1.16 : prod.costo_usd) / prod.precio_venta_usd)) * 100
+                        : 30
+                    );
 
-                  const currentPriceUsd = itemConPrecio.nuevo_precio_usd !== undefined
-                    ? itemConPrecio.nuevo_precio_usd
-                    : (itemConPrecio.nuevo_margen !== undefined
-                      ? getPriceFromMargen(itemConPrecio.nuevo_margen, item.costo_unitario_usd, item.aplica_iva)
-                      : (precioAnteriorUsd || getPriceFromMargen(30, item.costo_unitario_usd, item.aplica_iva)));
+                    const getPriceFromMargen = (m: number, baseUsd: number, aplicaIva: boolean) => {
+                      const cIva = aplicaIva ? baseUsd * 1.16 : baseUsd;
+                      const f = (1 - m / 100);
+                      return f > 0 ? cIva / f : 0;
+                    };
 
-                  const currentPriceBs = currentPriceUsd * tasa;
+                    const currentPriceUsd = itemConPrecio.nuevo_precio_usd !== undefined
+                      ? itemConPrecio.nuevo_precio_usd
+                      : (itemConPrecio.nuevo_margen !== undefined
+                        ? getPriceFromMargen(itemConPrecio.nuevo_margen, item.costo_unitario_usd, item.aplica_iva)
+                        : (precioAnteriorUsd || getPriceFromMargen(30, item.costo_unitario_usd, item.aplica_iva)));
 
-                  return (
-                    <div key={item._key} className="p-5 rounded-[2rem] border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 shadow-sm group">
-                      <div className="flex flex-col lg:flex-row lg:items-center gap-6">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest">{item.codigo}</span>
-                            <Badge variant="secondary" className="text-[9px] h-4 bg-slate-100 dark:bg-slate-800 text-slate-500 border-none">STOCK: {prod?.stock_actual || 0}</Badge>
-                          </div>
-                          <h4 className="font-bold text-slate-900 dark:text-white truncate text-base">{item.nombre}</h4>
-                          <div className="flex items-center gap-4 mt-2">
-                            <div className="flex flex-col">
-                              <span className="text-[9px] text-slate-400 uppercase font-bold tracking-tighter">Costo Entrada</span>
-                              <span className="text-sm font-bold text-slate-700 dark:text-slate-300">
-                                {isBs ? `${costoUnitarioBs.toFixed(2)} Bs` : `$${item.costo_unitario_usd.toFixed(2)}`}
-                              </span>
+                    const currentPriceBs = currentPriceUsd * tasa;
+
+                    return (
+                      <div key={item._key} className="p-5 rounded-[2rem] border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 shadow-sm group">
+                        <div className="flex flex-col lg:flex-row lg:items-center gap-6">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest">{item.codigo}</span>
+                              <Badge variant="secondary" className="text-[9px] h-4 bg-slate-100 dark:bg-slate-800 text-slate-500 border-none">STOCK: {prod?.stock_actual || 0}</Badge>
                             </div>
-                            <Separator orientation="vertical" className="h-8" />
-                            <div className="flex flex-col">
-                              <span className="text-[9px] text-slate-400 uppercase font-bold tracking-tighter">Precio Anterior</span>
-                              <span className="text-sm font-medium text-slate-500">
-                                {isBs ? `${precioAnteriorBs.toFixed(2)} Bs` : `$${precioAnteriorUsd.toFixed(2)}`}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap items-end gap-3 shrink-0 bg-slate-50/50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
-                          <div className="space-y-1.5 w-20">
-                            <Label className="text-[10px] font-bold text-slate-500 uppercase">Margen</Label>
-                            <div className="relative">
-                              <Input
-                                type="text"
-                                className="h-9 text-center font-bold bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 rounded-lg focus:ring-primary/20 px-1"
-                                value={editValues[`${item._key}-margen`] ?? currentMargen.toFixed(1)}
-                                onFocus={(e) => e.target.select()}
-                                onChange={(e) => {
-                                  const val = e.target.value.replace(',', '.');
-                                  setEditValues(prev => ({ ...prev, [`${item._key}-margen`]: val }));
-                                  handleMargenChange(val);
-                                }}
-                                onBlur={() => setEditValues(prev => { const n = { ...prev }; delete n[`${item._key}-margen`]; return n; })}
-                              />
-                              <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400">%</span>
+                            <h4 className="font-bold text-slate-900 dark:text-white truncate text-base">{item.nombre}</h4>
+                            <div className="flex items-center gap-4 mt-2">
+                              <div className="flex flex-col">
+                                <span className="text-[9px] text-slate-400 uppercase font-bold tracking-tighter">Costo Entrada</span>
+                                <span className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                                  {isBs ? `${costoUnitarioBs.toFixed(2)} Bs` : `$${item.costo_unitario_usd.toFixed(2)}`}
+                                </span>
+                              </div>
+                              <Separator orientation="vertical" className="h-8" />
+                              <div className="flex flex-col">
+                                <span className="text-[9px] text-slate-400 uppercase font-bold tracking-tighter">Precio Anterior</span>
+                                <span className="text-sm font-medium text-slate-500">
+                                  {isBs ? `${precioAnteriorBs.toFixed(2)} Bs` : `$${precioAnteriorUsd.toFixed(2)}`}
+                                </span>
+                              </div>
                             </div>
                           </div>
 
-                          <div className="space-y-1.5 w-32">
-                            <Label className="text-[10px] font-bold text-slate-500 uppercase">Precio en Bs</Label>
-                            <div className="relative">
-                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">Bs</span>
-                              <Input
-                                type="text"
-                                className="h-9 text-right font-bold bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 rounded-lg focus:ring-primary/20 pr-2 pl-6"
-                                value={editValues[`${item._key}-precio-bs`] ?? currentPriceBs.toFixed(2)}
-                                onFocus={(e) => e.target.select()}
-                                onChange={(e) => {
-                                  const val = e.target.value.replace(',', '.');
-                                  setEditValues(prev => ({ ...prev, [`${item._key}-precio-bs`]: val }));
-                                  handlePrecioBsChange(val);
-                                }}
-                                onBlur={() => setEditValues(prev => { const n = { ...prev }; delete n[`${item._key}-precio-bs`]; return n; })}
-                              />
+                          <div className="flex flex-wrap items-end gap-3 shrink-0 bg-slate-50/50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
+                            <div className="space-y-1.5 w-20">
+                              <Label className="text-[10px] font-bold text-slate-500 uppercase">Margen</Label>
+                              <div className="relative">
+                                <Input
+                                  type="text"
+                                  className="h-9 text-center font-bold bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 rounded-lg focus:ring-primary/20 px-1"
+                                  value={editValues[`${item._key}-margen`] ?? currentMargen.toFixed(1)}
+                                  onFocus={(e) => e.target.select()}
+                                  onChange={(e) => {
+                                    const val = e.target.value.replace(',', '.');
+                                    setEditValues(prev => ({ ...prev, [`${item._key}-margen`]: val }));
+                                    handleMargenChange(val);
+                                  }}
+                                  onBlur={() => setEditValues(prev => { const n = { ...prev }; delete n[`${item._key}-margen`]; return n; })}
+                                />
+                                <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400">%</span>
+                              </div>
                             </div>
-                          </div>
 
-                          <div className="space-y-1.5 w-28">
-                            <Label className="text-[10px] font-bold text-primary uppercase">Ref en $</Label>
-                            <div className="relative">
-                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-primary">$</span>
-                              <Input
-                                type="text"
-                                className="h-9 text-right font-black text-primary bg-primary/5 border-primary/20 rounded-lg focus:ring-primary/20 pr-2 pl-5"
-                                value={editValues[`${item._key}-precio-usd`] ?? currentPriceUsd.toFixed(2)}
-                                onFocus={(e) => e.target.select()}
-                                onChange={(e) => {
-                                  const val = e.target.value.replace(',', '.');
-                                  setEditValues(prev => ({ ...prev, [`${item._key}-precio-usd`]: val }));
-                                  handlePrecioUsdChange(val);
-                                }}
-                                onBlur={() => setEditValues(prev => { const n = { ...prev }; delete n[`${item._key}-precio-usd`]; return n; })}
-                              />
+                            <div className="space-y-1.5 w-32">
+                              <Label className="text-[10px] font-bold text-slate-500 uppercase">Precio en Bs</Label>
+                              <div className="relative">
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">Bs</span>
+                                <Input
+                                  type="text"
+                                  className="h-9 text-right font-bold bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 rounded-lg focus:ring-primary/20 pr-2 pl-6"
+                                  value={editValues[`${item._key}-precio-bs`] ?? currentPriceBs.toFixed(2)}
+                                  onFocus={(e) => e.target.select()}
+                                  onChange={(e) => {
+                                    const val = e.target.value.replace(',', '.');
+                                    setEditValues(prev => ({ ...prev, [`${item._key}-precio-bs`]: val }));
+                                    handlePrecioBsChange(val);
+                                  }}
+                                  onBlur={() => setEditValues(prev => { const n = { ...prev }; delete n[`${item._key}-precio-bs`]; return n; })}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="space-y-1.5 w-28">
+                              <Label className="text-[10px] font-bold text-primary uppercase">Ref en $</Label>
+                              <div className="relative">
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-primary">$</span>
+                                <Input
+                                  type="text"
+                                  className="h-9 text-right font-black text-primary bg-primary/5 border-primary/20 rounded-lg focus:ring-primary/20 pr-2 pl-5"
+                                  value={editValues[`${item._key}-precio-usd`] ?? currentPriceUsd.toFixed(2)}
+                                  onFocus={(e) => e.target.select()}
+                                  onChange={(e) => {
+                                    const val = e.target.value.replace(',', '.');
+                                    setEditValues(prev => ({ ...prev, [`${item._key}-precio-usd`]: val }));
+                                    handlePrecioUsdChange(val);
+                                  }}
+                                  onBlur={() => setEditValues(prev => { const n = { ...prev }; delete n[`${item._key}-precio-usd`]; return n; })}
+                                />
+                              </div>
                             </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* STEP 3: Summary / Fiscal Review */}
-          {step === 3 && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
-              <div className="space-y-4">
-                {items.map(i => (
-                  <div key={i._key} className="flex justify-between text-sm group">
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-slate-700 dark:text-slate-300">
-                        {i.cantidad} × {i.nombre}
-                      </span>
-                      <span className="text-[10px] text-slate-400 font-mono">{i.codigo}</span>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-slate-900 dark:text-white">
-                        {invoiceCurrency === 'bs' && tasaCambio > 0
-                          ? `Bs ${(i.subtotal_usd * tasaCambio).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
-                          : `$${i.subtotal_usd.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-                      </p>
-                      {invoiceCurrency === 'bs' && tasaCambio > 0 && (
-                        <span className="text-[10px] text-slate-400 font-medium">${i.subtotal_usd.toFixed(2)}</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <Separator className="bg-slate-100 dark:bg-slate-800" />
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm"><span className="text-slate-500 font-medium">Monto Neto (Base)</span><span className="font-bold text-slate-900 dark:text-white">${subtotal.toFixed(2)}</span></div>
-                <div className="flex justify-between text-sm"><span className="text-slate-500 font-medium">I.V.A. (16%)</span><span className="font-medium text-slate-900 dark:text-white">${ivaTotal.toFixed(2)}</span></div>
-                <div className="flex justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Total Documento</span>
-                    <span className="text-2xl font-black tracking-tighter text-slate-900 dark:text-white">${total.toFixed(2)}</span>
-                  </div>
-                  {tasaCambio > 0 && (
-                    <div className="flex flex-col items-end">
-                      <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Total Bs</span>
-                      <span className="text-xl font-black tracking-tighter text-slate-700 dark:text-slate-300">Bs {totalBs.toFixed(2)}</span>
-                    </div>
-                  )}
+                    );
+                  })}
                 </div>
               </div>
-              {(() => {
-                const prov = proveedores.find(p => p.id === selectedProveedor);
-                if (prov?.isRetentionAgent && ivaTotal > 0) {
-                  return (
-                    <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1">
-                      <p className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5 text-slate-400" /> Retención de IVA Aplicable</p>
-                      <p className="text-[10px] text-slate-500">Se retendrá el {prov.porcentaje_retencion_iva || 75}% del IVA (${(ivaTotal * (prov.porcentaje_retencion_iva || 75) / 100).toFixed(2)}).</p>
-                    </div>
-                  );
-                }
-                return null;
-              })()}
-            </div>
-          )}
+            )}
 
-          {/* STEP 4: Payment Terms */}
-          {step === 4 && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
-              <div className="space-y-4">
-                <Label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2 px-1">
-                  <CheckCircle2 className="h-4 w-4 text-primary" /> Condición de la Operación
-                </Label>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {[
-                    { id: 'contado', label: 'Pagado', desc: 'Cancelado al momento' },
-                    { id: 'por_pagar', label: 'Por Pagar', desc: 'Carga a cuenta corriente' },
-                    { id: 'credito', label: 'Crédito', desc: 'Acuerdo con proveedor' }
-                  ].map(opt => (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => setTipoPago(opt.id as any)}
-                      className={cn(
-                        "flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all duration-300 gap-1 text-center",
-                        tipoPago === opt.id
-                          ? 'border-primary bg-primary/5 shadow-lg shadow-primary/10 scale-[1.02]'
-                          : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 opacity-60 hover:opacity-100 shadow-sm'
-                      )}
-                    >
-                      <span className={cn("font-bold text-sm", tipoPago === opt.id ? 'text-primary' : 'text-slate-500')}>{opt.label}</span>
-                      <span className="text-[9px] font-medium text-slate-400 uppercase tracking-tighter">{opt.desc}</span>
-                    </button>
+            {step === 3 && (
+              <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+                <div className="space-y-4">
+                  {items.map(i => (
+                    <div key={i._key} className="flex justify-between text-sm group">
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-slate-700 dark:text-slate-300">
+                          {i.cantidad} × {i.nombre}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono">{i.codigo}</span>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-slate-900 dark:text-white">
+                          {invoiceCurrency === 'bs' && tasaCambio > 0
+                            ? `Bs ${(i.subtotal_usd * tasaCambio).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                            : `$${i.subtotal_usd.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                        </p>
+                        {invoiceCurrency === 'bs' && tasaCambio > 0 && (
+                          <span className="text-[10px] text-slate-400 font-medium">${i.subtotal_usd.toFixed(2)}</span>
+                        )}
+                      </div>
+                    </div>
                   ))}
                 </div>
-              </div>
-
-              {tipoPago === 'credito' && (
-                <div className="space-y-2 animate-in zoom-in-95">
-                  <Label className="text-slate-700 dark:text-slate-300 font-semibold px-1">Días de Crédito Otorgados</Label>
-                  <Input type="number" value={diasCredito} onChange={e => setDiasCredito(e.target.value)} className="h-11 rounded-xl text-center font-bold bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800" />
-                </div>
-              )}
-
-              <div className="p-10 rounded-[2.5rem] bg-primary text-white space-y-8 relative overflow-hidden group shadow-2xl">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-white/20 rounded-full blur-3xl -mr-32 -mt-32 opacity-20 group-hover:scale-110 transition-transform duration-700" />
-                <Package className="absolute -bottom-10 -right-10 w-48 h-48 opacity-5 -rotate-12 group-hover:rotate-0 transition-all duration-700" />
-
-                <div className="flex flex-col md:flex-row justify-between items-center gap-6 relative z-10">
-                  <div className="space-y-1">
-                    <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/80 leading-none">Confirmación Final</p>
-                    <h5 className="text-2xl font-black tracking-tight text-white uppercase">Monto Total a Cargar</h5>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-5xl font-black tracking-tighter text-white">${total.toFixed(2)}</p>
-                    <p className="text-[10px] text-white/60 font-black uppercase tracking-widest mt-1">Dólares Americanos</p>
-                  </div>
-                </div>
-
-                <Separator className="bg-white/20" />
-
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 relative z-10">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-white">
-                      <CheckCircle2 className="h-5 w-5" />
+                <Separator className="bg-slate-100 dark:bg-slate-800" />
+                <div className="space-y-3">
+                  <div className="flex justify-between text-sm"><span className="text-slate-500 font-medium">Monto Neto (Base)</span><span className="font-bold text-slate-900 dark:text-white">${subtotal.toFixed(2)}</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-slate-500 font-medium">I.V.A. (16%)</span><span className="font-medium text-slate-900 dark:text-white">${ivaTotal.toFixed(2)}</span></div>
+                  <div className="flex justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Total Documento</span>
+                      <span className="text-2xl font-black tracking-tighter text-slate-900 dark:text-white">${total.toFixed(2)}</span>
                     </div>
-                    <div className="text-left">
-                      <p className="text-sm font-bold text-white uppercase">{proveedores.find(p => p.id === selectedProveedor)?.nombre}</p>
-                      <p className="text-[9px] text-white/60 font-black uppercase tracking-widest">Beneficiario del Registro</p>
+                    {tasaCambio > 0 && (
+                      <div className="flex flex-col items-end">
+                        <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Total Bs</span>
+                        <span className="text-xl font-black tracking-tighter text-slate-700 dark:text-slate-300">Bs {totalBs.toFixed(2)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {(() => {
+                  const prov = proveedores.find(p => p.id === selectedProveedor);
+                  if (prov?.isRetentionAgent && ivaTotal > 0) {
+                    return (
+                      <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1">
+                        <p className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5 text-slate-400" /> Retención de IVA Aplicable</p>
+                        <p className="text-[10px] text-slate-500">Se retendrá el {prov.porcentaje_retencion_iva || 75}% del IVA (${(ivaTotal * (prov.porcentaje_retencion_iva || 75) / 100).toFixed(2)}).</p>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+              </div>
+            )}
+
+            {step === 4 && (
+              <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
+                <div className="space-y-4">
+                  <Label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2 px-1">
+                    <CheckCircle2 className="h-4 w-4 text-primary" /> Condición de la Operación
+                  </Label>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {[
+                      { id: 'contado', label: 'Pagado', desc: 'Cancelado al momento' },
+                      { id: 'por_pagar', label: 'Por Pagar', desc: 'Carga a cuenta corriente' },
+                      { id: 'credito', label: 'Crédito', desc: 'Acuerdo con proveedor' }
+                    ].map(opt => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setTipoPago(opt.id as any)}
+                        className={cn(
+                          "flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all duration-300 gap-1 text-center",
+                          tipoPago === opt.id
+                            ? 'border-primary bg-primary/5 shadow-lg shadow-primary/10 scale-[1.02]'
+                            : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 opacity-60 hover:opacity-100 shadow-sm'
+                        )}
+                      >
+                        <span className={cn("font-bold text-sm", tipoPago === opt.id ? 'text-primary' : 'text-slate-500')}>{opt.label}</span>
+                        <span className="text-[9px] font-medium text-slate-400 uppercase tracking-tighter">{opt.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {tipoPago === 'credito' && (
+                  <div className="space-y-2 animate-in zoom-in-95">
+                    <Label className="text-slate-700 dark:text-slate-300 font-semibold px-1">Días de Crédito Otorgados</Label>
+                    <Input type="number" value={diasCredito} onChange={e => setDiasCredito(e.target.value)} className="h-11 rounded-xl text-center font-bold bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800" />
+                  </div>
+                )}
+
+                <div className="p-10 rounded-[2.5rem] bg-primary text-white space-y-8 relative overflow-hidden group shadow-2xl">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-white/20 rounded-full blur-3xl -mr-32 -mt-32 opacity-20 group-hover:scale-110 transition-transform duration-700" />
+                  <Package className="absolute -bottom-10 -right-10 w-48 h-48 opacity-5 -rotate-12 group-hover:rotate-0 transition-all duration-700" />
+
+                  <div className="flex flex-col md:flex-row justify-between items-center gap-6 relative z-10">
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/80 leading-none">Confirmación Final</p>
+                      <h5 className="text-2xl font-black tracking-tight text-white uppercase">Monto Total a Cargar</h5>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-5xl font-black tracking-tighter text-white">${total.toFixed(2)}</p>
+                      <p className="text-[10px] text-white/60 font-black uppercase tracking-widest mt-1">Dólares Americanos</p>
                     </div>
                   </div>
-                  <div className="px-5 py-2 rounded-xl bg-white/20 border border-white/30 backdrop-blur-md">
-                    <span className="text-[10px] font-black text-white uppercase tracking-widest">
-                      {tipoPago === 'contado' ? 'PAGADO HOY' : (tipoPago === 'credito' ? `PLAZO: ${diasCredito} DÍAS` : 'CTA. CORRIENTE')}
-                    </span>
+
+                  <Separator className="bg-white/20" />
+
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 relative z-10">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-white">
+                        <CheckCircle2 className="h-5 w-5" />
+                      </div>
+                      <div className="text-left">
+                        <p className="text-sm font-bold text-white uppercase">{proveedores.find(p => p.id === selectedProveedor)?.nombre}</p>
+                        <p className="text-[9px] text-white/60 font-black uppercase tracking-widest">Beneficiario del Registro</p>
+                      </div>
+                    </div>
+                    <div className="px-5 py-2 rounded-xl bg-white/20 border border-white/30 backdrop-blur-md">
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest">
+                        {tipoPago === 'contado' ? 'PAGADO HOY' : (tipoPago === 'credito' ? `PLAZO: ${diasCredito} DÍAS` : 'CTA. CORRIENTE')}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         {step < STEPS.length && (
-          <DialogFooter className="p-6 bg-white/40 dark:bg-slate-900/40 backdrop-blur-sm border-t border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between gap-4">
+          <DialogFooter className="p-6 bg-white/40 dark:bg-slate-900/40 backdrop-blur-sm border-t border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between gap-4 shrink-0">
             <Button
               variant="ghost"
               onClick={() => step > 0 ? setStep(s => s - 1) : onOpenChange(false)}
@@ -1321,44 +1342,77 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
         )}
 
         {step === STEPS.length && successData && (
-          <div className="flex flex-col items-center justify-center p-12 space-y-8 text-center animate-in zoom-in-95 duration-500 min-h-[400px]">
-            <div className="w-24 h-24 bg-primary/10 text-primary rounded-full flex items-center justify-center shadow-inner relative">
-              <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl animate-pulse" />
-              <CheckCircle2 className="w-14 h-14 relative z-10" />
-            </div>
-            <div className="space-y-2">
-              <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white uppercase leading-none">¡Compra Exitosa!</h2>
-              <p className="text-slate-500 text-sm max-w-[340px] mx-auto leading-relaxed font-medium">
-                La factura fiscal ha sido registrada y el inventario actualizado.
-              </p>
-            </div>
+          <div className="flex-1 overflow-y-auto min-h-0 custom-scrollbar bg-white dark:bg-slate-950">
+            <div className="flex flex-col items-center justify-center p-8 sm:p-12 pb-20 space-y-8 text-center animate-in zoom-in-95 duration-500 min-h-full">
+              <div className="w-24 h-24 bg-primary/10 text-primary rounded-[2.5rem] flex items-center justify-center shadow-inner relative group shrink-0">
+                <div className="absolute inset-0 bg-primary/20 rounded-[2.5rem] blur-2xl opacity-40 group-hover:opacity-60 transition-opacity animate-pulse" />
+                <CheckCircle2 className="w-12 h-12 relative z-10 transition-transform group-hover:scale-110 duration-500" />
+              </div>
 
-            <div className="flex flex-col items-center w-full max-w-sm gap-6 pt-2">
-              <div className="w-full">
-                <div className="group relative overflow-hidden bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 max-w-[240px] mx-auto">
-                  <div className="p-5 flex flex-col items-center gap-3">
-                    <div className="p-3 bg-primary/10 rounded-xl group-hover:bg-primary group-hover:text-white transition-all duration-500">
-                      <Printer className="w-6 h-6 text-primary group-hover:text-white" />
+              <div className="space-y-3 shrink-0">
+                <h2 className="text-4xl font-black tracking-tighter text-slate-900 dark:text-white uppercase leading-none">¡Compra Registrada!</h2>
+                <p className="text-slate-500 text-sm max-w-[340px] mx-auto leading-relaxed font-medium">
+                  La factura fiscal <span className="text-primary font-bold">#{successData.numero_factura}</span> ha sido procesada con éxito en el sistema.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-lg shrink-0">
+                {/* Card Resumen */}
+                <div className="group relative overflow-hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-sm hover:shadow-xl hover:border-primary/30 transition-all duration-500">
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="p-3 bg-primary/10 rounded-2xl group-hover:bg-primary group-hover:text-white transition-all duration-500 shadow-inner">
+                      <FileText className="w-6 h-6 text-primary group-hover:text-white" />
                     </div>
-                    <span className="text-[10px] font-black text-primary uppercase tracking-widest">Resumen de Compra</span>
-                    <div className="flex w-full gap-1 border-t border-primary/10 pt-4 mt-1">
-                      <Button variant="ghost" size="sm" className="flex-1 h-10 gap-2 rounded-lg font-bold text-[10px] uppercase text-primary hover:bg-primary/10" onClick={handlePrintSummary}>
-                        <Printer className="w-4 h-4" /> Imprimir
+                    <div className="text-center">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Documento Fiscal</span>
+                      <span className="text-xs font-bold text-slate-700 dark:text-slate-200">Resumen de Compra</span>
+                    </div>
+                    <div className="flex w-full gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                      <Button variant="ghost" size="sm" className="flex-1 h-10 gap-2 rounded-xl font-bold text-[10px] uppercase text-primary hover:bg-primary/10 transition-colors" onClick={handlePrintSummary}>
+                        <Printer className="w-3.5 h-3.5" /> Imprimir
                       </Button>
-                      <Button variant="ghost" size="sm" className="w-10 h-10 rounded-lg text-primary/70 hover:bg-primary/10" onClick={handleDownloadSummary}>
-                        <Download className="w-4 h-4" />
+                      <Button variant="ghost" size="sm" className="w-10 h-10 rounded-xl text-primary/70 hover:bg-primary/10 transition-colors" onClick={handleDownloadSummary}>
+                        <Download className="w-3.5 h-3.5" />
                       </Button>
                     </div>
                   </div>
                 </div>
+
+                {/* Card Retención (Solo si aplica) */}
+                {successData.numero_comprobante ? (
+                  <div className="group relative overflow-hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-sm hover:shadow-xl hover:border-emerald-500/30 transition-all duration-500">
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="p-3 bg-emerald-500/10 rounded-2xl group-hover:bg-emerald-500 group-hover:text-white transition-all duration-500 shadow-inner">
+                        <ShieldCheck className="w-6 h-6 text-emerald-500 group-hover:text-white" />
+                      </div>
+                      <div className="text-center">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Retención IVA</span>
+                        <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{successData.numero_comprobante}</span>
+                      </div>
+                      <div className="flex w-full gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                        <Button variant="ghost" size="sm" className="flex-1 h-10 gap-2 rounded-xl font-bold text-[10px] uppercase text-emerald-600 hover:bg-emerald-50 transition-colors" onClick={handlePrintRetention}>
+                          <Printer className="w-3.5 h-3.5" /> Imprimir
+                        </Button>
+                        <Button variant="ghost" size="sm" className="w-10 h-10 rounded-xl text-emerald-600/70 hover:bg-emerald-50 transition-colors" onClick={handleDownloadRetention}>
+                          <Download className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center p-5 border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-3xl opacity-50">
+                    <AlertCircle className="w-8 h-8 text-slate-300 mb-2" />
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Sin Retención</span>
+                  </div>
+                )}
               </div>
 
-              <div className="w-full pt-6 border-t border-slate-100 dark:border-slate-800">
+              <div className="w-full max-w-sm pt-4 border-t border-slate-100 dark:border-slate-800 shrink-0">
                 <Button
                   onClick={handleFinish}
-                  className="w-full h-14 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold shadow-xl shadow-primary/20 transition-all active:scale-[0.98] text-base uppercase tracking-wider"
+                  className="w-full h-14 rounded-2xl bg-primary hover:bg-primary/90 text-white font-black shadow-xl shadow-primary/20 transition-all active:scale-[0.98] text-base uppercase tracking-widest"
                 >
-                  Finalizar Gestión
+                  continuar
                 </Button>
               </div>
             </div>
@@ -1389,14 +1443,61 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
       {/* Printable Sheet (hidden) */}
       {successData && (
         <div id="purchase-print-root" style={{ display: 'none' }}>
-          <PurchaseOrderPrint data={successData} concesionario={concesionario} printMode={printMode} />
+          <style dangerouslySetInnerHTML={{
+            __html: `
+              @media print {
+                body * { visibility: hidden !important; }
+                #purchase-print-root, #purchase-print-root * { visibility: visible !important; }
+                #purchase-print-root { 
+                  display: block !important;
+                  position: absolute !important;
+                  left: 0 !important; top: 0 !important;
+                  width: 210mm !important;
+                }
+              }
+              @page { size: A4 portrait; margin: 0; }
+              .page-break-after { page-break-after: always; break-after: page; }
+          `}} />
+          <div className="print-root text-black font-sans bg-white w-[210mm]">
+            {/* PAGE 1: PURCHASE SUMMARY */}
+            {(printMode === 'both' || printMode === 'summary') && (
+              <div className={successData.numero_comprobante && printMode === 'both' ? 'page-break-after' : ''}>
+                <PurchaseOrderPrint data={successData} concesionario={concesionario} logoBase64={logoBase64} />
+              </div>
+            )}
+
+            {/* PAGE 2: RETENTION (Only if exists) */}
+            {successData.numero_comprobante && (printMode === 'both' || printMode === 'retention') && (
+              <LegalRetentionVoucher
+                concesionario={concesionario}
+                logoBase64={logoBase64}
+                data={{
+                  currency: 'USD',
+                  exchange_rate: successData.tasa_cambio,
+                  iva_retention_number: successData.numero_comprobante,
+                  invoice_number: successData.numero_factura,
+                  control_number: successData.numero_control,
+                  date: successData.fecha_factura,
+                  provider_name: successData.proveedor_nombre,
+                  provider_rif: successData.proveedor_rif || '—',
+                  provider_direccion: successData.proveedor_direccion || '—',
+                  taxable_amount: successData.base_imponible_usd,
+                  exempt_amount: successData.monto_exento_usd,
+                  iva_amount: successData.iva_monto,
+                  total_amount: successData.total_usd,
+                  igtf_amount: 0,
+                  retention_iva_rate: successData.porcentaje_retencion_aplicado || 75
+                }}
+              />
+            )}
+          </div>
         </div>
       )}
     </Dialog>
   );
 }
 
-function PurchaseOrderPrint({ data, concesionario, printMode }: { data: any, concesionario: any, printMode: string }) {
+function PurchaseOrderPrint({ data, concesionario, logoBase64 }: { data: any, concesionario: any, logoBase64: string | null }) {
   const isBs = data.moneda_original === 'bs';
   const sym = isBs ? 'Bs' : '$';
   const tasa = data.tasa_cambio || 1;
@@ -1404,86 +1505,81 @@ function PurchaseOrderPrint({ data, concesionario, printMode }: { data: any, con
   const now = new Date();
 
   return (
-    <div className="p-[10mm] bg-white text-black font-sans w-[210mm]">
-      {/* PAGE 1: PURCHASE SUMMARY */}
-      {(printMode === 'both' || printMode === 'summary') && (
-        <div className="mb-20">
-          <div className="flex justify-between items-start border-b-2 border-slate-200 pb-6 mb-8">
-            <div className="w-20 h-20 bg-blue-600 rounded-2xl flex items-center justify-center text-white text-4xl font-black">ZM</div>
-            <div className="text-right">
-              <h1 className="text-xl font-black uppercase text-slate-900">{concesionario?.nombre_empresa}</h1>
-              <p className="text-sm text-slate-500">RIF: {concesionario?.rif || 'N/A'}</p>
-            </div>
+    <div style={{ padding: '8mm 15mm 5mm 15mm', height: '297mm', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', position: 'relative' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+        <div>{logoBase64
+          ? <img src={logoBase64} alt="Logo" style={{ width: 65, height: 65, objectFit: 'contain' }} />
+          : concesionario?.logo_url 
+            ? <img src={concesionario.logo_url} alt="Logo" crossOrigin="anonymous" loading="eager" style={{ width: 65, height: 65, objectFit: 'contain' }} />
+            : <div style={{ width: 65, height: 65, background: '#2563eb', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: 22, borderRadius: 4 }}>ZM</div>}
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <h1 style={{ fontSize: 15, fontWeight: 'bold', textTransform: 'uppercase', color: '#2563eb', letterSpacing: 1, margin: 0 }}>{concesionario?.nombre_empresa}</h1>
+          <p style={{ fontSize: 12, color: '#6b7280', margin: 0 }}>RIF: {concesionario?.rif || '—'}</p>
+        </div>
+      </div>
+      <div style={{ textAlign: 'center', marginBottom: 16 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 'bold', textTransform: 'uppercase', margin: 0 }}>Resumen de Compra</h2>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14, background: '#f9fafb', border: '1px solid #dbeafe', padding: 14, borderRadius: 6, fontSize: 12 }}>
+        <div>
+          <p style={{ margin: '2px 0' }}><strong>N° Factura:</strong> {data.numero_factura || 'N/A'}</p>
+          <p style={{ margin: '2px 0' }}><strong>N° Control:</strong> {data.numero_control || 'N/A'}</p>
+          <p style={{ margin: '2px 0' }}><strong>Proveedor:</strong> {data.proveedor_nombre} {data.proveedor_rif ? `(${data.proveedor_rif})` : ''}</p>
+          {data.fecha_factura && <p style={{ margin: '2px 0' }}><strong>Fecha Factura:</strong> {data.fecha_factura}</p>}
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <p style={{ margin: '2px 0' }}><strong>Fecha Registro:</strong> {now.toLocaleDateString('es-VE')}</p>
+          <p style={{ margin: '2px 0' }}><strong>Tasa BCV:</strong> {tasa.toFixed(2)} Bs/$</p>
+          <p style={{ margin: '2px 0' }}><strong>Cargado por:</strong> {data.creado_por || 'Administrador'}</p>
+          {data.numero_comprobante && <p style={{ margin: '2px 0' }}><strong>N° Retención IVA:</strong> {data.numero_comprobante}</p>}
+        </div>
+        <div style={{ gridColumn: '1 / span 2', textAlign: 'center', marginTop: 8, borderTop: '1px solid #e5e7eb', paddingTop: 6 }}>
+          <p style={{ margin: 0, fontSize: 10, color: '#9ca3af', fontStyle: 'italic' }}>Este documento no tiene validez fiscal.</p>
+        </div>
+      </div>
+      <h3 style={{ fontWeight: 'bold', borderBottom: '1.5px solid #dbeafe', paddingBottom: 4, marginBottom: 7, fontSize: 12, color: '#2563eb', textTransform: 'uppercase' }}>Lista de Productos</h3>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 18 }}>
+        <thead>
+          <tr style={{ background: '#f3f4f6', borderTop: '1px solid #d1d5db', borderBottom: '1px solid #d1d5db' }}>
+            <th style={{ padding: '4px 8px', textAlign: 'left', width: 80 }}>Código</th>
+            <th style={{ padding: '4px 8px', textAlign: 'left' }}>Descripción</th>
+            <th style={{ padding: '4px 8px', textAlign: 'center', width: 60 }}>Cant.</th>
+            <th style={{ padding: '4px 8px', textAlign: 'right', width: 110 }}>P. Unit. {sym}</th>
+            <th style={{ padding: '4px 8px', textAlign: 'right', width: 110 }}>Total {sym}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.items.map((item: any, i: number) => (
+            <tr key={i} style={{ borderBottom: '1px solid #e5e7eb' }}>
+              <td style={{ padding: '6px 8px', fontFamily: 'monospace', fontSize: 11 }}>{item.codigo || '—'}</td>
+              <td style={{ padding: '6px 8px' }}>{item.nombre}</td>
+              <td style={{ padding: '6px 8px', textAlign: 'center' }}>{item.cantidad}</td>
+              <td style={{ padding: '6px 8px', textAlign: 'right' }}>{sym}{formatAmt(item.costo_unitario_usd)}</td>
+              <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 600 }}>{sym}{formatAmt(item.subtotal_usd)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div style={{ marginLeft: 'auto', width: 260, fontSize: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #d1d5db', paddingTop: 6, marginBottom: 4 }}>
+          <span style={{ fontWeight: 600 }}>Monto Exento:</span><span>{sym}{formatAmt(data.monto_exento_usd || 0)}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+          <span style={{ fontWeight: 600 }}>Monto Gravable:</span><span>{sym}{formatAmt(data.base_imponible_usd || 0)}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+          <span style={{ fontWeight: 600 }}>IVA (16%):</span><span>{sym}{formatAmt(data.iva_monto)}</span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', borderTop: '2px solid #d1d5db', paddingTop: 6 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontWeight: 'bold', fontSize: 15 }}>
+            <span>Total:</span><span style={{ color: '#2563eb' }}>{sym}{formatAmt(data.total_usd)}</span>
           </div>
-
-          <div className="text-center mb-10">
-            <h2 className="text-3xl font-black tracking-[0.2em] uppercase text-slate-900">Resumen de Compra</h2>
-            <div className="w-16 h-1 bg-blue-600 mx-auto mt-2" />
-          </div>
-
-          <div className="grid grid-cols-2 gap-8 mb-10 bg-slate-50 p-6 rounded-2xl border border-slate-100 text-sm">
-            <div className="space-y-1">
-              <p><strong>Factura N°:</strong> {data.numero_factura || 'N/A'}</p>
-              <p><strong>Control N°:</strong> {data.numero_control || 'N/A'}</p>
-              <p><strong>Proveedor:</strong> {data.proveedor_nombre}</p>
-            </div>
-            <div className="text-right space-y-1">
-              <p><strong>Fecha Factura:</strong> {data.fecha_factura || 'N/A'}</p>
-              <p><strong>Fecha Registro:</strong> {now.toLocaleDateString('es-VE')}</p>
-              <p><strong>Tasa Cambio:</strong> {tasa.toFixed(2)} Bs/$</p>
-            </div>
-          </div>
-
-          <table className="w-full border-collapse mb-10">
-            <thead>
-              <tr className="bg-slate-100 border-y border-slate-200 text-[10px] font-black uppercase tracking-widest text-slate-600">
-                <th className="p-3 text-left">Código</th>
-                <th className="p-3 text-left">Descripción</th>
-                <th className="p-3 text-center w-20">Cant</th>
-                <th className="p-3 text-right w-32">P. Unit {sym}</th>
-                <th className="p-3 text-right w-32">Total {sym}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
-              {data.items.map((item: any, i: number) => (
-                <tr key={i} className="text-xs">
-                  <td className="p-3 font-mono">{item.codigo || '—'}</td>
-                  <td className="p-3 font-bold">{item.nombre}</td>
-                  <td className="p-3 text-center">{item.cantidad}</td>
-                  <td className="p-3 text-right">{sym}{formatAmt(item.costo_unitario_usd)}</td>
-                  <td className="p-3 text-right font-black">{sym}{formatAmt(item.subtotal_usd)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <div className="ml-auto w-64 space-y-2 border-t-2 border-slate-900 pt-4">
-            <div className="flex justify-between text-sm text-slate-600"><span>Subtotal:</span><span className="font-bold text-slate-900">{sym}{formatAmt(data.subtotal_usd)}</span></div>
-            <div className="flex justify-between text-sm text-slate-600"><span>IVA (16%):</span><span className="font-bold text-slate-900">{sym}{formatAmt(data.iva_monto)}</span></div>
-            <div className="flex justify-between text-lg font-black uppercase text-slate-900"><span>Total:</span><span>{sym}{formatAmt(data.total_usd)}</span></div>
+          <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>
+            {isBs ? `Ref: $${data.total_usd.toFixed(2)}` : `Equiv: Bs ${(data.total_usd * tasa).toFixed(2)}`}
           </div>
         </div>
-      )}
-
-      {data.numero_comprobante && (printMode === 'both' || printMode === 'retention') && (
-        <div className="pt-10 border-t-2 border-dashed border-slate-200 mt-10">
-          <div className="text-center mb-6">
-            <h2 className="text-xl font-black uppercase tracking-widest text-slate-900">Comprobante de Retención de I.V.A.</h2>
-          </div>
-          <div className="grid grid-cols-2 gap-4 text-xs mb-6 border border-slate-200 p-4 rounded-xl text-slate-700">
-            <div>
-              <p><strong>N° Comprobante:</strong> {data.numero_comprobante}</p>
-              <p><strong>Agente:</strong> {concesionario?.nombre_empresa}</p>
-              <p><strong>RIF Agente:</strong> {concesionario?.rif}</p>
-            </div>
-            <div className="text-right">
-              <p><strong>Proveedor:</strong> {data.proveedor_nombre}</p>
-              <p><strong>RIF Proveedor:</strong> {data.proveedor_rif}</p>
-              <p className="text-slate-900 font-black"><strong>RETENIDO Bs:</strong> {(data.monto_retenido * tasa).toFixed(2)}</p>
-            </div>
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -7,9 +7,10 @@ interface DeliveryNotePrintProps {
   data: any;
   concesionario: any;
   id?: string;
+  logoBase64?: string | null;
 }
 
-export function DeliveryNotePrint({ data, concesionario, id = "delivery-print-root" }: DeliveryNotePrintProps) {
+export function DeliveryNotePrint({ data, concesionario, id = "delivery-print-root", logoBase64 }: DeliveryNotePrintProps) {
   if (!data) return null;
 
   const isBs = data.moneda_original === 'bs';
@@ -40,9 +41,11 @@ export function DeliveryNotePrint({ data, concesionario, id = "delivery-print-ro
           style={{ padding: '8mm 15mm 5mm 15mm', height: '297mm', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
-            <div>{concesionario?.logo_url
-              ? <img src={concesionario.logo_url} alt="Logo" crossOrigin="anonymous" loading="eager" style={{ width: 65, height: 65, objectFit: 'contain' }} />
-              : <div style={{ width: 65, height: 65, background: '#64748b', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: 22, borderRadius: 4 }}>ZM</div>}
+            <div>{logoBase64
+              ? <img src={logoBase64} alt="Logo" style={{ width: 65, height: 65, objectFit: 'contain' }} />
+              : concesionario?.logo_url 
+                ? <img src={concesionario.logo_url} alt="Logo" crossOrigin="anonymous" loading="eager" style={{ width: 65, height: 65, objectFit: 'contain' }} />
+                : <div style={{ width: 65, height: 65, background: '#64748b', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: 22, borderRadius: 4 }}>ZM</div>}
             </div>
             <div style={{ textAlign: 'right' }}>
               <h1 style={{ fontSize: 15, fontWeight: 'bold', textTransform: 'uppercase', color: '#64748b', letterSpacing: 1, margin: 0 }}>{concesionario?.nombre_empresa}</h1>

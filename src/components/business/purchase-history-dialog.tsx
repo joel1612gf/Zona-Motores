@@ -59,6 +59,24 @@ export function PurchaseHistoryDialog({
   // Printing state
   const [printData, setPrintData] = useState<Compra | null>(null);
   const [printMode, setPrintMode] = useState<'summary' | 'retention' | 'both'>('summary');
+  const [logoBase64, setLogoBase64] = useState<string | null>(null);
+
+  // Preload logo for reliable printing
+  useEffect(() => {
+    if (concesionario?.logo_url) {
+      fetch(concesionario.logo_url)
+        .then(res => res.blob())
+        .then(blob => {
+          const reader = new FileReader();
+          reader.onloadend = () => setLogoBase64(reader.result as string);
+          reader.readAsDataURL(blob);
+        })
+        .catch(err => {
+          console.error('Error preloading logo:', err);
+          setLogoBase64(null);
+        });
+    }
+  }, [concesionario?.logo_url]);
 
   useEffect(() => {
     if (open && concesionario?.id) {
@@ -795,9 +813,11 @@ export function PurchaseHistoryDialog({
                   style={{ padding: '8mm 15mm 5mm 15mm', height: '297mm', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', position: 'relative' }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
-                    <div>{concesionario?.logo_url
-                      ? <img src={concesionario.logo_url} alt="Logo" crossOrigin="anonymous" loading="eager" style={{ width: 65, height: 65, objectFit: 'contain' }} />
-                      : <div style={{ width: 65, height: 65, background: '#2563eb', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: 22, borderRadius: 4 }}>ZM</div>}
+                    <div>{logoBase64
+                      ? <img src={logoBase64} alt="Logo" style={{ width: 65, height: 65, objectFit: 'contain' }} />
+                      : concesionario?.logo_url
+                        ? <img src={concesionario.logo_url} alt="Logo" crossOrigin="anonymous" loading="eager" style={{ width: 65, height: 65, objectFit: 'contain' }} />
+                        : <div style={{ width: 65, height: 65, background: '#2563eb', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: 22, borderRadius: 4 }}>ZM</div>}
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <h1 style={{ fontSize: 15, fontWeight: 'bold', textTransform: 'uppercase', color: '#2563eb', letterSpacing: 1, margin: 0 }}>{concesionario?.nombre_empresa}</h1>
@@ -885,6 +905,7 @@ export function PurchaseHistoryDialog({
                 <div data-print-page="retention" style={{ display: 'flex', flexDirection: 'column' }}>
                   <LegalRetentionVoucher
                     concesionario={concesionario}
+                    logoBase64={logoBase64}
                     data={{
                       currency: 'USD', // Forzamos USD para que el componente multiplique por la tasa y muestre Bs
                       exchange_rate: printData.tasa_cambio,

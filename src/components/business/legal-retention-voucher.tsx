@@ -5,6 +5,7 @@ import { Concesionario } from '@/lib/business-types';
 
 interface LegalRetentionVoucherProps {
   concesionario: Concesionario | null;
+  logoBase64?: string | null;
   data: {
     currency: 'USD' | 'VES';
     exchange_rate: number;
@@ -112,7 +113,13 @@ export function LegalRetentionVoucher({ concesionario, data }: LegalRetentionVou
       {/* HEADER */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
         <div>
-          {concesionario?.logo_url ? (
+          {logoBase64 ? (
+            <img
+              src={logoBase64}
+              alt="Logo"
+              style={{ width: 65, height: 65, objectFit: 'contain' }}
+            />
+          ) : concesionario?.logo_url ? (
             <img
               src={concesionario.logo_url}
               alt="Logo"
