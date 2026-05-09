@@ -27,7 +27,7 @@ import {
   CalendarDays,
   CarIcon,
   Landmark,
-  FileWarning
+  FileText
 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -49,7 +49,7 @@ function getSidebarItems(slug: string): SidebarItem[] {
     { module: 'clients', label: 'Clientes', icon: Users, href: `/business/${slug}/clients` },
     { module: 'consignment', label: 'Consignación', icon: Handshake, href: `/business/${slug}/consignment` },
     { module: 'finance', label: 'Finanzas', icon: Wallet, href: `/business/${slug}/finance` },
-    { module: 'payables', label: 'Cuentas x Pagar', icon: FileWarning, href: `/business/${slug}/payables` },
+    { module: 'payables', label: 'Cuentas por Pagar', icon: FileText, href: `/business/${slug}/payables` },
     { module: 'banks', label: 'Bancos', icon: Landmark, href: `/business/${slug}/banks` },
     { module: 'calendar', label: 'Calendario', icon: CalendarDays, href: `/business/${slug}/calendar` },
     { module: 'staff', label: 'Personal', icon: UserCog, href: `/business/${slug}/staff` },

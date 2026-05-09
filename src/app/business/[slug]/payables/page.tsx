@@ -60,10 +60,10 @@ function statusBadge(estado: PayableRow['estado']) {
 
 function origenLabel(origen: string): string {
   const map: Record<string, string> = {
-    compra_factura: 'Factura',
-    compra_nota_entrega: 'Nota Entrega',
+    compra_factura: 'Factura Fiscal',
+    compra_nota_entrega: 'Nota de Entrega',
     consignacion: 'Consignación',
-    nota_debito: 'Nota Débito',
+    nota_debito: 'Nota de Débito',
     gasto: 'Gasto Operativo',
     vehiculo: 'Vehículo',
   };
@@ -73,48 +73,43 @@ function origenLabel(origen: string): string {
 function origenIcon(origen: string) {
   if (origen === 'compra_factura') return <FileText className="h-5 w-5 text-primary" />;
   if (origen === 'compra_nota_entrega') return <FileText className="h-5 w-5 text-slate-400" />;
-  if (origen === 'consignacion' || origen === 'vehiculo') return <Car className="h-5 w-5 text-indigo-500" />;
-  if (origen === 'gasto') return <TrendingDown className="h-5 w-5 text-rose-500" />;
+  if (origen === 'consignacion' || origen === 'vehiculo') return <Car className="h-5 w-5 text-primary" />;
+  if (origen === 'gasto' || origen === 'nota_debito') return <TrendingDown className="h-5 w-5 text-rose-500" />;
   return <ArrowUpDown className="h-5 w-5 text-amber-500" />;
 }
 
 // ─── Premium KPI Card ────────────────────────────────────────────────────────
 
 function KpiCard({
-  title, value, sub, icon, accentColor, trend
+  title, value, sub, icon: Icon, variant = 'primary'
 }: {
   title: string;
   value: string;
   sub?: string;
-  icon: React.ReactNode;
-  accentColor: string;
-  trend?: { label: string; value: string; isPositive: boolean };
+  icon: any;
+  variant?: 'primary' | 'success' | 'warning' | 'danger';
 }) {
-  return (
-    <div className="relative group overflow-hidden rounded-[2.5rem] bg-card/40 backdrop-blur-xl border border-white/10 p-6 transition-all duration-300 hover:shadow-2xl hover:shadow-primary/5 hover:-translate-y-1">
-      {/* Decorative Gradient Background */}
-      <div className={cn("absolute -right-4 -top-4 h-24 w-24 rounded-full opacity-10 blur-2xl transition-all duration-500 group-hover:scale-150", accentColor)} />
-      
-      <div className="relative flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <div className={cn("flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5 border border-white/10 text-foreground shadow-inner", accentColor.replace('bg-', 'text-'))}>
-            {icon}
-          </div>
-          {trend && (
-            <div className={cn(
-              "flex items-center gap-1 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-tight",
-              trend.isPositive ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"
-            )}>
-              {trend.value}
-            </div>
-          )}
-        </div>
+  const styles = {
+    primary: "bg-primary text-primary-foreground shadow-primary/30",
+    success: "bg-card border-l-4 border-l-emerald-500 shadow-sm",
+    warning: "bg-card border-l-4 border-l-amber-500 shadow-sm",
+    danger: "bg-card border-l-4 border-l-red-500 shadow-sm"
+  };
+  const isLight = variant !== 'primary';
 
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/70">{title}</p>
-          <h3 className="mt-1 text-3xl font-black tracking-tight text-foreground">{value}</h3>
-          {sub && <p className="mt-1 text-xs font-medium text-muted-foreground/60">{sub}</p>}
-        </div>
+  return (
+    <div className={cn("relative overflow-hidden rounded-[2rem] transition-all hover:-translate-y-1 border-none group", styles[variant])}>
+      <Icon className={cn("absolute -bottom-4 -right-4 h-28 w-28 opacity-[0.08] group-hover:scale-110 transition-transform", !isLight && "opacity-[0.15]")} />
+      <div className="p-6 relative z-10">
+        <p className={cn("text-[10px] font-black uppercase tracking-[0.2em] mb-1", isLight ? "text-muted-foreground" : "text-primary-foreground/60")}>
+          {title}
+        </p>
+        <h3 className="text-3xl font-bold tracking-tighter leading-none">
+          {value}
+        </h3>
+        <p className={cn("text-xs mt-2.5 font-medium", isLight ? "text-muted-foreground" : "text-primary-foreground/80")}>
+          {sub}
+        </p>
       </div>
     </div>
   );
@@ -146,7 +141,7 @@ function PayableRowCard({
             {origenIcon(row.origen)}
           </div>
           <div className="min-w-0">
-            <h4 className="text-lg font-black tracking-tight truncate">{row.proveedor_nombre}</h4>
+            <h4 className="text-lg font-bold tracking-tight truncate">{row.proveedor_nombre}</h4>
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
               <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1">
                 {origenLabel(row.origen)}
@@ -188,13 +183,13 @@ function PayableRowCard({
               <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/50">Saldo Pendiente</p>
               <div className="flex flex-col items-end">
                 <p className={cn(
-                  "text-xl font-black tracking-tight",
-                  row.saldo_pendiente > 0 ? "text-amber-500" : "text-emerald-500"
+                  "text-xl font-bold tracking-tighter font-headline",
+                  row.saldo_pendiente > 0 ? "text-primary" : "text-emerald-500"
                 )}>
                   {formatCurrency(row.saldo_pendiente, row.moneda_original === 'bs' ? 'VES' : 'USD')}
                 </p>
                 {row.moneda_original === 'bs' && row.tasa_cambio && row.saldo_pendiente > 0 && (
-                  <p className="text-[10px] font-bold text-amber-500/50 mt-0.5">
+                  <p className="text-[10px] font-bold text-primary/50 mt-0.5">
                     ≈ {formatCurrency(row.saldo_pendiente / row.tasa_cambio, 'USD')}
                   </p>
                 )}
@@ -397,7 +392,7 @@ export default function PayablesPage() {
   const filteredRows = useMemo(() => {
     return allRows.filter(r => {
       const matchSearch = r.proveedor_nombre.toLowerCase().includes(search.toLowerCase()) ||
-                          r.descripcion.toLowerCase().includes(search.toLowerCase());
+        r.descripcion.toLowerCase().includes(search.toLowerCase());
       return matchSearch && matchesAging(r, aging);
     });
   }, [allRows, search, aging]);
@@ -409,56 +404,59 @@ export default function PayablesPage() {
   const activeDocs = allRows.length;
 
   return (
-    <div className="flex flex-col min-h-screen gap-10 p-6 md:p-10 bg-transparent">
-      
+    <div className="flex flex-col min-h-screen gap-10 pb-12 relative animate-in fade-in duration-500">
+
+      <div className="absolute -top-24 -right-24 w-96 h-96 bg-primary/5 rounded-full blur-[100px] pointer-events-none" />
+
       {/* ── Header Area ────────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-        <div className="space-y-2">
+      <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between relative z-10">
+        <div className="space-y-1">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-[1.2rem] bg-primary/10 text-primary shadow-inner">
-              <Wallet className="h-6 w-6" />
+            <div className="p-2.5 bg-primary rounded-2xl shadow-lg shadow-primary/25">
+              <FileText className="h-6 w-6 text-primary-foreground" />
             </div>
-            <h1 className="text-4xl font-black tracking-tight text-foreground">Cuentas x Pagar</h1>
+            <h1 className="text-3xl font-bold font-headline tracking-tight text-foreground">Cuentas por Pagar</h1>
           </div>
-          <p className="text-sm font-medium text-muted-foreground">Centraliza tus pasivos, compras y consignaciones en tiempo real.</p>
+          <p className="text-muted-foreground font-medium flex items-center gap-2">
+            Panel de <span className="text-foreground font-bold">{concesionario?.nombre_empresa}</span>
+          </p>
         </div>
 
-        <div className="flex items-center gap-4 rounded-3xl bg-card/40 backdrop-blur-md border border-white/5 p-2 px-6 shadow-sm">
-          <div className="flex flex-col text-right">
-            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Referencia BCV</span>
-            <span className="text-sm font-black text-primary">Bs {bcvRate?.toFixed(2) || '—'}</span>
+        <div className="flex flex-col sm:flex-row items-stretch gap-px rounded-2xl border bg-background shadow-sm overflow-hidden backdrop-blur-sm w-full sm:w-auto">
+          <div className="px-5 py-3 bg-muted/50 flex flex-col justify-center border-b sm:border-b-0 sm:border-r min-w-0 sm:min-w-[140px]">
+            <p className="text-[10px] uppercase font-black text-muted-foreground tracking-widest mb-1">Referencia BCV</p>
+            <p className="text-sm font-bold font-headline text-primary">Bs {bcvRate?.toFixed(2) || '—'}</p>
           </div>
         </div>
       </div>
 
       {/* ── KPI Dashboard ──────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 relative z-10">
         <KpiCard
           title="Total Deuda"
           value={formatCurrency(totalSaldo, 'USD')}
           sub={bcvRate ? `≈ Bs ${(totalSaldo * bcvRate).toLocaleString('es-VE')}` : 'Sincronizando tasa...'}
-          icon={<Wallet className="h-6 w-6" />}
-          accentColor="bg-primary"
-          trend={{ label: "mensual", value: "Salida", isPositive: false }}
+          icon={Wallet}
+          variant="primary"
         />
         <KpiCard
           title="Mora Crítica"
           value={formatCurrency(totalOverdue, 'USD')}
           sub="Facturas con +30 días de antigüedad"
-          icon={<AlertCircle className="h-6 w-6" />}
-          accentColor="bg-red-500"
+          icon={AlertCircle}
+          variant="danger"
         />
         <KpiCard
           title="Documentos"
           value={String(activeDocs)}
           sub="Pasivos por liquidar actualmente"
-          icon={<Clock className="h-6 w-6" />}
-          accentColor="bg-indigo-500"
+          icon={Clock}
+          variant="success"
         />
       </div>
 
       {/* ── Control Bar ─────────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between relative z-10">
         <div className="flex flex-wrap items-center gap-2">
           {[
             { id: 'todas', label: 'Todas' },
@@ -472,10 +470,10 @@ export default function PayablesPage() {
               key={bucket.id}
               onClick={() => setAging(bucket.id as AgingBucket)}
               className={cn(
-                "h-10 rounded-2xl px-5 text-[10px] font-black uppercase tracking-widest transition-all duration-300 border",
-                aging === bucket.id 
-                  ? "bg-foreground text-background border-foreground shadow-lg shadow-foreground/10" 
-                  : "bg-card/40 text-muted-foreground/60 border-white/5 hover:border-white/20 hover:text-foreground"
+                "h-10 rounded-2xl px-5 text-[10px] font-black uppercase tracking-widest transition-all duration-300 border shadow-sm",
+                aging === bucket.id
+                  ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-[1.02]"
+                  : "bg-card text-muted-foreground border-border hover:border-primary/40 hover:bg-muted"
               )}
             >
               {bucket.label}
@@ -485,24 +483,24 @@ export default function PayablesPage() {
 
         <div className="relative w-full lg:w-80">
           <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/50" />
-          <Input 
+          <Input
             placeholder="Buscar proveedor o Nº factura..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="h-12 rounded-[1.2rem] bg-card/40 border-white/5 pl-11 text-sm font-medium focus:ring-primary/20"
+            className="h-12 rounded-[1.2rem] bg-card border-border pl-11 text-sm font-medium focus:ring-primary/20 shadow-sm"
           />
         </div>
       </div>
 
       {/* ── Main List Area ─────────────────────────────────────────────────── */}
-      <Tabs defaultValue="todas" className="w-full space-y-8">
-        <TabsList className="h-14 w-full justify-start gap-2 rounded-[1.5rem] bg-card/20 border border-white/5 p-1.5 backdrop-blur-sm md:w-max">
-          <TabsTrigger value="todas" className="rounded-xl px-8 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-lg">Todas</TabsTrigger>
-          <TabsTrigger value="compras" className="rounded-xl px-8 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-lg">Compras</TabsTrigger>
-          <TabsTrigger value="vehiculos" className="rounded-xl px-8 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-lg">Vehículos</TabsTrigger>
-          <TabsTrigger value="consignaciones" className="rounded-xl px-8 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-lg">Consignaciones</TabsTrigger>
-          <TabsTrigger value="gastos" className="rounded-xl px-8 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-lg">Gastos</TabsTrigger>
-          <TabsTrigger value="notas_debito" className="rounded-xl px-8 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-lg">N. Débito</TabsTrigger>
+      <Tabs defaultValue="todas" className="w-full space-y-8 relative z-10">
+        <TabsList className="bg-transparent h-auto p-0 gap-4 sm:gap-8 justify-start border-b w-full rounded-none mb-8 flex-wrap">
+          <TabsTrigger value="todas" className="data-[state=active]:text-primary data-[state=active]:after:scale-x-100 relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:bg-primary after:scale-x-0 after:transition-transform text-muted-foreground font-bold text-xs uppercase tracking-widest h-12 px-2 bg-transparent gap-2">Todas</TabsTrigger>
+          <TabsTrigger value="compras" className="data-[state=active]:text-primary data-[state=active]:after:scale-x-100 relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:bg-primary after:scale-x-0 after:transition-transform text-muted-foreground font-bold text-xs uppercase tracking-widest h-12 px-2 bg-transparent gap-2">Compras</TabsTrigger>
+          <TabsTrigger value="vehiculos" className="data-[state=active]:text-primary data-[state=active]:after:scale-x-100 relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:bg-primary after:scale-x-0 after:transition-transform text-muted-foreground font-bold text-xs uppercase tracking-widest h-12 px-2 bg-transparent gap-2">Vehículos</TabsTrigger>
+          <TabsTrigger value="consignaciones" className="data-[state=active]:text-primary data-[state=active]:after:scale-x-100 relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:bg-primary after:scale-x-0 after:transition-transform text-muted-foreground font-bold text-xs uppercase tracking-widest h-12 px-2 bg-transparent gap-2">Consignaciones</TabsTrigger>
+          <TabsTrigger value="gastos" className="data-[state=active]:text-primary data-[state=active]:after:scale-x-100 relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:bg-primary after:scale-x-0 after:transition-transform text-muted-foreground font-bold text-xs uppercase tracking-widest h-12 px-2 bg-transparent gap-2">Gastos</TabsTrigger>
+          <TabsTrigger value="notas_debito" className="data-[state=active]:text-primary data-[state=active]:after:scale-x-100 relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:bg-primary after:scale-x-0 after:transition-transform text-muted-foreground font-bold text-xs uppercase tracking-widest h-12 px-2 bg-transparent gap-2">N. Débito</TabsTrigger>
         </TabsList>
 
         <div className="min-h-[400px]">
