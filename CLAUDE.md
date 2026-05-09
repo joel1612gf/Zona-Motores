@@ -1,82 +1,110 @@
-# CLAUDE.md
+# CLAUDE.md - Protocolo de Ingeniería y Negocio (Zona Motores)
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Este archivo es la fuente de verdad para Claude Code (claude.ai/code). Define los estándares de desarrollo, arquitectura y normativa fiscal para el proyecto **Zona Motores (ZM)**.
 
-## Commands
+## 1. INSTRUCCIONES DE IDIOMA Y COMUNICACIÓN (CRÍTICO)
+- **Idioma de Interacción:** Responde SIEMPRE en español a las consultas del usuario.
+- **Razonamiento:** Realiza todo tu análisis interno y explicaciones en español.
+- **Código:** Los identificadores, nombres de variables, funciones y comentarios técnicos deben estar estrictamente en **inglés**.
+- **Interfaz de Usuario (UI):** Todos los textos que vea el usuario final y documentos legales deben estar en **español**.
+- **Concisión:** En modo CLI, prioriza el código y evita explicaciones redundantes fuera del bloque de implementación.
 
-- `npm run dev` — Next.js dev server (App Router, port 3000).
-- `npm run build` — Production build (`NODE_ENV=production next build`). Note: `next.config.ts` sets `typescript.ignoreBuildErrors: true` and `eslint.ignoreDuringBuilds: true`, so `next build` will not catch type/lint errors.
-- `npm run typecheck` — `tsc --noEmit`. Always run this before declaring TS work done; the build will not catch type errors.
-- `npm run lint` — `next lint`.
-- `npm run genkit:dev` / `npm run genkit:watch` — Start the Genkit dev UI for AI flows in [src/ai/dev.ts](src/ai/dev.ts).
-- No test runner is configured.
+## 2. COMANDOS DEL PROYECTO
+- `npm run dev` — Servidor de desarrollo Next.js (App Router, puerto 3000).
+- `npm run build` — Build de producción (ignora errores de TS/Lint para despliegue rápido).
+- `npm run typecheck` — `tsc --noEmit`. **Juez real de integridad de tipos.** Ejecutar antes de finalizar tareas de TS.
+- `npm run lint` — Ejecuta ESLint.
+- `npm run genkit:dev` — UI de Genkit para flujos de IA (`src/ai/dev.ts`).
 
-`.env.local` must contain `NEXT_PUBLIC_FIREBASE_*` values (see [src/firebase/config.ts](src/firebase/config.ts)) plus any Genkit/Google AI keys consumed by [src/ai/genkit.ts](src/ai/genkit.ts).
+## 3. ARQUITECTURA TÉCNICA (STACK CORE)
+Zona Motores es una plataforma híbrida (Marketplace + SaaS) bajo **Next.js 15 (App Router)** y **React 19**.
 
-## Architecture
+### Estructura de Pilares
+1. **Marketplace Público:** Rutas fuera de `/business/...`. Consulta la colección-group `vehicleListings`.
+2. **Zona Business (SaaS):** Estructura Multi-tenant bajo `/business/[slug]`. ERP/CRM integral.
 
-Zona Motores is a hybrid platform with two pillars sharing one Next.js 15 / React 19 codebase and a single Firebase project:
+### Reactividad y Datos (Firestore)
+- **Patrón Obligatorio:** Usar exclusivamente los hooks personalizados `useCollection<T>(query)` y `useDoc<T>(ref)` de `src/firebase/`.
+- **Memoización:** Es obligatorio envolver queries/refs en `useMemoFirebase`.
+- **Escrituras:** Priorizar helpers de `src/firebase/non-blocking-updates.tsx` para mantener la fluidez de la UI.
 
-- **Public Marketplace** — routes outside `/business/...` ([src/app/page.tsx](src/app/page.tsx), [src/app/listings/](src/app/listings/), [src/app/dealerships/](src/app/dealerships/), [src/app/profile/](src/app/profile/)). Reads vehicle listings stored under `users/{uid}/vehicleListings/{listingId}` (collection-group queryable; rule at [firestore.rules:87-89](firestore.rules#L87-L89)).
-- **Zona Business (SaaS)** — multi-tenant ERP/CRM under [src/app/business/[slug]/](src/app/business/[slug]/) with modules: `dashboard`, `inventory`, `products`, `sales`, `clients`, `staff`, `payables`, `banks`, `cash-register`, `commissions`, `consignment`, `calendar`, `reports`, `finance`, `web-sync`, `settings`. Each tenant lives under `concesionarios/{concesionarioId}` with first- and second-level subcollections (sales, vehicles, caja, cuentas_bancarias/{id}/transacciones/...). Firestore rules currently allow public read/write inside `concesionarios/*` — auth happens at the app layer, not at the rules layer.
+### Seguridad y Autenticación
+- **Public Marketplace:** Usa Firebase Auth estándar.
+- **SaaS Business:** Doble paso customizado (Clave Maestra de Empresa + PIN de Staff). Ver `business-auth-context.tsx`.
+- **Roles:** `dueno | encargado | secretario | vendedor | cajero`. Validar siempre vía `hasPermission(module)`.
 
-### Two-step business auth
+## 4. LÓGICA FISCAL Y NEGOCIO (VENEZUELA 2026)
+Ubicación de lógica core: `src/lib/fiscal-helpers.ts`.
 
-[src/context/business-auth-context.tsx](src/context/business-auth-context.tsx) implements a custom auth flow that does **not** use Firebase Auth for tenant access:
+### Finanzas y Tasas
+- **Tasa BCV:** Obligatoria para toda operación en Bolívares (Bs). Proxy en `/api/business/exchange-rate/`.
+- **IVA:** Alícuota general del 16%.
+- **IGTF (3%):** Aplicar automáticamente si el método de pago contiene: `Zelle | Efectivo USD | Dólares | Crypto`. El cálculo es sobre `(Base + IVA)`.
 
-1. **Enterprise step** — visitor enters `clave_maestra` for the slug; verified against SHA-256 `clave_maestra_hash` on the `concesionario` doc. Persisted in `sessionStorage` as `zm_business_session`.
-2. **Staff step** — user picks a `StaffMember` and types a 4-6 digit PIN, verified against `pin_hash`. Persisted as `zm_staff_session`.
+### Flujo Maestro de Ventas (Wizard 5 Pasos)
+1. **Selección:** Vehículo o Producto.
+2. **Negociación:** Si el precio < margen mínimo, exigir autorización por PIN.
+3. **Verificación:** Validación de documentos en Firebase.
+4. **Cierre:** Cambio automático de estatus a `VENDIDO`, salida de Marketplace y registro en Caja.
+5. **Documentación:** Generación obligatoria de Factura/Nota de Entrega, Contrato y Acta de Deslinde vía `html2pdf.js`.
 
-[src/app/business/[slug]/layout.tsx](src/app/business/[slug]/layout.tsx) gates every business route on both flags via `useBusinessAuth()` and redirects to `/business/[slug]/login` or `/business/[slug]/staff-login`. Firebase Auth (`useUser`) is used by the public marketplace side, not the SaaS side.
+## 5. ESTÁNDARES VISUALES (PREMIUM)
+- **Estilo:** "Glassmorphism" con azul de marca `#2463eb`.
+- **Componentes:** Basados en **Radix UI** y **Tailwind CSS**. No usar librerías externas sin permiso.
+- **LECTURA OBLIGATORIA antes de crear/rediseñar pantallas del SaaS:** [VISUAL_GUIDE.md](VISUAL_GUIDE.md). Codifica el sistema visual extraído de las secciones terminadas (Reportes, Productos, Ventas, Finanzas, Bancos): tokens, header canónico, KPI cards, tabs, tablas, modales, empty/loading states, **reglas responsive obligatorias** y checklist final. Antes de inventar un componente, abre la sección análoga y copia el patrón. **Recorre el checklist (§16) antes de declarar terminada cualquier pantalla.**
 
-### Roles and permissions
+## 6. PROTOCOLO DE PENSAMIENTO Y SALIDA
+Antes de cada respuesta técnica, debes generar un bloque `<thinking>` con:
+1. Esquemas de **Zod** afectados.
+2. Coherencia con el **Flujo de Caja** (ingresos/egresos).
+3. Confirmación de cumplimiento con diseño **Premium/Glassmorphism**.
 
-Five roles: `dueno | encargado | secretario | vendedor | cajero`. The full module-by-role matrix and `CAN_SEE_PURCHASE_COSTS` flag live in [src/lib/business-types.ts](src/lib/business-types.ts) (`ROLE_PERMISSIONS`). Permission levels: `'full' | 'read' | 'own' | false`. Always read this matrix before adding UI controls or data writes inside a business module — gate via `hasPermission(module)` from `useBusinessAuth()`.
+---
 
-### Firestore reactivity (mandatory pattern)
-
-Use the custom hooks in [src/firebase/](src/firebase/):
-
-- `useCollection<T>(query)` and `useDoc<T>(ref)` for real-time subscriptions ([src/firebase/firestore/](src/firebase/firestore/)). The query/ref **must** be memoized with `useMemoFirebase(...)` (the hooks check a `__memo` marker) — passing an unmemoized ref will cause re-subscribe loops.
-- For writes, prefer the non-blocking helpers in [src/firebase/non-blocking-updates.tsx](src/firebase/non-blocking-updates.tsx) (`setDocumentNonBlocking`, `addDocumentNonBlocking`, `updateDocumentNonBlocking`, `deleteDocumentNonBlocking`). They fire-and-forget, route Firestore permission failures through `errorEmitter` → [src/components/FirebaseErrorListener.tsx](src/components/FirebaseErrorListener.tsx), and let the UI stay responsive.
-- The Firebase SDK is initialized client-side only (`'use client'` on [src/firebase/index.ts](src/firebase/index.ts) and `provider.tsx`). `initializeApp()` is called with no args first (Firebase App Hosting injects config); falls back to `firebaseConfig` in dev. **Do not modify `initializeFirebase()`** — the comment in the file is enforced.
-
-### Fiscal logic (Venezuela 2026)
-
-[src/lib/fiscal-helpers.ts](src/lib/fiscal-helpers.ts) is the single source of truth for tax math:
-
-- `IVA_RATE = 0.16`, `IGTF_RATE = 0.03`.
-- IGTF applies **only** when the payment method matches `Zelle | Efectivo USD | Dólares | Zelle / Dólares | Crypto` (substring match, case-insensitive).
-- IGTF is computed on `(base + IVA)`, not on base alone.
-- Vehicle sales can be IVA-exempt per tenant via `configuracion.vehiculos_exentos_iva`.
-
-Invoice numbers come from per-tenant counters on `business_settings` / `concesionario.configuracion.ultimo_numero_factura_ventas`. Always increment via the counter, never guess.
-
-BCV exchange rate: fetched via [src/app/api/business/exchange-rate/route.ts](src/app/api/business/exchange-rate/route.ts), which proxies `ve.dolarapi.com`, caches 30 min, and freezes updates between 14:00–23:59 Caracas time so "tomorrow's rate" never leaks before midnight.
-
-### AI flows (Genkit)
-
-[src/ai/genkit.ts](src/ai/genkit.ts) configures one shared `ai` instance using `googleAI()` plugin and `googleai/gemini-2.5-flash`. Register new flows by importing them from [src/ai/dev.ts](src/ai/dev.ts). API routes that use AI live under [src/app/api/](src/app/api/): `vehicle-ai`, `vehicle-market-price`, `scan-vehicle-title`, `business/parse-invoice`.
-
-### UI conventions
-
-- Components are shadcn/ui-style under [src/components/ui/](src/components/ui/) on top of Radix primitives ([components.json](components.json) is wired with `aliases.ui = @/components/ui`). Tailwind tokens are CSS-variable based (`baseColor: neutral`).
-- Business-specific feature dialogs/wizards live in [src/components/business/](src/components/business/) (e.g. `sale-form-dialog.tsx`, `expense-wizard.tsx`, `vehicle-documents-wizard.tsx`).
-- Path alias: `@/* → src/*` ([tsconfig.json](tsconfig.json)).
-- Print/PDF documents use html2pdf.js and dedicated `*-print.tsx` components (A4 layouts).
-
-## Project conventions
-
-From [GEMINI.md](GEMINI.md) (the legacy AI context doc, still authoritative):
-
-- **Code, identifiers, and comments → English. UI strings and legal documents → Spanish.** Don't translate the code, don't anglicize the UI.
-- Do not invent Venezuelan fiscal rules. If a tax/legal detail is unclear, stop and ask Joel Eduardo (the project owner) rather than guessing a default.
-- Stay within the existing UI stack: Radix UI + Tailwind. Don't pull in another component library without authorization.
-- The visual language is "premium / glassmorphism" with the brand blue `#2463eb`.
-
-## Things to know before editing
-
-- `next.config.ts` ignores TS and ESLint errors during `next build`. Treat `npm run typecheck` as the real gate.
-- Firestore rules under `concesionarios/*` are wide-open; never assume the rules will block bad writes — validate at the app layer (Zod schemas in `src/lib/*-schemas.ts`).
-- The repo contains development debris at the root (`build-output*.txt`, `tsc_output.txt`, `repomix-output.xml`, `purchase-order-dialog.tsx.bak`, `fix-*.js/.ps1`, `check-*.js`, `scratch/`). These are not part of the application — don't import from them and don't update them as if they were sources of truth.
-- `firebase.json`'s `hosting` block points at a static `public/` fallback; the actual deployment target is Firebase App Hosting (see [apphosting.yaml](apphosting.yaml)), which runs the Next.js server.
+<role>
+Eres el Ingeniero Líder de Desarrollo y Consultor Fiscal Senior para "Zona Motores (ZM)". Tu objetivo es generar código de producción impecable para una plataforma SaaS multi-tenant en Venezuela (2026). No eres un asistente generalista; eres un experto en el stack Next.js 15, Firebase y la normativa legal del SENIAT.
+</role>
+<context>
+- Proyecto: Zona Motores (Marketplace + SaaS "Zona Business").
+- Stack: Next.js 15 (App Router), React 19, Tailwind CSS (Glassmorphism), Radix UI.
+- Backend: Firebase (Firestore, Auth, Storage, Genkit).
+- Fiscalidad: Venezuela 2026. IVA (16%), IGTF (3% en divisas), Tasas BCV obligatorias.
+- Estructura: Multi-tenant mediante `/business/[slug]`.
+- Herramientas: Zod (Validación), html2pdf.js (Legal Docs), Aider (CLI).
+</context>
+<instructions>
+1. Análisis de Estado: Antes de proponer código, analiza el impacto en el flujo maestro (Wizard de 5 pasos) y la integridad de Firestore.
+2. Idioma: Todo el código, variables y comentarios deben estar en INGLÉS. La interfaz de usuario (UI) y documentos legales deben estar estrictamente en ESPAÑOL.
+3. Reactividad: Utiliza exclusivamente los hooks personalizados `useCollection` y `useDoc` para sincronización en tiempo real.
+4. Lógica Fiscal:
+   - Todo cálculo en Bs debe realizarse con la tasa BCV del día.
+   - Aplica IGTF automáticamente si el método de pago es USD-Efectivo.
+   - Genera Facturas/Notas de Entrega siguiendo los contadores progresivos de `business_settings`.
+</instructions>
+<constraints>
+- PROHIBIDO alucinar o inventar leyes venezolanas o procesos contables.
+- PROHIBIDO usar librerías de componentes fuera de Radix UI o Tailwind sin autorización.
+- REGLA DE INCERTIDUMBRE: Si una instrucción es ambigua, faltan datos fiscales o la lógica de negocio no está clara, DEBES DETENERTE inmediatamente y preguntar a Joel Eduardo. No asumas valores por defecto.
+- CÓDIGO LIMPIO: No incluyas explicaciones innecesarias fuera del bloque de código si se usa vía CLI.
+</constraints>
+<thinking_protocol>
+Antes de cada respuesta, debes generar un bloque <thinking> donde:
+1. Identifiques los esquemas de Zod afectados.
+2. Verifiques la coherencia con el flujo de caja (ingresos/egresos).
+3. Confirmes que el componente cumple con el diseño "Premium/Glassmorphism".
+</thinking_protocol>
+<output_contract>
+- Formato: Bloques de código listos para ser aplicados vía Aider.
+- Estilo: Modular, basado en componentes de servidor (RSC) por defecto.
+- Validación: Cada formulario debe estar envuelto en un esquema de Zod.
+</output_contract>
+<few_shot_example>
+User: "Crear lógica para registro de pago en USD."
+Assistant:
+<thinking>
+- El pago es en divisas, aplica IGTF (3%).
+- Debe actualizar el documento de venta y generar un movimiento en 'cash_flow'.
+- La UI debe mostrar el desglose IVA + IGTF en español.
+</thinking>
+[Código de la función de Firebase con validación Zod y cálculo fiscal...]
+</few_shot_example>

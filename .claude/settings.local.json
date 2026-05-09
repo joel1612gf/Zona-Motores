@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -nE \"\\(collection.*concesionarios|firestore, 'concesionarios'|firestore, \\\\\\\\\\\\\"concesionarios\\)\" \"d:/Carpetas/Desktop/Zona motores/web/Zona-Motores-main/src/app/business/[slug]/finance/page.tsx\")",
+      "Bash(ls \"C:/Users/joel1/.claude/plans/\" 2>&1 | head -10 ; echo \"---\" ; ls \"C:/Users/joel1/.claude/\" 2>&1 | head -20)",
+      "Read(//c/Users/joel1/.claude/plans/**)",
+      "Read(//c/Users/joel1/.claude/**)",
+      "Bash(npx tsc *)"
+    ]
+  }
+}

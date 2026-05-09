@@ -1,250 +1,305 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
+import { type View, Views } from 'react-big-calendar';
 import { useBusinessAuth } from '@/context/business-auth-context';
-import { useFirestore } from '@/firebase';
-import { collection, query, getDocs, Timestamp, orderBy } from 'firebase/firestore';
-import { Calendar, dateFnsLocalizer, Views } from 'react-big-calendar';
-import { format, parse, startOfWeek, getDay } from 'date-fns';
-import { es } from 'date-fns/locale';
-import 'react-big-calendar/lib/css/react-big-calendar.css';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Loader2, Calendar as CalendarIcon, Clock } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-
-const locales = {
-  'es': es,
-}
-
-const localizer = dateFnsLocalizer({
-  format,
-  parse,
-  startOfWeek,
-  getDay,
-  locales,
-})
-
-interface CitaEvent {
-  id: string;
-  title: string;
-  start: Date;
-  end: Date;
-  allDay: boolean;
-  resource?: any;
-}
+import { Skeleton } from '@/components/ui/skeleton';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import {
+  CalendarDays,
+  Plus,
+  RefreshCw,
+  Lock,
+  CalendarOff,
+} from 'lucide-react';
+import { useCalendarEvents } from '@/components/business/calendar/use-calendar-events';
+import { CalendarHeaderStats } from '@/components/business/calendar/calendar-header-stats';
+import { CalendarTypeFilters } from '@/components/business/calendar/calendar-type-filters';
+import { CalendarMainGrid } from '@/components/business/calendar/calendar-main-grid';
+import { CalendarDayPanel } from '@/components/business/calendar/calendar-day-panel';
+import { CalendarMobileList } from '@/components/business/calendar/calendar-mobile-list';
+import { CalendarEventDetailDialog } from '@/components/business/calendar/calendar-event-detail-dialog';
+import { CalendarEventFormDialog } from '@/components/business/calendar/calendar-event-form-dialog';
+import { CalendarEmptyState } from '@/components/business/calendar/calendar-empty-state';
+import {
+  canCreateEvents,
+  type CalendarEventSource,
+  type UnifiedCalendarEvent,
+  type EventoCalendario,
+} from '@/lib/calendar-schemas';
+import { format, isSameDay } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 export default function BusinessCalendarPage() {
-  const { concesionario, isLoading: authLoading } = useBusinessAuth();
-  const firestore = useFirestore();
-  
-  const [events, setEvents] = useState<CitaEvent[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { concesionario, currentRole, hasPermission, isLoading: authLoading } = useBusinessAuth();
+  const permission = hasPermission('calendar');
 
-  const [selectedEvent, setSelectedEvent] = useState<CitaEvent | null>(null);
+  // Filters
+  const [activeFilters, setActiveFilters] = useState<Set<CalendarEventSource>>(
+    () => new Set(['cita', 'cxp', 'manual'])
+  );
 
-  useEffect(() => {
-    if (authLoading || !concesionario || !firestore) return;
+  const { events, visibleSources, isLoading } = useCalendarEvents(activeFilters);
 
-    const fetchCitas = async () => {
-      setIsLoading(true);
-      try {
-        const citasRef = collection(firestore, `concesionarios/${concesionario.id}/citas_consignacion`);
-        const q = query(citasRef, orderBy('fecha_cita', 'asc'));
-        const snapshot = await getDocs(q);
-        
-        const citasData: CitaEvent[] = [];
-        snapshot.forEach(doc => {
-          const data = doc.data();
-          if (data.fecha_cita) {
-            const startDate = (data.fecha_cita as Timestamp).toDate();
-            // Default 1 hour duration
-            const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
-            
-            citasData.push({
-              id: doc.id,
-              title: `${data.vehicle_nombre} - ${data.publicador_nombre || 'Cliente'}`,
-              start: startDate,
-              end: endDate,
-              allDay: false,
-              resource: data
-            });
-          }
-        });
-        setEvents(citasData);
-      } catch (error) {
-        console.error("Error fetching citas:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  // Calendar state
+  const [view, setView] = useState<View>(Views.MONTH);
+  const [date, setDate] = useState<Date>(new Date());
+  const [selectedDay, setSelectedDay] = useState<Date>(new Date());
+  const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
 
-    fetchCitas();
-  }, [concesionario, firestore, authLoading]);
+  // Dialogs
+  const [detailEvent, setDetailEvent] = useState<UnifiedCalendarEvent | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<EventoCalendario | null>(null);
+  const [initialDate, setInitialDate] = useState<Date | undefined>(undefined);
 
-  // Translate messages for react-big-calendar
-  const messages = {
-    allDay: 'Todo el día',
-    previous: 'Anterior',
-    next: 'Siguiente',
-    today: 'Hoy',
-    month: 'Mes',
-    week: 'Semana',
-    day: 'Día',
-    agenda: 'Agenda',
-    date: 'Fecha',
-    time: 'Hora',
-    event: 'Evento',
-    noEventsInRange: 'No hay eventos en este rango.',
-    showMore: (total: number) => `+ Ver más (${total})`
+  const canCreate = canCreateEvents(currentRole);
+
+  const openCreate = (atDate?: Date) => {
+    setEditingEvent(null);
+    setInitialDate(atDate);
+    setFormOpen(true);
   };
 
-  const eventStyleGetter = (event: CitaEvent) => {
-    const estado = event.resource?.estado || 'agendada';
-    let backgroundColor = '#3b82f6'; // blue
-    if (estado === 'completada') backgroundColor = '#10b981'; // green
-    if (estado === 'cancelada') backgroundColor = '#ef4444'; // red
-
-    return {
-      style: {
-        backgroundColor,
-        borderRadius: '6px',
-        opacity: 0.9,
-        color: 'white',
-        border: '0px',
-        display: 'block',
-        padding: '2px 6px',
-        fontSize: '12px'
-      }
-    };
+  const openEdit = (evt: UnifiedCalendarEvent) => {
+    if (evt.source !== 'manual') return;
+    setEditingEvent(evt.raw as EventoCalendario);
+    setInitialDate(undefined);
+    setFormOpen(true);
   };
 
-  const statusColors: Record<string, string> = {
-    agendada: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
-    completada: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
-    cancelada: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
+  const handleSelectEvent = (evt: UnifiedCalendarEvent) => {
+    setDetailEvent(evt);
+    setDetailOpen(true);
   };
 
-  return (
-    <div className="space-y-6 pb-12">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold font-headline tracking-tight">Calendario</h1>
-          <p className="text-muted-foreground mt-1 text-lg">
-            Gestiona citas de captación de consignaciones y otros eventos
+  const handleSelectSlot = ({ start }: { start: Date; end: Date }) => {
+    setSelectedDay(start);
+    if (typeof window !== 'undefined' && window.matchMedia('(min-width: 1280px)').matches) {
+      // xl: side panel ya muestra
+      return;
+    }
+    if (typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches) {
+      setMobileSheetOpen(true);
+    }
+  };
+
+  const toggleFilter = (s: CalendarEventSource) => {
+    setActiveFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(s)) next.delete(s);
+      else next.add(s);
+      return next;
+    });
+  };
+
+  // ── Access guard
+  if (authLoading) {
+    return (
+      <div className="space-y-8 pb-12">
+        <Skeleton className="h-12 w-64 rounded-xl" />
+        <Skeleton className="h-[650px] rounded-[2rem]" />
+      </div>
+    );
+  }
+
+  if (permission === false) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-5 animate-in fade-in duration-500">
+        <div className="relative">
+          <div className="absolute inset-0 bg-slate-500/20 blur-2xl rounded-full" />
+          <div className="relative p-8 bg-white/60 backdrop-blur-xl border border-white/40 rounded-[2rem] shadow-xl">
+            <Lock className="h-14 w-14 text-slate-400 mx-auto" />
+          </div>
+        </div>
+        <div className="text-center space-y-2">
+          <h2 className="text-xl font-bold font-headline">Acceso restringido</h2>
+          <p className="text-sm text-muted-foreground max-w-sm">
+            Tu rol no tiene permisos para ver el calendario. Habla con el dueño del concesionario.
           </p>
         </div>
       </div>
+    );
+  }
 
-      <Card className="shadow-sm border-muted/60">
-        <CardHeader className="pb-4 border-b bg-muted/20">
-          <div className="flex items-center gap-2">
-            <CalendarIcon className="h-5 w-5 text-primary" />
-            <CardTitle>Agenda del Concesionario</CardTitle>
+  const dayEventsForSelected = events.filter((e) => isSameDay(e.start, selectedDay));
+
+  return (
+    <div className="space-y-8 pb-12 relative animate-in fade-in duration-500">
+      {/* Blob */}
+      <div className="absolute -top-24 -right-24 w-96 h-96 bg-primary/5 rounded-full blur-[100px] pointer-events-none" />
+
+      {/* Header §3 */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative z-10">
+        <div className="space-y-1">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-primary rounded-2xl shadow-lg shadow-primary/25">
+              <CalendarDays className="h-6 w-6 text-primary-foreground" />
+            </div>
+            <h1 className="text-3xl font-bold font-headline tracking-tight">Calendario</h1>
           </div>
-          <CardDescription>Visualiza y organiza el flujo de trabajo del equipo. Selecciona una vista superior para cambiar el enfoque.</CardDescription>
-        </CardHeader>
-        <CardContent className="p-0 sm:p-6">
+          <p className="text-muted-foreground font-medium">
+            Agenda unificada de citas, vencimientos y recordatorios de{' '}
+            <span className="text-foreground font-bold">{concesionario?.nombre_empresa}</span>
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => window.location.reload()}
+            className="rounded-2xl h-12 w-12 border-primary/20 hover:bg-primary/5"
+            aria-label="Refrescar"
+          >
+            <RefreshCw className="h-5 w-5 text-primary" />
+          </Button>
+          {canCreate && (
+            <Button
+              onClick={() => openCreate()}
+              className="rounded-2xl h-12 px-6 shadow-xl shadow-primary/20 gap-2 font-bold flex-1 md:flex-none"
+            >
+              <Plus className="h-5 w-5" /> Nuevo evento
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Stats chips */}
+      <div className="relative z-10">
+        {isLoading ? (
+          <div className="flex flex-wrap gap-3">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-14 w-44 rounded-2xl" />
+            ))}
+          </div>
+        ) : (
+          <CalendarHeaderStats events={events} />
+        )}
+      </div>
+
+      {/* Filters */}
+      <div className="relative z-10">
+        <CalendarTypeFilters
+          visibleSources={visibleSources}
+          active={activeFilters}
+          onToggle={toggleFilter}
+        />
+      </div>
+
+      {/* Desktop: calendar + side panel */}
+      <div className="hidden md:grid xl:grid-cols-3 gap-6 relative z-10">
+        <div className="xl:col-span-2">
           {isLoading ? (
-            <div className="h-[600px] flex items-center justify-center">
-              <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
-            </div>
+            <Skeleton className="h-[700px] rounded-[2rem]" />
           ) : (
-            <div className="h-[650px] w-full p-2 bg-background dark:calendar-dark-override rounded-lg">
-              <style dangerouslySetInnerHTML={{__html: `
-                .rbc-calendar { font-family: inherit; }
-                .rbc-toolbar button { border-radius: 6px; }
-                .rbc-toolbar button.rbc-active { background-color: var(--primary); color: white; border-color: var(--primary); box-shadow: none; pointer-events: none;}
-                .rbc-toolbar button:active { background-color: var(--primary); color: white; border-color: var(--primary); }
-                .rbc-toolbar button:hover:not(.rbc-active) { background-color: var(--muted); }
-                .rbc-event { box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); }
-                .dark .rbc-month-view, .dark .rbc-time-view, .dark .rbc-agenda-view { border-color: hsl(var(--border)); }
-                .dark .rbc-day-bg, .dark .rbc-month-row, .dark .rbc-header { border-color: hsl(var(--border)); }
-                .dark .rbc-off-range-bg { background-color: hsl(var(--muted)/0.3); }
-                .dark .rbc-today { background-color: hsl(var(--muted)/0.6); }
-                .dark .rbc-time-content, .dark .rbc-timeslot-group, .dark .rbc-day-slot .rbc-time-slot { border-color: hsl(var(--border)); }
-                .dark .rbc-toolbar button { color: hsl(var(--foreground)); border-color: hsl(var(--border)); }
-                .dark .rbc-agenda-view table.rbc-agenda-table { border-color: hsl(var(--border)); }
-                .dark .rbc-agenda-view table.rbc-agenda-table tbody > tr > td { border-color: hsl(var(--border)); }
-                .dark .rbc-agenda-view table.rbc-agenda-table thead > tr > th { border-color: hsl(var(--border)); border-bottom-color: hsl(var(--border)); }
-              `}} />
-              <Calendar
-                localizer={localizer}
-                events={events}
-                startAccessor="start"
-                endAccessor="end"
-                style={{ height: '100%' }}
-                messages={messages}
-                culture="es"
-                defaultView={Views.MONTH}
-                views={['month', 'week', 'day', 'agenda']}
-                eventPropGetter={eventStyleGetter}
-                popup
-                selectable
-                onSelectEvent={(event) => setSelectedEvent(event)}
+            <CalendarMainGrid
+              events={events}
+              onSelectEvent={handleSelectEvent}
+              onSelectSlot={handleSelectSlot}
+              view={view}
+              onView={setView}
+              date={date}
+              onNavigate={setDate}
+            />
+          )}
+        </div>
+        <div className="hidden xl:block">
+          {isLoading ? (
+            <Skeleton className="h-[700px] rounded-[1.5rem]" />
+          ) : (
+            <CalendarDayPanel
+              date={selectedDay}
+              events={events}
+              onSelectEvent={handleSelectEvent}
+              canCreate={canCreate}
+              onCreate={() => openCreate(selectedDay)}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Mobile vista lista */}
+      <div className="md:hidden relative z-10">
+        {isLoading ? (
+          <Skeleton className="h-[500px] rounded-[2rem]" />
+        ) : (
+          <CalendarMobileList
+            events={events}
+            onSelectEvent={handleSelectEvent}
+            canCreate={canCreate}
+            onCreate={() => openCreate()}
+          />
+        )}
+      </div>
+
+      {/* Sheet lateral para tablet/desktop pequeño (md - lg) */}
+      <Sheet open={mobileSheetOpen} onOpenChange={setMobileSheetOpen}>
+        <SheetContent side="right" className="w-[90vw] sm:w-[420px] sm:max-w-[420px] p-0 bg-card overflow-y-auto">
+          <SheetHeader className="p-6 pb-4 border-b bg-muted/30">
+            <SheetTitle className="font-headline text-xl tracking-tight capitalize">
+              {format(selectedDay, "EEEE d 'de' MMMM", { locale: es })}
+            </SheetTitle>
+            <SheetDescription>
+              {dayEventsForSelected.length} evento{dayEventsForSelected.length === 1 ? '' : 's'}
+            </SheetDescription>
+          </SheetHeader>
+          <div className="p-4">
+            {dayEventsForSelected.length === 0 ? (
+              <CalendarEmptyState
+                canCreate={canCreate}
+                onCreate={() => {
+                  setMobileSheetOpen(false);
+                  openCreate(selectedDay);
+                }}
               />
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Dialog open={!!selectedEvent} onOpenChange={(val) => { if (!val) setSelectedEvent(null); }}>
-        <DialogContent className="sm:max-w-[425px]">
-          {selectedEvent && (
-            <>
-              <DialogHeader>
-                <div className="flex items-center gap-2 mb-2">
-                  <Badge variant="outline" className={statusColors[selectedEvent.resource?.estado || 'agendada'] || 'bg-muted'}>
-                    {(selectedEvent.resource?.estado || 'agendada').toUpperCase()}
-                  </Badge>
-                </div>
-                <DialogTitle className="text-xl font-headline tracking-tight">{selectedEvent.title}</DialogTitle>
-                <DialogDescription>
-                  Detalles de la cita programada
-                </DialogDescription>
-              </DialogHeader>
-              
-              <div className="grid gap-4 py-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                    <Clock className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium leading-none">Fecha y Hora</p>
-                    <p className="text-sm text-muted-foreground mt-1 capitalize">
-                      {format(selectedEvent.start, "EEEE d 'de' MMMM", { locale: es })} a las {format(selectedEvent.start, 'h:mm a')}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 mt-2">
-                  <div className="space-y-1 bg-muted/40 p-3 rounded-md">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Vehículo</p>
-                    <p className="text-sm font-medium">{selectedEvent.resource?.vehicle_nombre}</p>
-                    <p className="text-xs text-muted-foreground font-mono">ID: {selectedEvent.resource?.vehicle_id?.substring(0,6)}...</p>
-                  </div>
-                  <div className="space-y-1 bg-muted/40 p-3 rounded-md">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Atendido por</p>
-                    <p className="text-sm font-medium">{selectedEvent.resource?.vendedor_nombre || 'No asignado'}</p>
-                  </div>
-                </div>
-
-                {selectedEvent.resource?.publicador_telefono && (
-                  <div className="bg-primary/5 p-3 rounded-md border border-primary/20">
-                     <p className="text-xs font-medium text-primary uppercase tracking-wider mb-1">Contacto del Cliente</p>
-                     <p className="text-sm font-medium">{selectedEvent.resource.publicador_nombre}</p>
-                     <p className="text-sm text-muted-foreground">{selectedEvent.resource.publicador_telefono}</p>
-                  </div>
-                )}
+            ) : (
+              <div className="rounded-[1.5rem] border ring-1 ring-border overflow-hidden divide-y bg-background/60">
+                {dayEventsForSelected.map((evt) => {
+                  const Icon = evt.icon;
+                  return (
+                    <button
+                      key={evt.id}
+                      type="button"
+                      onClick={() => {
+                        setMobileSheetOpen(false);
+                        handleSelectEvent(evt);
+                      }}
+                      className="w-full flex items-center gap-3 p-4 hover:bg-muted/30 transition-colors text-left"
+                    >
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${evt.tone.chipBg}`}>
+                        <Icon className={`h-4 w-4 ${evt.tone.iconColor}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-sm truncate">{evt.title}</p>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mt-0.5">
+                          {evt.allDay ? 'Todo el día' : format(evt.start, 'HH:mm')}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
-              <div className="flex justify-end gap-2 border-t pt-4">
-                 <Button variant="outline" onClick={() => setSelectedEvent(null)}>Cerrar</Button>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Dialogs */}
+      <CalendarEventDetailDialog
+        event={detailEvent}
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        onEdit={openEdit}
+      />
+      <CalendarEventFormDialog
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        editing={editingEvent}
+        initialDate={initialDate}
+      />
     </div>
   );
 }

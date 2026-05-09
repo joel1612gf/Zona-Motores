@@ -42,7 +42,7 @@ type SidebarItem = {
 
 function getSidebarItems(slug: string): SidebarItem[] {
   return [
-    { module: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, href: `/business/${slug}/dashboard` },
+    { module: 'dashboard', label: 'Visión General', icon: LayoutDashboard, href: `/business/${slug}/dashboard` },
     { module: 'inventory', label: 'Inventario', icon: CarIcon, href: `/business/${slug}/inventory` },
     { module: 'products', label: 'Productos', icon: ShoppingBag, href: `/business/${slug}/products` },
     { module: 'sales', label: 'Ventas', icon: ShoppingCart, href: `/business/${slug}/sales` },
