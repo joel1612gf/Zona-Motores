@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Bell, Check, CheckCheck, Trash2, AlertTriangle, Pause, Clock, Megaphone, X } from 'lucide-react';
+import { Bell, Check, CheckCheck, Trash2, AlertTriangle, Pause, Clock, Megaphone, Sparkles, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -37,6 +37,8 @@ function getNotificationIcon(type: NotificationType) {
             return <Trash2 className="h-5 w-5 text-red-500" />;
         case 'listing_promoted':
             return <Megaphone className="h-5 w-5 text-green-500" />;
+        case 'crm_match':
+            return <Sparkles className="h-5 w-5 text-amber-500" />;
         case 'welcome':
         default:
             return <Bell className="h-5 w-5 text-blue-500" />;

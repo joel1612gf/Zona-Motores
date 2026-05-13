@@ -27,7 +27,9 @@ import {
   CalendarDays,
   CarIcon,
   Landmark,
-  FileText
+  FileText,
+  HandCoins,
+  Calculator,
 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -50,11 +52,13 @@ function getSidebarItems(slug: string): SidebarItem[] {
     { module: 'consignment', label: 'Consignación', icon: Handshake, href: `/business/${slug}/consignment` },
     { module: 'finance', label: 'Finanzas', icon: Wallet, href: `/business/${slug}/finance` },
     { module: 'payables', label: 'Cuentas por Pagar', icon: FileText, href: `/business/${slug}/payables` },
+    { module: 'receivables', label: 'Cuentas por Cobrar', icon: HandCoins, href: `/business/${slug}/receivables` },
     { module: 'banks', label: 'Bancos', icon: Landmark, href: `/business/${slug}/banks` },
     { module: 'calendar', label: 'Calendario', icon: CalendarDays, href: `/business/${slug}/calendar` },
     { module: 'staff', label: 'Personal', icon: UserCog, href: `/business/${slug}/staff` },
     { module: 'commissions', label: 'Comisiones', icon: Award, href: `/business/${slug}/commissions` },
     { module: 'reports', label: 'Reportes', icon: BarChart3, href: `/business/${slug}/reports` },
+    { module: 'accounting', label: 'Contabilidad', icon: Calculator, href: `/business/${slug}/accounting` },
     { module: 'cash_register', label: 'Caja', icon: Wallet, href: `/business/${slug}/cash-register` },
     { module: 'web_sync', label: 'Web Pública', icon: Globe, href: `/business/${slug}/web-sync` },
     { module: 'settings', label: 'Configuración', icon: Settings, href: `/business/${slug}/settings` },

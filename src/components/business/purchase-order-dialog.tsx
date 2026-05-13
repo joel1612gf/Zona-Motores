@@ -47,6 +47,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { assertPeriodOpen } from '@/lib/accounting-helpers';
 import {
   collection,
   getDocs,
@@ -68,6 +69,7 @@ import { ProductFormDialog } from '@/components/business/product-form-dialog';
 import { SupplierFormDialog } from '@/components/business/supplier-form-dialog';
 import { downloadPdf, printPdf } from '@/lib/download-pdf';
 import { LegalRetentionVoucher } from '@/components/business/legal-retention-voucher';
+import { ISLR_CONCEPTS } from '@/lib/finance-schemas';
 
 interface PurchaseOrderDialogProps {
   open: boolean;
@@ -104,6 +106,10 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
   const [printMode, setPrintMode] = useState<'both' | 'summary' | 'retention'>('both');
   const [editValues, setEditValues] = useState<Record<string, string>>({});
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
+
+  // ISLR retention state (income tax withholding, Venezuela)
+  const [islrConcept, setIslrConcept] = useState<'NONE' | 'SERV' | 'HPN' | 'HPJ' | 'FLET' | 'PUBL'>('NONE');
+  const [islrBaseInput, setIslrBaseInput] = useState<string>('');
 
   // Preload logo for reliable printing
   useEffect(() => {
@@ -180,6 +186,8 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
     setInvoiceCurrency('bs');
     setTipoPago('por_pagar');
     setSuccessData(null);
+    setIslrConcept('NONE');
+    setIslrBaseInput('');
 
     const col = (name: string) => collection(firestore, 'concesionarios', concesionario.id, name);
 
@@ -230,6 +238,14 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
   const montoExento = items.filter(i => !i.aplica_iva).reduce((s, i) => s + i.subtotal_usd, 0);
   const baseImponible = items.filter(i => i.aplica_iva).reduce((s, i) => s + i.subtotal_usd, 0);
   const total = subtotal + ivaTotal;
+
+  // ISLR derived
+  const islrConceptDef = islrConcept !== 'NONE' ? ISLR_CONCEPTS.find(c => c.code === islrConcept) : undefined;
+  const islrPercentage = islrConceptDef?.value ?? 0;
+  const islrBase = islrConcept !== 'NONE'
+    ? (islrBaseInput ? parseFloat(islrBaseInput) || 0 : subtotal)
+    : 0;
+  const islrRetenido = parseFloat((islrBase * islrPercentage).toFixed(2));
   const totalBs = total * tasaCambio;
 
   const generateRetentionVoucherNumber = async (): Promise<string> => {
@@ -353,9 +369,26 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
 
   const handleSave = async () => {
     if (!concesionario?.id || items.length === 0) return;
+
+    // Fiscal period lock: reject creation if fecha_factura falls in a closed period.
+    const ultimoCerrado = concesionario.configuracion?.ultimo_periodo_cerrado;
+    const fechaParaValidar = fechaFactura || new Date().toISOString().slice(0, 10);
+    try {
+      assertPeriodOpen(fechaParaValidar, ultimoCerrado, 'crear');
+    } catch (e) {
+      toast({
+        variant: 'destructive',
+        title: 'Período Cerrado',
+        description: (e as Error).message,
+      });
+      return;
+    }
+
     setIsSaving(true);
     try {
       const proveedor = proveedores.find(p => p.id === selectedProveedor);
+      const isBs = invoiceCurrency === 'bs' && tasaCambio > 0;
+
       const payload: any = {
         proveedor_id: selectedProveedor,
         proveedor_nombre: proveedor?.nombre || '',
@@ -374,10 +407,19 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
         total_bs: totalBs,
         tasa_cambio: tasaCambio,
         moneda_original: invoiceCurrency,
+        is_fiscal: true,
         estado: tipoPago === 'contado' ? 'pagada' : 'pendiente',
         creado_por: staff?.nombre || 'Sistema',
         created_at: serverTimestamp(),
       };
+
+      // Fiscal precision: when the invoice was captured in Bs, snapshot every financial value in Bs
+      // so the SENIAT TXT and CSV exports use the same Bs digits that the operator saw on screen,
+      // avoiding Bs → USD → Bs round-trip rounding.
+      if (isBs) {
+        payload.subtotal_bs = parseFloat((subtotal * tasaCambio).toFixed(2));
+        payload.iva_monto_bs = parseFloat((ivaTotal * tasaCambio).toFixed(2));
+      }
 
       const isRetentionApplicable = proveedor?.isRetentionAgent && ivaTotal > 0;
       let retentionData: any = null;
@@ -385,7 +427,7 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
       if (isRetentionApplicable && proveedor) {
         const porcentaje = proveedor.porcentaje_retencion_iva || 75;
         const monto_retenido = parseFloat((ivaTotal * porcentaje / 100).toFixed(2));
-        const neto_a_pagar = parseFloat((total - monto_retenido).toFixed(2));
+        const neto_a_pagar = parseFloat((total - monto_retenido - islrRetenido).toFixed(2));
         const numero_comprobante = await generateRetentionVoucherNumber();
 
         retentionData = { numero_comprobante, monto_retenido, neto_a_pagar, porcentaje_retencion_aplicado: porcentaje };
@@ -393,6 +435,27 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
         payload.monto_retenido = monto_retenido;
         payload.neto_a_pagar = neto_a_pagar;
         payload.porcentaje_retencion_aplicado = porcentaje;
+        if (isBs) {
+          payload.monto_retenido_bs = parseFloat((monto_retenido * tasaCambio).toFixed(2));
+          payload.neto_a_pagar_bs = parseFloat((neto_a_pagar * tasaCambio).toFixed(2));
+        }
+      } else if (islrRetenido > 0) {
+        payload.neto_a_pagar = parseFloat((total - islrRetenido).toFixed(2));
+        if (isBs) {
+          payload.neto_a_pagar_bs = parseFloat((payload.neto_a_pagar * tasaCambio).toFixed(2));
+        }
+      }
+
+      // ISLR persistence (independent of IVA retention)
+      if (islrConcept !== 'NONE' && islrRetenido > 0) {
+        payload.islr_concept = islrConcept;
+        payload.islr_percentage = islrPercentage;
+        payload.islr_base = islrBase;
+        payload.islr_retenido = islrRetenido;
+        if (isBs) {
+          payload.islr_base_bs = parseFloat((islrBase * tasaCambio).toFixed(2));
+          payload.islr_retenido_bs = parseFloat((islrRetenido * tasaCambio).toFixed(2));
+        }
       }
 
       const docRef = await addDoc(collection(firestore, 'concesionarios', concesionario.id, 'compras'), payload);
@@ -1242,6 +1305,57 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
                   }
                   return null;
                 })()}
+
+                {/* ISLR Retention Selector */}
+                <div className="p-4 rounded-xl bg-card/60 backdrop-blur-md border border-border space-y-3">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                    <Percent className="h-3 w-3 text-primary" /> Retención ISLR (Opcional)
+                  </Label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Select value={islrConcept} onValueChange={(v) => setIslrConcept(v as any)}>
+                      <SelectTrigger className="h-10 rounded-xl text-sm">
+                        <SelectValue placeholder="Concepto ISLR" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="NONE">Ninguna</SelectItem>
+                        {ISLR_CONCEPTS.map(c => (
+                          <SelectItem key={c.code} value={c.code}>{c.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder={`Base ISLR (default: $${subtotal.toFixed(2)})`}
+                      value={islrBaseInput}
+                      onChange={(e) => setIslrBaseInput(e.target.value)}
+                      disabled={islrConcept === 'NONE'}
+                      className="h-10 rounded-xl text-sm"
+                    />
+                  </div>
+                  {islrConcept !== 'NONE' && islrRetenido > 0 && (
+                    <div className="flex justify-between items-center pt-2 border-t border-dashed border-border">
+                      <span className="text-xs text-muted-foreground">ISLR a retener ({(islrPercentage * 100).toFixed(0)}%)</span>
+                      <span className="font-bold text-sm text-primary">${islrRetenido.toFixed(2)}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Neto a pagar final */}
+                {(() => {
+                  const prov = proveedores.find(p => p.id === selectedProveedor);
+                  const ivaRet = prov?.isRetentionAgent && ivaTotal > 0
+                    ? ivaTotal * (prov.porcentaje_retencion_iva || 75) / 100
+                    : 0;
+                  const neto = total - ivaRet - islrRetenido;
+                  if (ivaRet === 0 && islrRetenido === 0) return null;
+                  return (
+                    <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 flex justify-between items-center">
+                      <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">Neto a Pagar Proveedor</span>
+                      <span className="text-xl font-bold tracking-tighter text-primary">${neto.toFixed(2)}</span>
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
@@ -1434,7 +1548,7 @@ export function PurchaseOrderDialog({ open, onOpenChange, onSaved }: PurchaseOrd
           <div className="w-16 h-16 bg-destructive/10 text-destructive rounded-full flex items-center justify-center mx-auto shadow-inner">
             <AlertCircle className="w-10 h-10" />
           </div>
-          <h3 className="text-xl font-bold text-slate-900 dark:text-white">Factura Duplicada</h3>
+          <DialogTitle className="text-xl font-bold text-slate-900 dark:text-white">Factura Duplicada</DialogTitle>
           <p className="text-sm text-slate-500">Este número de factura ya existe para este proveedor.</p>
           <Button onClick={() => setDuplicateInvoice(null)} className="w-full h-11 rounded-xl font-bold bg-primary text-white transition-all">Corregir Datos</Button>
         </DialogContent>

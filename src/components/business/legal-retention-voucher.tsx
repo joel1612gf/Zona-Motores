@@ -28,7 +28,7 @@ interface LegalRetentionVoucherProps {
   };
 }
 
-export function LegalRetentionVoucher({ concesionario, data }: LegalRetentionVoucherProps) {
+export function LegalRetentionVoucher({ concesionario, logoBase64, data }: LegalRetentionVoucherProps) {
   if (!concesionario) return null;
 
   const now = new Date();

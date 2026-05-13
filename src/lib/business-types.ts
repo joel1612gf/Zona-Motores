@@ -4,7 +4,7 @@ import type { Timestamp, GeoPoint } from 'firebase/firestore';
 
 // ==================== ROLES ====================
 
-export type BusinessRole = 'dueno' | 'encargado' | 'secretario' | 'vendedor' | 'cajero';
+export type BusinessRole = 'dueno' | 'encargado' | 'secretario' | 'vendedor' | 'cajero' | 'contador';
 
 export const ROLE_LABELS: Record<BusinessRole, string> = {
   dueno: 'Dueño',
@@ -12,6 +12,7 @@ export const ROLE_LABELS: Record<BusinessRole, string> = {
   secretario: 'Secretario',
   vendedor: 'Vendedor',
   cajero: 'Cajero',
+  contador: 'Contador',
 };
 
 export type BusinessModule =
@@ -30,7 +31,9 @@ export type BusinessModule =
   | 'reports'
   | 'finance'
   | 'banks'
-  | 'payables';
+  | 'payables'
+  | 'receivables'
+  | 'accounting';
 
 /**
  * Permission matrix defining which modules each role can access.
@@ -56,6 +59,8 @@ export const ROLE_PERMISSIONS: Record<BusinessRole, Record<BusinessModule, Permi
     finance: 'full',
     banks: 'full',
     payables: 'full',
+    receivables: 'full',
+    accounting: 'full',
   },
   encargado: {
     dashboard: 'read',
@@ -74,6 +79,8 @@ export const ROLE_PERMISSIONS: Record<BusinessRole, Record<BusinessModule, Permi
     finance: 'full',
     banks: 'full',
     payables: 'full',
+    receivables: 'full',
+    accounting: 'full',
   },
   secretario: {
     dashboard: false,
@@ -92,6 +99,8 @@ export const ROLE_PERMISSIONS: Record<BusinessRole, Record<BusinessModule, Permi
     finance: false,
     banks: 'full',
     payables: false,
+    receivables: 'read',
+    accounting: 'read',
   },
   vendedor: {
     dashboard: false,
@@ -110,6 +119,8 @@ export const ROLE_PERMISSIONS: Record<BusinessRole, Record<BusinessModule, Permi
     finance: false,
     banks: false,
     payables: false,
+    receivables: 'read',
+    accounting: false,
   },
   cajero: {
     dashboard: false,
@@ -128,6 +139,28 @@ export const ROLE_PERMISSIONS: Record<BusinessRole, Record<BusinessModule, Permi
     finance: 'read',
     banks: false,
     payables: 'read',
+    receivables: 'full',
+    accounting: 'read',
+  },
+  contador: {
+    dashboard: 'read',
+    inventory: 'read',
+    sales: false,
+    clients: 'read',
+    staff: false,
+    settings: false,
+    cash_register: false,
+    consignment: false,
+    calendar: false,
+    web_sync: false,
+    commissions: false,
+    products: 'read',
+    reports: 'full',
+    finance: 'read',
+    banks: 'read',
+    payables: 'full',
+    receivables: 'full',
+    accounting: 'full',
   },
 };
 
@@ -138,6 +171,7 @@ export const CAN_SEE_PURCHASE_COSTS: Record<BusinessRole, boolean> = {
   secretario: false,
   vendedor: false,
   cajero: false,
+  contador: true,
 };
 
 // ==================== DATA MODELS ====================
@@ -171,6 +205,9 @@ export type ConcesionarioConfig = {
   tasa_cambio_auto?: boolean; // If true, auto-fetch from BCV
   ultimo_numero_factura_ventas?: number; // Auto-incrementing invoice counter for sales
   vehiculos_exentos_iva?: boolean; // If true, vehicles are IVA-exempt (no 16% IVA applied to sales invoices)
+  sujeto_pasivo_especial?: boolean; // SENIAT — if true, the company collects IGTF on USD payments to providers
+  igtf_trigger_entry_methods?: BankEntryMethod[]; // Bank entry methods that trigger IGTF when account is es_divisa (default: efectivo_fisico, zelle, crypto, transferencia)
+  ultimo_periodo_cerrado?: string; // YYYYMM. Locks creation/edition/anulation of fiscal docs (compras/ventas/notas) with date <= this period. Only the owner can close/reopen.
 };
 
 export type StaffMember = {
@@ -293,6 +330,26 @@ export type VehicleInfoSnapshot = {
   mileage?: number;
 };
 
+export type CreditFrequency = 'semanal' | 'quincenal' | 'mensual';
+
+export const CREDIT_FREQUENCY_LABELS: Record<CreditFrequency, string> = {
+  semanal: 'Semanal',
+  quincenal: 'Quincenal',
+  mensual: 'Mensual',
+};
+
+export type CreditTerms = {
+  cuotas_total: number;
+  frecuencia: CreditFrequency;
+  tasa_interes_anual: number; // % anual; 0 = sin interés
+  inicial_usd: number;
+  monto_cuota_usd: number; // Equal installment amount (simple interest distribution)
+  fecha_primera_cuota: Timestamp;
+};
+
+export type SaleModalidadPago = 'contado' | 'credito';
+export type SaleStatusPago = 'pagado' | 'parcial' | 'pendiente';
+
 export type Venta = {
   id: string;
   vehiculo_id?: string;
@@ -315,6 +372,13 @@ export type Venta = {
   numero_factura_venta?: string;   // e.g. "0000001" (progressive)
   numero_control_venta?: string;   // e.g. "00-0000001" (progressive)
   vehiculo_info?: VehicleInfoSnapshot; // Snapshot of vehicle data at sale time
+  // Credit / receivables (CXC)
+  modalidad_pago?: SaleModalidadPago; // default 'contado' if omitted (backwards compatible)
+  status_pago?: SaleStatusPago;       // default 'pagado' if omitted
+  paid_usd?: number;                   // amount already received in USD
+  saldo_pendiente_usd?: number;        // outstanding balance in USD
+  credit_terms?: CreditTerms;
+  cuenta_cobrar_id?: string;           // FK to cuentas_por_cobrar
 };
 
 export type VehiculoRequerido = {
@@ -326,6 +390,41 @@ export type VehiculoRequerido = {
   budget?: number;
   status: 'pendiente' | 'completado' | 'cancelado';
   created_at: Timestamp;
+};
+
+export type RiesgoCredito = 'bajo' | 'medio' | 'alto';
+
+export type InteraccionTipo = 'llamada' | 'whatsapp' | 'visita' | 'nota' | 'email';
+
+export type Interaccion = {
+  id: string;
+  tipo: InteraccionTipo;
+  nota: string;
+  fecha: Timestamp;
+  creado_por_id: string;
+  creado_por_nombre: string;
+};
+
+export type MatchOportunidadStatus = 'pendiente' | 'contactado' | 'descartado' | 'convertido';
+
+export type MatchOportunidad = {
+  id: string;
+  cliente_id: string;
+  cliente_nombre: string;
+  cliente_telefono?: string;
+  vehiculo_id: string;
+  vehiculo_make: string;
+  vehiculo_model: string;
+  vehiculo_year?: number;
+  vehiculo_precio_usd: number;
+  requerido_id: string;
+  budget?: number;
+  within_tolerance: boolean;
+  status: MatchOportunidadStatus;
+  created_at: Timestamp;
+  updated_at?: Timestamp;
+  contactado_por_id?: string;
+  contactado_por_nombre?: string;
 };
 
 export type Cliente = {
@@ -343,6 +442,10 @@ export type Cliente = {
   traspaso_fecha_limite?: Timestamp; // 30 days after last vehicle purchase
   tags: string[]; // e.g. ["Comprador de Carros", "Cliente de Taller", "Inversionista"]
   vehiculos_requeridos?: VehiculoRequerido[];
+  // Receivables / credit health
+  deuda_actual_usd?: number;            // Current outstanding USD across all CXC
+  ventas_credito_ids?: string[];         // FKs to credit-mode sales still open
+  riesgo_credito?: RiesgoCredito;
   created_at: Timestamp;
   updated_at?: Timestamp;
 };
@@ -464,7 +567,31 @@ export type Compra = {
   numero_comprobante?: string; // e.g. "20260400000001"
   porcentaje_retencion_aplicado?: number; // 75 or 100
   monto_retenido?: number; // iva_monto * porcentaje / 100
-  neto_a_pagar?: number; // total_usd - monto_retenido
+  neto_a_pagar?: number; // total_usd - monto_retenido - islr_retenido
+  // ISLR retention (income tax withholding, Venezuela)
+  islr_concept?: 'SERV' | 'HPN' | 'HPJ' | 'FLET' | 'PUBL';
+  islr_percentage?: number; // 0.02 .. 0.05
+  islr_base?: number; // base imponible ISLR in USD
+  islr_retenido?: number; // base * percentage
+};
+
+// ==================== KARDEX (Inventory accounting ledger) ====================
+
+export type KardexMovement = {
+  id: string;
+  producto_id: string;
+  fecha: Timestamp;
+  tipo: 'entrada' | 'salida';
+  origen: 'compra' | 'venta' | 'ajuste';
+  origen_doc_id: string; // id of source Compra/Venta document
+  cantidad: number;
+  costo_unitario: number; // USD
+  valor_total: number; // cantidad * costo_unitario
+  // Post-movement balance (denormalized for audit trail)
+  saldo_cantidad: number;
+  saldo_costo_promedio: number;
+  saldo_valor_total: number;
+  created_at: Timestamp;
 };
 
 // ==================== BANKS MODULE ====================
@@ -535,7 +662,7 @@ export type BankAccount = {
   updated_at?: Timestamp;
 };
 
-export type BankTransactionType = 'ingreso_venta' | 'egreso_compra' | 'ajuste_manual' | 'ingreso_manual' | 'egreso_manual' | 'egreso_cxp' | 'egreso_igtf';
+export type BankTransactionType = 'ingreso_venta' | 'egreso_compra' | 'ajuste_manual' | 'ingreso_manual' | 'egreso_manual' | 'egreso_cxp' | 'egreso_igtf' | 'ingreso_cxc';
 
 export const BANK_TRANSACTION_TYPE_LABELS: Record<BankTransactionType, string> = {
   ingreso_venta: 'Ingreso por Venta',
@@ -545,6 +672,7 @@ export const BANK_TRANSACTION_TYPE_LABELS: Record<BankTransactionType, string> =
   egreso_manual: 'Egreso Manual',
   egreso_cxp: 'Pago Cuenta por Pagar',
   egreso_igtf: 'IGTF (3% Divisas)',
+  ingreso_cxc: 'Cobro Cuenta por Cobrar',
 };
 
 export type BankTransaction = {
@@ -559,6 +687,13 @@ export type BankTransaction = {
   // Links to other documents
   venta_id?: string;
   compra_id?: string;
+  cuenta_cobrar_id?: string;       // FK to cuentas_por_cobrar (CXC payments)
+  cuota_id?: string;                // FK to cuotas subcollection
+  // IGTF withholding when collecting in divisa from a special-taxpayer fiscal invoice
+  igtf_retenido?: number;           // USD amount withheld for SENIAT reporting
+  // BCV rates snapshot for audit
+  tasa_bcv_cobro?: number;          // Live BCV used at collection time (CXC only)
+  tasa_bcv_venta?: number;          // Historical BCV recorded at sale time (CXC audit)
   // Audit
   registrado_por_id: string;
   registrado_por_nombre: string;
@@ -597,6 +732,87 @@ export type ConsignacionPorPagar = {
   // Audit
   created_at: Timestamp;
   updated_at?: Timestamp;
+};
+
+// ==================== ACCOUNTS RECEIVABLE (CXC) ====================
+
+export type ReceivableOrigen = 'venta_credito_vehiculo' | 'venta_credito_producto' | 'nota_debito_cliente';
+
+export const RECEIVABLE_ORIGEN_LABELS: Record<ReceivableOrigen, string> = {
+  venta_credito_vehiculo: 'Financiamiento Vehículo',
+  venta_credito_producto: 'Crédito Comercial',
+  nota_debito_cliente: 'Nota de Débito',
+};
+
+export type CuentaPorCobrarStatus = 'pendiente' | 'parcial' | 'pagado';
+export type CuotaEstado = 'pendiente' | 'parcial' | 'pagada' | 'vencida';
+
+export const CUOTA_ESTADO_LABELS: Record<CuotaEstado, string> = {
+  pendiente: 'Pendiente',
+  parcial: 'Parcial',
+  pagada: 'Pagada',
+  vencida: 'Vencida',
+};
+
+/**
+ * Lives in: concesionarios/{id}/cuentas_por_cobrar/{id}
+ * Generated automatically when a sale is closed with modalidad_pago === 'credito'.
+ */
+export type CuentaPorCobrar = {
+  id: string;
+  venta_id: string;
+  cliente_id: string;
+  cliente_nombre: string;
+  cliente_telefono?: string;
+  cliente_cedula?: string;
+  origen: ReceivableOrigen;
+  // Descripción del bien o concepto
+  descripcion: string;
+  vehiculo_id?: string;
+  vehiculo_info?: VehicleInfoSnapshot;
+  // Amounts (USD canonical)
+  monto_original_usd: number;       // Total saldo financiado (sin inicial)
+  paid_usd: number;
+  saldo_pendiente_usd: number;
+  // Plan
+  cuotas_total: number;
+  cuotas_pagadas: number;
+  frecuencia: CreditFrequency;
+  tasa_interes_anual: number;
+  fecha_emision: Timestamp;
+  fecha_primera_cuota: Timestamp;
+  fecha_ultima_cuota: Timestamp;
+  // Fiscal
+  is_fiscal: boolean;
+  // Status
+  status: CuentaPorCobrarStatus;
+  // BCV snapshot al momento de la venta (para auditoría; NO usar para conversiones)
+  tasa_cambio_venta: number;
+  // Audit
+  created_at: Timestamp;
+  updated_at?: Timestamp;
+};
+
+/**
+ * Lives in: concesionarios/{id}/cuentas_por_cobrar/{id}/cuotas/{id}
+ * One document per scheduled payment.
+ * Denormalized parent keys (`concesionario_id`, `cuenta_cobrar_id`) enable
+ * collectionGroup queries from the CXC dashboard.
+ */
+export type Cuota = {
+  id: string;
+  concesionario_id: string;         // Denormalized for collectionGroup filtering
+  cuenta_cobrar_id: string;         // FK to parent CuentaPorCobrar
+  numero: number;                   // 1-indexed
+  monto_usd: number;                 // Total a pagar en esta cuota (capital + interes)
+  capital: number;                   // USD del principal en esta cuota
+  interes: number;                   // USD de interés
+  saldo_usd: number;                 // Outstanding portion of monto_usd
+  paid_usd: number;                  // Amount already collected for this installment
+  fecha_vencimiento: Timestamp;
+  estado: CuotaEstado;
+  calendar_event_id?: string;        // FK to eventos_calendario
+  pagada_at?: Timestamp;
 };
 
 // ==================== HELPERS ====================

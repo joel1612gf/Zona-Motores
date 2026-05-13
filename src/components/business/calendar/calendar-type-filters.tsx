@@ -1,7 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { Handshake, Receipt, Bell } from 'lucide-react';
+import { Handshake, Receipt, Bell, HandCoins } from 'lucide-react';
 import type { CalendarEventSource } from '@/lib/calendar-schemas';
 
 type CalendarTypeFiltersProps = {
@@ -22,6 +22,12 @@ const FILTER_DEFS: Record<CalendarEventSource, { label: string; icon: typeof Han
     icon: Receipt,
     activeClass: 'bg-amber-500 text-white border-amber-500 shadow-sm',
     inactiveClass: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100',
+  },
+  cxc: {
+    label: 'Cobros CxC',
+    icon: HandCoins,
+    activeClass: 'bg-emerald-600 text-white border-emerald-600 shadow-sm',
+    inactiveClass: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100',
   },
   manual: {
     label: 'Eventos manuales',

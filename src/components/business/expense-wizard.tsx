@@ -41,7 +41,7 @@ interface ExpenseWizardProps {
 }
 
 export function ExpenseWizard({ open, onOpenChange }: ExpenseWizardProps) {
-  const { slug, concesionario, staff } = useBusinessAuth();
+  const { concesionario, staff } = useBusinessAuth();
   const { bcvRate } = useCurrency();
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -209,8 +209,23 @@ export function ExpenseWizard({ open, onOpenChange }: ExpenseWizardProps) {
           dueDate.setDate(dueDate.getDate() + parseInt(values.dias_credito));
         }
 
+        // Fiscal precision: when the operator typed amounts in Bs, persist those raw Bs values
+        // alongside the USD-normalized values so SENIAT exports can read the exact Bs digits
+        // (avoids round-trip Bs → USD → Bs precision loss like 1600 Bs → 1201.10 Bs).
+        const isVes = selectedCurrency === 'VES';
+        const bsSnapshots = isVes ? {
+          base_imponible_bs: base,
+          monto_exento_bs: exempt,
+          iva_monto_bs: iva,
+          total_bs: totalBeforeRetentions,
+          monto_retenido_bs: retentionIvaAmount,
+          islr_retenido_bs: retentionIslrAmount,
+          neto_a_pagar_bs: netToPay,
+        } : {};
+
         finalPayload = {
           ...values,
+          moneda_original: selectedCurrency, // 'VES' | 'USD' — drives Bs-direct vs convert in accounting tabs.
           islr_concept: values.islr_concept || 'NONE',
           islr_percentage: values.islr_percentage || 0,
           provider_name: selectedProvider?.nombre || 'Proveedor Desconocido',
@@ -224,6 +239,7 @@ export function ExpenseWizard({ open, onOpenChange }: ExpenseWizardProps) {
           net_to_pay: netToPay,
           total_usd: selectedCurrency === 'USD' ? netToPay : netToPay / rate,
           exchange_rate: rate,
+          ...bsSnapshots,
           saldo_pendiente: values.tipo_pago === 'credito' ? netToPay : 0,
           status: values.tipo_pago === 'credito' ? 'PENDIENTE' : 'COMPLETADO',
           due_date: dueDate || null,

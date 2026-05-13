@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
+import { assertPeriodOpen } from '@/lib/accounting-helpers';
 import { Loader2, Car, User, DollarSign, ArrowRight, ArrowLeft, AlertCircle, CheckCircle2, Search, Lock, FileText, Receipt, Printer, Download, ShieldAlert, Package, LayoutGrid, Plus, Trash2, Wallet, RefreshCw, ChevronDown } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { StockVehicle, BankAccount } from '@/lib/business-types';
@@ -18,6 +19,8 @@ import { ROLE_LABELS, verifySHA256, BANK_ENTRY_METHOD_LABELS } from '@/lib/busin
 import { cn } from '@/lib/utils';
 import { SaleDocumentsPrint } from './sale-documents-print';
 import type { PaymentSplit } from '@/lib/finance-schemas';
+import { CreditTermsConfig, type CreditPlanResult } from './credit-terms-config';
+import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
 // ---------- Helpers ----------
 const padNum = (n: number, len: number) => String(n).padStart(len, '0');
@@ -109,6 +112,10 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
   const [registrarCaja, setRegistrarCaja] = useState(true);
   const [docsAlerta, setDocsAlerta] = useState(false);
 
+  // Credit (CXC) — modalidad pago + plan financiero
+  const [modalidad, setModalidad] = useState<'contado' | 'credito'>('contado');
+  const [creditPlan, setCreditPlan] = useState<CreditPlanResult | null>(null);
+
   // Bank accounts
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   
@@ -164,7 +171,7 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
   
   const negotiatedPrice = useMemo(() => {
     if (tipoVenta === 'producto') {
-      return productItems.reduce((acc, it) => acc + (it.subtotal_usd ?? (it.precio_usd * it.cantidad) ?? 0), 0);
+      return productItems.reduce((acc, it) => acc + (it.subtotal_usd ?? (it.precio_usd * it.cantidad)), 0);
     }
     return Number(precioVenta) || 0;
   }, [tipoVenta, productItems, precioVenta]);
@@ -262,7 +269,12 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
   };
   const totalPaidUsd = paymentSplits.reduce((acc, s) => acc + (s.equivalentUsd || 0), 0);
   const remainingUsd = Math.max(0, totalOperacionUsd - totalPaidUsd);
-  const isPaymentValid = remainingUsd < 0.01 && paymentSplits.length > 0;
+  // Credit mode: inicial may be 0; require splits only if inicial > 0; otherwise the plan IS the payment.
+  const requiredInitialUsd = modalidad === 'credito' ? (creditPlan?.plan?.inicial_usd ?? 0) : totalOperacionUsd;
+  const planValid = modalidad === 'credito' ? !!creditPlan?.valido : true;
+  const isPaymentValid = modalidad === 'credito'
+    ? (totalPaidUsd + 0.01 >= requiredInitialUsd && (requiredInitialUsd <= 0.01 || paymentSplits.length > 0) && planValid)
+    : (remainingUsd < 0.01 && paymentSplits.length > 0);
   
   const getMethodLabel = (m: string) => {
     return BANK_ENTRY_METHOD_LABELS[m as keyof typeof BANK_ENTRY_METHOD_LABELS] || m;
@@ -696,16 +708,32 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
       toast({ title: 'Faltan datos', description: 'Agrega productos y completa el pago para continuar.', variant: 'destructive' }); return;
     }
 
+    // Fiscal period lock: sales are stamped with today; reject if today falls in a closed period.
+    try {
+      assertPeriodOpen(new Date(), concesionario?.configuracion?.ultimo_periodo_cerrado, 'crear');
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Período Cerrado', description: (e as Error).message });
+      return;
+    }
+
     setIsSaving(true);
     try {
-      const { runTransaction, increment } = await import('firebase/firestore');
-      
+      const { runTransaction, increment, arrayUnion } = await import('firebase/firestore');
+
       // Basic info for any sale type
       const vStaff = vendedorId ? staffList.find(s => s.id === vendedorId) : staff;
       const vendedorNombre = vStaff?.nombre || 'Venta de Mostrador';
       const salePrice = negotiatedPrice;
       const metodoPagoStr = paymentSplits.map(s => s.method).join(', ');
       const totalIgtf = paymentSplits.reduce((acc, s) => acc + (s.igtfAmount || 0), 0);
+      const isCredito = modalidad === 'credito' && !!creditPlan?.valido && !!creditPlan.plan;
+      const paidUsdInicial = isCredito ? Math.min(totalPaidUsd, totalOperacionUsd) : totalOperacionUsd;
+      const saldoPendienteUsd = Math.max(0, totalOperacionUsd - paidUsdInicial);
+      const statusPago: 'pagado' | 'parcial' | 'pendiente' = saldoPendienteUsd <= 0.01
+        ? 'pagado'
+        : paidUsdInicial > 0.01
+          ? 'parcial'
+          : 'pendiente';
       
       let cId = compradorId;
       const clientsRef = collection(firestore, 'concesionarios', concesionarioId, 'clientes');
@@ -723,6 +751,9 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
       const now = new Date();
       let finalFacN = '';
       let finalCtrlN = '';
+      // Captured to spawn calendar events after the transaction commits.
+      let createdCuentaCobrarId: string | null = null;
+      const createdCuotasMeta: Array<{ id: string; numero: number; fecha_vencimiento: Date; monto_usd: number }> = [];
 
       await runTransaction(firestore, async (transaction) => {
         // --- 1. ALL READS FIRST ---
@@ -765,10 +796,28 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
           fecha: serverTimestamp(),
           tipo_venta: tipoVenta,
           tipo_documento_emitido: tipoDocumento,
+          // Fiscal flag: only "Factura Fiscal" enters the SENIAT books / fiscal reports.
+          // Nota de Entrega is informational and must NOT appear in libro_ventas.
+          is_fiscal: tipoDocumento === 'factura_fiscal',
           numero_factura_venta: finalFacN,
           numero_control_venta: finalCtrlN,
           iva_total: ivaAmount,
-          total_con_impuestos: totalOperacionUsd
+          total_con_impuestos: totalOperacionUsd,
+          // CXC fields
+          modalidad_pago: isCredito ? 'credito' : 'contado',
+          status_pago: statusPago,
+          paid_usd: paidUsdInicial,
+          saldo_pendiente_usd: saldoPendienteUsd,
+          ...(isCredito && creditPlan?.plan ? {
+            credit_terms: {
+              cuotas_total: creditPlan.plan.cuotas_total,
+              frecuencia: creditPlan.plan.frecuencia,
+              tasa_interes_anual: creditPlan.plan.tasa_interes_anual,
+              inicial_usd: creditPlan.plan.inicial_usd,
+              monto_cuota_usd: creditPlan.plan.monto_cuota_usd,
+              fecha_primera_cuota: Timestamp.fromDate(creditPlan.plan.fecha_primera_cuota),
+            },
+          } : {}),
         };
 
         if (tipoVenta === 'vehiculo') {
@@ -848,10 +897,15 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
           if (clientSnap) {
             const currentInvertido = clientSnap.data()?.total_invertido || 0;
             const currentCompras = clientSnap.data()?.compras_ids || [];
+            const currentDeuda = clientSnap.data()?.deuda_actual_usd || 0;
             transaction.update(doc(firestore, 'concesionarios', concesionarioId, 'clientes', cId!), {
               ...clientUpdateData,
               total_invertido: currentInvertido + salePrice,
-              compras_ids: [...currentCompras, saleDocRef.id]
+              compras_ids: [...currentCompras, saleDocRef.id],
+              ...(isCredito && saldoPendienteUsd > 0 ? {
+                deuda_actual_usd: currentDeuda + saldoPendienteUsd,
+                ventas_credito_ids: arrayUnion(saleDocRef.id),
+              } : {}),
             });
           } else if (compradorCedula) {
             const newClientRef = doc(collection(firestore, 'concesionarios', concesionarioId, 'clientes'));
@@ -862,7 +916,76 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
               total_invertido: salePrice,
               compras_ids: [saleDocRef.id],
               tags: [tipoVenta === 'vehiculo' ? 'Comprador de Carros' : 'Comprador de Repuestos'],
+              ...(isCredito && saldoPendienteUsd > 0 ? {
+                deuda_actual_usd: saldoPendienteUsd,
+                ventas_credito_ids: [saleDocRef.id],
+              } : {}),
               created_at: serverTimestamp()
+            });
+          }
+        }
+
+        // CXC: create CuentaPorCobrar + cuotas subcoll when modalidad === 'credito' and there is balance left
+        if (isCredito && creditPlan?.plan && creditPlan.cuotas.length > 0 && saldoPendienteUsd > 0.001) {
+          const cuentaCobrarRef = doc(collection(firestore, 'concesionarios', concesionarioId, 'cuentas_por_cobrar'));
+          const cuentaCobrarId = cuentaCobrarRef.id;
+          createdCuentaCobrarId = cuentaCobrarId;
+          ventaData.cuenta_cobrar_id = cuentaCobrarId;
+
+          const origen = tipoVenta === 'vehiculo' ? 'venta_credito_vehiculo' : 'venta_credito_producto';
+          const descripcion = ventaData.vehiculo_nombre || ventaData.descripcion_resumen || 'Crédito comercial';
+          const ultimaFecha = creditPlan.cuotas[creditPlan.cuotas.length - 1].fecha_vencimiento;
+
+          transaction.set(cuentaCobrarRef, {
+            venta_id: saleDocRef.id,
+            cliente_id: cId || '',
+            cliente_nombre: `${finalCompradorNombre} ${finalCompradorApellido}`.trim(),
+            cliente_telefono: compradorTelefono || '',
+            cliente_cedula: compradorCedula || '',
+            origen,
+            descripcion,
+            ...(tipoVenta === 'vehiculo' && selectedVehicle ? {
+              vehiculo_id: selectedVehicle.id,
+              vehiculo_info: {
+                make: selectedVehicle.make, model: selectedVehicle.model, year: selectedVehicle.year,
+                placa: selectedVehicle.placa || selectedVehicle.info_extra?.placa || '',
+              },
+            } : {}),
+            monto_original_usd: creditPlan.plan.saldo_financiado_usd,
+            paid_usd: 0,
+            saldo_pendiente_usd: saldoPendienteUsd,
+            cuotas_total: creditPlan.plan.cuotas_total,
+            cuotas_pagadas: 0,
+            frecuencia: creditPlan.plan.frecuencia,
+            tasa_interes_anual: creditPlan.plan.tasa_interes_anual,
+            fecha_emision: serverTimestamp(),
+            fecha_primera_cuota: Timestamp.fromDate(creditPlan.plan.fecha_primera_cuota),
+            fecha_ultima_cuota: Timestamp.fromDate(ultimaFecha),
+            is_fiscal: tipoDocumento === 'factura_fiscal',
+            status: 'pendiente',
+            tasa_cambio_venta: effectiveTasa,
+            created_at: serverTimestamp(),
+          });
+
+          for (const cuota of creditPlan.cuotas) {
+            const cuotaRef = doc(collection(firestore, 'concesionarios', concesionarioId, 'cuentas_por_cobrar', cuentaCobrarId, 'cuotas'));
+            createdCuotasMeta.push({
+              id: cuotaRef.id,
+              numero: cuota.numero,
+              fecha_vencimiento: cuota.fecha_vencimiento,
+              monto_usd: cuota.monto_usd,
+            });
+            transaction.set(cuotaRef, {
+              concesionario_id: concesionarioId,
+              cuenta_cobrar_id: cuentaCobrarId,
+              numero: cuota.numero,
+              monto_usd: cuota.monto_usd,
+              capital: cuota.capital,
+              interes: cuota.interes,
+              saldo_usd: cuota.monto_usd,
+              paid_usd: 0,
+              fecha_vencimiento: Timestamp.fromDate(cuota.fecha_vencimiento),
+              estado: 'pendiente',
             });
           }
         }
@@ -910,6 +1033,42 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
       });
 
       if (preInvoice?.id) await import('firebase/firestore').then(m => m.deleteDoc(doc(firestore, 'concesionarios', concesionarioId, 'pre_invoices', preInvoice.id)));
+
+      // Calendar events for each cuota — failures shouldn't roll back the sale.
+      if (createdCuentaCobrarId && createdCuotasMeta.length > 0) {
+        const { addDoc } = await import('firebase/firestore');
+        const eventosCol = collection(firestore, 'concesionarios', concesionarioId, 'eventos_calendario');
+        for (const cuota of createdCuotasMeta) {
+          try {
+            const eventoData = {
+              titulo: `Cuota ${cuota.numero} — ${compradorNombre || 'Cliente'}`,
+              descripcion: `Cobro de cuota ${cuota.numero}/${createdCuotasMeta.length} por $${cuota.monto_usd.toFixed(2)}`,
+              categoria: 'pago',
+              inicio: Timestamp.fromDate(cuota.fecha_vencimiento),
+              fin: Timestamp.fromDate(cuota.fecha_vencimiento),
+              todo_el_dia: true,
+              cliente_id: compradorId || '',
+              cliente_nombre: `${compradorNombre} ${compradorApellido}`.trim(),
+              visibilidad: 'equipo',
+              estado: 'pendiente',
+              source: 'cxc',
+              cuenta_cobrar_id: createdCuentaCobrarId,
+              cuota_id: cuota.id,
+              recordatorio: [{ tipo: 'push', minutos_antes: 4320 }], // 3 días antes
+              creado_por_id: staff?.id ?? '',
+              creado_por_nombre: staff?.nombre ?? '',
+              creado_en: serverTimestamp(),
+            };
+            const eventoRef = await addDoc(eventosCol, eventoData);
+            updateDocumentNonBlocking(
+              doc(firestore, 'concesionarios', concesionarioId, 'cuentas_por_cobrar', createdCuentaCobrarId, 'cuotas', cuota.id),
+              { calendar_event_id: eventoRef.id }
+            );
+          } catch (calErr) {
+            console.warn('Calendar event creation failed (non-fatal):', calErr);
+          }
+        }
+      }
 
       setNumFactura(finalFacN); setNumControl(finalCtrlN); setVentaFecha(now);
       setStep('exito'); onSave();
@@ -1326,6 +1485,46 @@ export function SaleFormDialog({ open, onOpenChange, concesionarioId, onSave, pr
                     </button>
                   ))}
                 </div>
+
+                {/* Modalidad de Pago: Contado / Crédito */}
+                <div>
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2 block">
+                    Modalidad de Pago
+                  </Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {([
+                      { id: 'contado', label: 'Contado', sub: 'Pago 100% al cerrar' },
+                      { id: 'credito', label: 'Crédito / Financiamiento', sub: 'Inicial + cuotas' },
+                    ] as const).map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => {
+                          setModalidad(m.id);
+                          if (m.id === 'contado') setCreditPlan(null);
+                          // Reset splits when switching modalidad to avoid stale amounts.
+                          setPaymentSplits([]);
+                        }}
+                        className={cn(
+                          'p-3 rounded-2xl border text-left transition-all',
+                          modalidad === m.id
+                            ? 'border-primary bg-primary/5 shadow-lg shadow-primary/10'
+                            : 'border-border bg-card hover:bg-muted/30'
+                        )}
+                      >
+                        <p className={cn('text-sm font-bold', modalidad === m.id && 'text-primary')}>{m.label}</p>
+                        <p className="text-[10px] text-muted-foreground">{m.sub}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {modalidad === 'credito' && (
+                  <CreditTermsConfig
+                    totalVenta={totalOperacionUsd}
+                    onChange={setCreditPlan}
+                  />
+                )}
 
                 {/* Exchange Rate */}
                 <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-primary/5 border-2 border-primary/20 shadow-sm">

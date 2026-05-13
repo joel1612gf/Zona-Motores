@@ -50,6 +50,7 @@ export function useCalendarEvents(activeFilters?: Set<CalendarEventSource>): Use
 
   const showCitas = visibleSources.includes('cita') && (activeFilters?.has('cita') ?? true);
   const showCxp = visibleSources.includes('cxp') && (activeFilters?.has('cxp') ?? true);
+  const showCxc = visibleSources.includes('cxc') && (activeFilters?.has('cxc') ?? true);
   const showManual = visibleSources.includes('manual') && (activeFilters?.has('manual') ?? true);
 
   // ── Citas
@@ -70,14 +71,14 @@ export function useCalendarEvents(activeFilters?: Set<CalendarEventSource>): Use
     );
   }, [concesionario?.id, firestore, showCxp]);
 
-  // ── Eventos manuales
+  // ── Eventos en la colección eventos_calendario (manual + cxc share the same store)
   const eventosQuery = useMemoFirebase(() => {
-    if (!concesionario?.id || !showManual) return null;
+    if (!concesionario?.id || (!showManual && !showCxc)) return null;
     return query(
       collection(firestore, 'concesionarios', concesionario.id, 'eventos_calendario'),
       where('estado', '!=', 'cancelado')
     );
-  }, [concesionario?.id, firestore, showManual]);
+  }, [concesionario?.id, firestore, showManual, showCxc]);
 
   const { data: citas, isLoading: citasLoading } = useCollection<Cita>(citasQuery);
   const { data: compras, isLoading: comprasLoading } = useCollection<Compra>(comprasQuery);
@@ -137,32 +138,64 @@ export function useCalendarEvents(activeFilters?: Set<CalendarEventSource>): Use
       });
     }
 
-    if (showManual && eventos) {
+    if (eventos) {
       eventos.forEach((e) => {
-        if (!canViewManualEvent(e, currentRole, staff?.id ?? null)) return;
+        const isCxc = (e as any).source === 'cxc';
+        // Filter: CXC entries follow showCxc; manual entries follow showManual + role view.
+        if (isCxc) {
+          if (!showCxc) return;
+        } else {
+          if (!showManual) return;
+          if (!canViewManualEvent(e, currentRole, staff?.id ?? null)) return;
+        }
         const start = e.inicio?.toDate?.();
         const end = e.fin?.toDate?.();
         if (!start || !end) return;
-        out.push({
-          id: `manual-${e.id}`,
-          source: 'manual',
-          categoria: e.categoria,
-          title: e.titulo,
-          start,
-          end,
-          allDay: e.todo_el_dia,
-          tone: CATEGORIA_TONES[e.categoria],
-          icon: CATEGORIA_ICONS[e.categoria],
-          raw: e,
-          meta: { estado: e.estado },
-        });
+        if (isCxc) {
+          const overdue = start.getTime() < now.getTime() && (e as any).estado !== 'completado';
+          out.push({
+            id: `cxc-${e.id}`,
+            source: 'cxc',
+            title: e.titulo,
+            start,
+            end,
+            allDay: e.todo_el_dia,
+            tone: overdue
+              ? {
+                  ...SOURCE_TONES.cxc,
+                  bg: '#ef4444',
+                  chipBg: 'bg-red-50',
+                  chipText: 'text-red-700',
+                  borderLeft: 'border-l-red-500',
+                  iconColor: 'text-red-600',
+                }
+              : SOURCE_TONES.cxc,
+            icon: SOURCE_ICONS.cxc,
+            raw: e,
+            meta: { estado: e.estado, overdue },
+          });
+        } else {
+          out.push({
+            id: `manual-${e.id}`,
+            source: 'manual',
+            categoria: e.categoria,
+            title: e.titulo,
+            start,
+            end,
+            allDay: e.todo_el_dia,
+            tone: CATEGORIA_TONES[e.categoria],
+            icon: CATEGORIA_ICONS[e.categoria],
+            raw: e,
+            meta: { estado: e.estado },
+          });
+        }
       });
     }
 
     return out.sort((a, b) => a.start.getTime() - b.start.getTime());
-  }, [citas, compras, eventos, showCitas, showCxp, showManual, currentRole, staff?.id]);
+  }, [citas, compras, eventos, showCitas, showCxp, showCxc, showManual, currentRole, staff?.id]);
 
-  const isLoading = (showCitas && citasLoading) || (showCxp && comprasLoading) || (showManual && eventosLoading);
+  const isLoading = (showCitas && citasLoading) || (showCxp && comprasLoading) || ((showManual || showCxc) && eventosLoading);
 
   return { events, visibleSources, isLoading };
 }

@@ -22,7 +22,8 @@ import {
   collection, query, where, doc, runTransaction, serverTimestamp, orderBy, getDocs, getDoc 
 } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency } from '@/lib/utils';
+import { assertPeriodOpen } from '@/lib/accounting-helpers';
+import { formatCurrency, roundMoney } from '@/lib/utils';
 import { 
   Loader2, Search, FileText, ArrowUpDown, AlertCircle, CheckCircle2, Printer, Download 
 } from 'lucide-react';
@@ -48,13 +49,14 @@ export function FiscalNoteForm({ type, onSuccess }: { type: 'DEBIT' | 'CREDIT', 
     return concesionario?.configuracion?.tasa_cambio_manual || bcvRate || 60;
   }, [concesionario, bcvRate]);
 
-  // Fetch pending credit purchases
+  // Fetch ALL purchases (invoices + delivery notes) sent to CxP.
+  // A note can be issued against any purchase that is not fully paid,
+  // regardless of payment type (contado / credito) or fiscal flag.
+  // Filter is client-side to avoid requiring a composite index.
   const purchasesQuery = useMemoFirebase(() => {
     if (!concesionario) return null;
     return query(
       collection(firestore, 'concesionarios', concesionario.id, 'compras'),
-      where('tipo_pago', '==', 'credito'),
-      where('estado', '==', 'pendiente'),
       orderBy('created_at', 'desc')
     );
   }, [concesionario, firestore]);
@@ -63,10 +65,16 @@ export function FiscalNoteForm({ type, onSuccess }: { type: 'DEBIT' | 'CREDIT', 
 
   const filteredPurchases = useMemo(() => {
     if (!purchases) return [];
-    return purchases.filter(p => 
-      p.numero_factura?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.proveedor_nombre.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const lower = searchTerm.toLowerCase();
+    return purchases.filter(p => {
+      const estado = (p as any).estado;
+      const eligible = estado === 'pendiente' || estado === 'parcial';
+      if (!eligible) return false;
+      const matchesSearch = !lower
+        || p.numero_factura?.toLowerCase().includes(lower)
+        || p.proveedor_nombre?.toLowerCase().includes(lower);
+      return matchesSearch;
+    });
   }, [purchases, searchTerm]);
 
   const form = useForm<FiscalNoteFormValues>({
@@ -112,25 +120,44 @@ export function FiscalNoteForm({ type, onSuccess }: { type: 'DEBIT' | 'CREDIT', 
   const selectedCurrency = form.watch('currency');
   const currentRate = form.watch('exchange_rate') || 1;
   
-  const selectedInvoice = useMemo(() => 
-    purchases?.find(p => p.id === selectedInvoiceId), 
+  const selectedInvoice = useMemo(() =>
+    purchases?.find(p => p.id === selectedInvoiceId),
   [purchases, selectedInvoiceId]);
 
-  const taxable = form.watch('taxable_amount') || 0;
-  const exempt = form.watch('exempt_amount') || 0;
-  const iva = taxable * 0.16;
-  const igtf = selectedCurrency === 'USD' ? (taxable + exempt + iva) * 0.03 : 0;
-  
+  // Derived: if the source invoice is non-fiscal (Nota de Entrega), the note is also non-fiscal:
+  // no IVA, no IGTF, no retention voucher. Pure balance adjustment.
+  const noteIsFiscal = selectedInvoice?.is_fiscal !== false;
+
+  const taxableRaw = form.watch('taxable_amount') || 0;
+  const exemptRaw = form.watch('exempt_amount') || 0;
+  // Effective taxable/exempt: when non-fiscal, force any digit-in gravable to fold into exempt,
+  // so IVA, IGTF and the retention voucher chain stay at zero regardless of operator input.
+  const taxable = noteIsFiscal ? taxableRaw : 0;
+  const exempt = noteIsFiscal ? exemptRaw : (taxableRaw + exemptRaw);
+  const iva = noteIsFiscal ? roundMoney(taxable * 0.16) : 0;
+  const igtf = noteIsFiscal && selectedCurrency === 'USD'
+    ? roundMoney((taxable + exempt + iva) * 0.03)
+    : 0;
+
   // Total in the currency of the NOTE
-  const totalInNoteCurrency = taxable + exempt + iva + igtf;
-  
+  const totalInNoteCurrency = roundMoney(taxable + exempt + iva + igtf);
+
   // Total in USD (to adjust the balance)
-  const totalInUsd = selectedCurrency === 'VES' 
-    ? totalInNoteCurrency / currentRate 
-    : totalInNoteCurrency;
+  const totalInUsd = roundMoney(selectedCurrency === 'VES'
+    ? totalInNoteCurrency / currentRate
+    : totalInNoteCurrency);
 
   const handleSubmit = async (values: FiscalNoteFormValues) => {
     if (!concesionario || !selectedInvoice) return;
+
+    // Fiscal period lock: notes are stamped with today; reject if today falls in a closed period.
+    try {
+      assertPeriodOpen(new Date(), concesionario.configuracion?.ultimo_periodo_cerrado, 'crear');
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Período Cerrado', description: (e as Error).message });
+      return;
+    }
+
     setIsSaving(true);
     try {
       // 1. Uniqueness check per provider
@@ -178,33 +205,50 @@ export function FiscalNoteForm({ type, onSuccess }: { type: 'DEBIT' | 'CREDIT', 
       await runTransaction(firestore, async (transaction) => {
         const counterRef = doc(firestore, 'concesionarios', concesionario.id, 'contadores', 'retencion_iva');
         const purchaseRef = doc(firestore, 'concesionarios', concesionario.id, 'compras', selectedInvoice.id);
-        
-        const counterSnap = await transaction.get(counterRef);
+
+        // Only fiscal notes consume the retention counter — non-fiscal notes never read/write it.
         const purchaseSnap = await transaction.get(purchaseRef);
+        const counterSnap = noteIsFiscal ? await transaction.get(counterRef) : null;
 
         if (!purchaseSnap.exists()) throw new Error('La factura ya no existe.');
 
-        let ivaSeq = 1;
-        if (counterSnap.exists()) {
-          ivaSeq = (counterSnap.data().ultimo_numero || 0) + 1;
-        }
-
-        const ivaRetentionNumber = `${yearMonth}${String(ivaSeq).padStart(8, '0')}`;
         const purchaseDocData = purchaseSnap.data() as any;
         const currentSaldo = purchaseDocData.saldo_pendiente ?? purchaseDocData.total_usd;
-        
-        // Balance Adjustment
-        const adjustment = values.type === 'DEBIT' ? totalInUsd : -totalInUsd;
-        const newSaldo = Math.max(0, currentSaldo + adjustment);
+        const noteTotalUsd = roundMoney(totalInUsd);
+
+        // CREDIT notes still reduce the invoice balance (refund / discount). DEBIT notes are tracked as a separate payable.
+        const newSaldo = values.type === 'CREDIT'
+          ? roundMoney(Math.max(0, currentSaldo - noteTotalUsd))
+          : currentSaldo;
 
         const noteRef = doc(collection(firestore, 'concesionarios', concesionario.id, 'notas_fiscales'));
-        
-        resultPayload = {
+
+        // Fiscal precision: when the operator typed amounts in Bs, persist those raw Bs values
+        // so SENIAT exports can use them directly (avoids Bs → USD → Bs round-trip rounding).
+        const isVes = selectedCurrency === 'VES';
+        const bsSnapshots = isVes ? {
+          base_imponible_bs: taxable,
+          monto_exento_bs: exempt,
+          iva_monto_bs: iva,
+          igtf_monto_bs: igtf,
+          total_bs: totalInNoteCurrency,
+          // Note retention against the iva_monto_bs at retention_iva_rate (computed later if fiscal).
+        } : {};
+
+        // Base payload shared by fiscal and non-fiscal notes.
+        // CRITICAL: override taxable_amount / exempt_amount with effective values so that a
+        // non-fiscal note never carries a non-zero gravable into Firestore even if the operator
+        // typed one before switching invoices.
+        const basePayload: any = {
           ...values,
+          taxable_amount: taxable,
+          exempt_amount: exempt,
+          moneda_original: selectedCurrency, // 'VES' | 'USD'
           total_amount: totalInNoteCurrency,
-          iva_amount: iva,
-          igtf_amount: igtf,
-          total_usd: totalInUsd,
+          total_usd: noteTotalUsd,
+          ...bsSnapshots,
+          saldo_pendiente: values.type === 'DEBIT' ? noteTotalUsd : 0,
+          monto_pagado: 0,
           invoice_id: selectedInvoice.id,
           invoice_number: purchaseDocData.numero_factura || 'S/N',
           control_number: purchaseDocData.numero_control || 'S/N',
@@ -213,25 +257,53 @@ export function FiscalNoteForm({ type, onSuccess }: { type: 'DEBIT' | 'CREDIT', 
           provider_rif: fullProviderRif,
           provider_direccion: fullProviderAddress,
           invoice_date: purchaseDocData.fecha_factura || purchaseDocData.date || '',
-          date: formattedToday, // Note issuance date
-          iva_retention_number: ivaRetentionNumber,
-          retention_iva_rate: purchaseDocData.porcentaje_retencion_aplicado || 75,
+          date: formattedToday,
+          is_fiscal: noteIsFiscal,
           status: 'COMPLETADO',
           created_at: serverTimestamp(),
           created_by: staff?.id || concesionario.owner_uid,
           creado_por: staff?.nombre || 'Administrador',
         };
 
-        transaction.set(noteRef, resultPayload);
+        if (noteIsFiscal) {
+          let ivaSeq = 1;
+          if (counterSnap?.exists()) {
+            ivaSeq = (counterSnap.data().ultimo_numero || 0) + 1;
+          }
+          const ivaRetentionNumber = `${yearMonth}${String(ivaSeq).padStart(8, '0')}`;
+          const retentionRatePct = purchaseDocData.porcentaje_retencion_aplicado || 75;
+          // monto_retenido_bs only meaningful if note was issued in VES (raw Bs precision).
+          const montoRetenidoBs = isVes ? roundMoney(iva * (retentionRatePct / 100)) : undefined;
 
-        transaction.update(purchaseRef, {
-          saldo_pendiente: newSaldo,
-          estado: newSaldo <= 0.01 ? 'pagada' : 'pendiente',
-          updated_at: serverTimestamp(),
-        });
+          resultPayload = {
+            ...basePayload,
+            iva_amount: iva,
+            igtf_amount: igtf,
+            iva_retention_number: ivaRetentionNumber,
+            retention_iva_rate: retentionRatePct,
+            ...(montoRetenidoBs !== undefined ? { monto_retenido_bs: montoRetenidoBs } : {}),
+          };
 
-        // Update unified counter
-        transaction.set(counterRef, { ultimo_numero: ivaSeq, ultimo_prefix: yearMonth, updated_at: serverTimestamp() }, { merge: true });
+          transaction.set(noteRef, resultPayload);
+          // Update unified counter only for fiscal notes
+          transaction.set(counterRef, { ultimo_numero: ivaSeq, ultimo_prefix: yearMonth, updated_at: serverTimestamp() }, { merge: true });
+        } else {
+          // Non-fiscal note: zero IVA/IGTF, no retention voucher. Pure balance adjustment.
+          resultPayload = {
+            ...basePayload,
+            iva_amount: 0,
+            igtf_amount: 0,
+          };
+          transaction.set(noteRef, resultPayload);
+        }
+
+        if (values.type === 'CREDIT') {
+          transaction.update(purchaseRef, {
+            saldo_pendiente: newSaldo,
+            estado: newSaldo <= 0.01 ? 'pagada' : (purchaseDocData.estado === 'pagada' ? 'pagada' : (purchaseDocData.estado || 'pendiente')),
+            updated_at: serverTimestamp(),
+          });
+        }
       });
 
       setSuccessData(resultPayload);
@@ -392,7 +464,7 @@ export function FiscalNoteForm({ type, onSuccess }: { type: 'DEBIT' | 'CREDIT', 
               {!loadingPurchases && filteredPurchases.length === 0 && (
                 <div className="py-10 text-center opacity-40">
                   <AlertCircle className="h-10 w-10 mx-auto mb-2" />
-                  <p className="text-xs font-bold uppercase tracking-widest">No se encontraron facturas a crédito</p>
+                  <p className="text-xs font-bold uppercase tracking-widest">No se encontraron facturas o notas pendientes</p>
                 </div>
               )}
             </div>
@@ -477,14 +549,18 @@ export function FiscalNoteForm({ type, onSuccess }: { type: 'DEBIT' | 'CREDIT', 
                 name="taxable_amount"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Monto Gravable</FormLabel>
+                    <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">
+                      Monto Gravable {!noteIsFiscal && <span className="text-amber-600">(N/A — no fiscal)</span>}
+                    </FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        step="0.01" 
-                        {...field} 
+                      <Input
+                        type="number"
+                        step="0.01"
+                        {...field}
+                        value={noteIsFiscal ? field.value : 0}
+                        disabled={!noteIsFiscal}
                         onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
-                        className="h-12 rounded-xl font-bold text-lg" 
+                        className={cn("h-12 rounded-xl font-bold text-lg", !noteIsFiscal && 'opacity-50 cursor-not-allowed')}
                       />
                     </FormControl>
                     <FormMessage />
@@ -497,14 +573,16 @@ export function FiscalNoteForm({ type, onSuccess }: { type: 'DEBIT' | 'CREDIT', 
                 name="exempt_amount"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">Monto Exento</FormLabel>
+                    <FormLabel className="text-xs font-black uppercase text-muted-foreground tracking-widest">
+                      {noteIsFiscal ? 'Monto Exento' : 'Monto Total de la Nota'}
+                    </FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        step="0.01" 
-                        {...field} 
+                      <Input
+                        type="number"
+                        step="0.01"
+                        {...field}
                         onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
-                        className="h-12 rounded-xl font-bold text-lg" 
+                        className="h-12 rounded-xl font-bold text-lg"
                       />
                     </FormControl>
                     <FormMessage />
@@ -512,27 +590,40 @@ export function FiscalNoteForm({ type, onSuccess }: { type: 'DEBIT' | 'CREDIT', 
                 )}
               />
 
-              <div className="space-y-2">
-                <Label className="text-xs font-black uppercase text-muted-foreground tracking-widest">IVA (16% Automático)</Label>
-                <div className="h-12 flex items-center px-4 rounded-xl bg-muted/50 border font-bold text-muted-foreground italic">
-                  + {formatCurrency(iva, selectedCurrency)}
-                </div>
-              </div>
-
-              {selectedCurrency === 'USD' ? (
-                <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                  <Label className="text-xs font-black uppercase text-amber-600 tracking-widest flex items-center gap-2">
-                    <AlertCircle className="h-3 w-3" /> IGTF (3% Aplicado)
-                  </Label>
-                  <div className="h-12 flex items-center px-4 rounded-xl bg-amber-500/5 border border-amber-500/20 font-bold text-amber-700 italic">
-                    + {formatCurrency(igtf, 'USD')}
+              {noteIsFiscal ? (
+                <>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-black uppercase text-muted-foreground tracking-widest">IVA (16% Automático)</Label>
+                    <div className="h-12 flex items-center px-4 rounded-xl bg-muted/50 border font-bold text-muted-foreground italic">
+                      + {formatCurrency(iva, selectedCurrency)}
+                    </div>
                   </div>
-                </div>
+
+                  {selectedCurrency === 'USD' ? (
+                    <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                      <Label className="text-xs font-black uppercase text-amber-600 tracking-widest flex items-center gap-2">
+                        <AlertCircle className="h-3 w-3" /> IGTF (3% Aplicado)
+                      </Label>
+                      <div className="h-12 flex items-center px-4 rounded-xl bg-amber-500/5 border border-amber-500/20 font-bold text-amber-700 italic">
+                        + {formatCurrency(igtf, 'USD')}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label className="text-xs font-black uppercase text-muted-foreground tracking-widest">Equivalente en USD</Label>
+                      <div className="h-12 flex items-center px-4 rounded-xl bg-primary/5 border border-primary/10 font-bold text-primary italic">
+                        ≈ {formatCurrency(totalInUsd, 'USD')}
+                      </div>
+                    </div>
+                  )}
+                </>
               ) : (
-                <div className="space-y-2">
-                  <Label className="text-xs font-black uppercase text-muted-foreground tracking-widest">Equivalente en USD</Label>
-                  <div className="h-12 flex items-center px-4 rounded-xl bg-primary/5 border border-primary/10 font-bold text-primary italic">
-                    ≈ {formatCurrency(totalInUsd, 'USD')}
+                <div className="md:col-span-2 space-y-2">
+                  <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                    <AlertCircle className="h-4 w-4 text-amber-700 flex-shrink-0" />
+                    <p className="text-xs font-bold uppercase tracking-widest text-amber-800">
+                      Nota administrativa — no fiscal · Sin IVA · Sin IGTF · Sin comprobante de retención. Solo ajusta el saldo de la CxP.
+                    </p>
                   </div>
                 </div>
               )}
@@ -562,19 +653,36 @@ export function FiscalNoteForm({ type, onSuccess }: { type: 'DEBIT' | 'CREDIT', 
                   <p className="text-4xl font-bold font-headline">{formatCurrency(totalInNoteCurrency, selectedCurrency)}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[10px] font-black uppercase opacity-70 tracking-widest">Nuevo Saldo ({selectedCurrency})</p>
-                  <p className="text-xl font-bold font-headline leading-none">
-                    {formatCurrency(
-                      Math.max(0, (selectedInvoice.saldo_pendiente ?? selectedInvoice.total_usd) + (type === 'DEBIT' ? totalInUsd : -totalInUsd)) * (selectedCurrency === 'VES' ? currentRate : 1), 
-                      selectedCurrency
-                    )}
-                  </p>
-                  <p className="text-[9px] font-black uppercase opacity-50 mt-1">
-                    Ref: {formatCurrency(
-                      Math.max(0, (selectedInvoice.saldo_pendiente ?? selectedInvoice.total_usd) + (type === 'DEBIT' ? totalInUsd : -totalInUsd)) * (selectedCurrency === 'USD' ? currentRate : 1),
-                      selectedCurrency === 'USD' ? 'VES' : 'USD'
-                    )}
-                  </p>
+                  {type === 'DEBIT' ? (
+                    <>
+                      <p className="text-[10px] font-black uppercase opacity-70 tracking-widest">Saldo Factura</p>
+                      <p className="text-xl font-bold font-headline leading-none line-through opacity-60">
+                        {formatCurrency(
+                          (selectedInvoice.saldo_pendiente ?? selectedInvoice.total_usd) * (selectedCurrency === 'VES' ? currentRate : 1),
+                          selectedCurrency
+                        )}
+                      </p>
+                      <p className="text-[9px] font-black uppercase opacity-80 mt-1 max-w-[180px]">
+                        Sin cambios. La nota se cobra como pasivo independiente en CxP.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-[10px] font-black uppercase opacity-70 tracking-widest">Nuevo Saldo Factura ({selectedCurrency})</p>
+                      <p className="text-xl font-bold font-headline leading-none">
+                        {formatCurrency(
+                          Math.max(0, (selectedInvoice.saldo_pendiente ?? selectedInvoice.total_usd) - totalInUsd) * (selectedCurrency === 'VES' ? currentRate : 1),
+                          selectedCurrency
+                        )}
+                      </p>
+                      <p className="text-[9px] font-black uppercase opacity-50 mt-1">
+                        Ref: {formatCurrency(
+                          Math.max(0, (selectedInvoice.saldo_pendiente ?? selectedInvoice.total_usd) - totalInUsd) * (selectedCurrency === 'USD' ? currentRate : 1),
+                          selectedCurrency === 'USD' ? 'VES' : 'USD'
+                        )}
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

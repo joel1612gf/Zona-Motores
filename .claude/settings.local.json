@@ -5,7 +5,39 @@
       "Bash(ls \"C:/Users/joel1/.claude/plans/\" 2>&1 | head -10 ; echo \"---\" ; ls \"C:/Users/joel1/.claude/\" 2>&1 | head -20)",
       "Read(//c/Users/joel1/.claude/plans/**)",
       "Read(//c/Users/joel1/.claude/**)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(Get-ChildItem -Path \"d:\\\\Carpetas\\\\Desktop\\\\Zona motores\\\\web\\\\Zona-Motores-main\" -Recurse -Filter \"*fiscal*\" -ErrorAction SilentlyContinue)",
+      "Bash(Select-Object -First 20)",
+      "Bash(xargs grep -l \"is_fiscal\")",
+      "Bash(xargs grep -l \"nota.*entrega\\\\|nota de entrega\")",
+      "Bash(npm run *)",
+      "Bash(Find-ChildItem -Path \"d:\\\\Carpetas\\\\Desktop\\\\Zona motores\\\\web\\\\Zona-Motores-main\\\\src\\\\app\\\\business\" -Type Directory)",
+      "Bash(Select-Object -ExpandProperty Name)",
+      "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
+      "PowerShell(Get-ChildItem -Path \"d:\\\\Carpetas\\\\Desktop\\\\Zona motores\\\\web\\\\Zona-Motores-main\\\\src\\\\app\\\\business\\\\[slug]\" -Directory | ForEach-Object { $_.Name })",
+      "Bash(mkdir -p \"d:/Carpetas/Desktop/Zona motores/web/Zona-Motores-main/src/app/business/[slug]/receivables\")",
+      "Bash(npx firebase-tools *)",
+      "Bash(xargs grep -l \"vehiculos_requeridos\")",
+      "Bash(npm install *)",
+      "Bash(firebase projects:list)",
+      "PowerShell(firebase --version 2>&1)",
+      "PowerShell(npx -y firebase-tools projects:list 2>&1)",
+      "PowerShell(npx -y firebase-tools deploy --only firestore:indexes --project studio-2511212328-1383b 2>&1)",
+      "PowerShell(npx -y firebase-tools deploy --only functions --project studio-2511212328-1383b 2>&1)",
+      "Bash(npx -y firebase-tools deploy --only functions --project studio-2511212328-1383b)",
+      "Bash(Get-ChildItem -Path \"src\\\\lib\" -Filter \"*.ts\")",
+      "Bash(firebase deploy *)",
+      "Bash(npx firebase *)",
+      "PowerShell(npm root -g)",
+      "Bash(./node_modules/.bin/firebase --version)",
+      "Bash(./node_modules/.bin/firebase projects:list)",
+      "Bash(./node_modules/.bin/firebase deploy *)",
+      "Bash(node -e \"require\\('./lib/index.js'\\); console.log\\('LOADED OK'\\);\")",
+      "Bash(awk -F'\\(' '{print $1}')"
+    ],
+    "additionalDirectories": [
+      "d:\\Carpetas\\Desktop\\Zona motores\\web\\Zona-Motores-main\\src\\app\\business\\[slug]"
     ]
   }
 }

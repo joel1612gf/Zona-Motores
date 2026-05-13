@@ -182,7 +182,20 @@ export function FinanceHistoryTable({ type }: FinanceHistoryTableProps) {
                         {record.created_at?.toDate().toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' })}
                       </TableCell>
                       <TableCell>
-                        <p className="font-bold text-sm leading-tight text-foreground/90">{record.provider_name}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-bold text-sm leading-tight text-foreground/90">{record.provider_name}</p>
+                          {type === 'DEBIT' && (() => {
+                            const saldo = record.saldo_pendiente ?? record.total_usd ?? 0;
+                            const total = record.total_usd ?? 0;
+                            if (saldo <= 0.001) {
+                              return <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[9px] font-black uppercase px-2 py-0.5 rounded-md">Pagada</Badge>;
+                            }
+                            if (saldo < total - 0.001) {
+                              return <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/20 text-[9px] font-black uppercase px-2 py-0.5 rounded-md">Parcial</Badge>;
+                            }
+                            return <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20 text-[9px] font-black uppercase px-2 py-0.5 rounded-md">Pendiente</Badge>;
+                          })()}
+                        </div>
                         <p className="text-[10px] text-muted-foreground/60 font-medium tracking-tight mt-0.5">RIF: {record.provider_rif || '—'}</p>
                       </TableCell>
                       <TableCell>

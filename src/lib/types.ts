@@ -108,7 +108,8 @@ export type NotificationType =
   | 'listing_paused'
   | 'listing_deleted'
   | 'listing_promoted'
-  | 'welcome';
+  | 'welcome'
+  | 'crm_match';
 
 export type Notification = {
   id: string;

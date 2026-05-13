@@ -9,7 +9,9 @@
     "build": "NODE_ENV=production next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "functions:build": "npm --prefix functions run build",
+    "functions:deploy": "npm --prefix functions run build && firebase deploy --only functions"
   },
   "dependencies": {
     "@genkit-ai/google-genai": "^1.20.0",
@@ -66,13 +68,14 @@
     "tailwind-merge": "^3.0.1",
     "tailwindcss-animate": "^1.0.7",
     "written-number": "^0.11.1",
-    "zod": "^3.24.2"
+    "zod": "3.24.2"
   },
   "devDependencies": {
     "@types/google.maps": "^3.55.10",
     "@types/node": "^20",
     "@types/react": "18.3.3",
     "@types/react-dom": "18.3.0",
+    "firebase-tools": "^15.17.0",
     "genkit-cli": "^1.20.0",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",

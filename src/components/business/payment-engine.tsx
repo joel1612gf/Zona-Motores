@@ -8,10 +8,12 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from '@/components/ui/select';
 import { Loader2, Plus, Trash2, AlertCircle } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, roundMoney } from '@/lib/utils';
 import type { PaymentSplit } from '@/lib/finance-schemas';
 import type { BankAccount, BankEntryMethod } from '@/lib/business-types';
 import { BANK_ENTRY_METHOD_LABELS, BANK_ACCOUNT_TYPE_LABELS } from '@/lib/business-types';
+
+const DEFAULT_IGTF_ENTRY_METHODS: BankEntryMethod[] = ['efectivo_fisico', 'zelle', 'crypto', 'transferencia'];
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -43,6 +45,10 @@ interface PaymentEngineProps {
   onValidChange: (isValid: boolean, splits: PaymentSplit[], totalEquivalentUsd: number) => void;
   /** Whether the document is fiscal. If false, IGTF is never applied. */
   isFiscal?: boolean;
+  /** Whether the company is a special taxpayer (Sujeto Pasivo Especial). If false, IGTF is never applied. */
+  isSpecialTaxpayer?: boolean;
+  /** Bank entry methods that trigger IGTF when account is foreign currency. Defaults to efectivo_fisico, zelle, crypto, transferencia. */
+  igtfTriggerMethods?: BankEntryMethod[];
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -110,11 +116,21 @@ function buildSplit(
   row: Pick<SplitRow, 'entryMethod' | 'accountId' | 'accountName' | 'amount'>,
   account: BankAccount | undefined,
   tasaBcv: number,
-  isFiscal: boolean
+  isFiscal: boolean,
+  isSpecialTaxpayer: boolean,
+  igtfTriggerMethods: BankEntryMethod[]
 ): PaymentSplit {
   const isUSD = account?.es_divisa ?? false;
   const currency = isUSD ? 'USD' : 'VES';
   const amount = row.amount || 0;
+  const equivalentUsd = roundMoney(isUSD ? amount : amount / tasaBcv);
+
+  const triggersIgtf =
+    isFiscal &&
+    isSpecialTaxpayer &&
+    isUSD &&
+    !!row.entryMethod &&
+    igtfTriggerMethods.includes(row.entryMethod as BankEntryMethod);
 
   return {
     method: account
@@ -123,8 +139,8 @@ function buildSplit(
     currency,
     amount,
     exchangeRate: tasaBcv,
-    igtfAmount: (isUSD && isFiscal) ? amount * 0.03 : 0,
-    equivalentUsd: isUSD ? amount : amount / tasaBcv,
+    igtfAmount: triggersIgtf ? roundMoney(equivalentUsd * 0.03) : 0,
+    equivalentUsd,
     accountId: row.accountId || undefined,
     accountName: row.accountName || undefined,
   };
@@ -132,18 +148,30 @@ function buildSplit(
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-export function PaymentEngine({ totalUsd, tasaBcv, bankAccounts, onValidChange, isFiscal = true }: PaymentEngineProps) {
+export function PaymentEngine({
+  totalUsd,
+  tasaBcv,
+  bankAccounts,
+  onValidChange,
+  isFiscal = true,
+  isSpecialTaxpayer = false,
+  igtfTriggerMethods,
+}: PaymentEngineProps) {
   const [rows, setRows] = useState<SplitRow[]>([]);
 
   const paymentOptions = useMemo(() => getPaymentOptions(bankAccounts), [bankAccounts]);
+  const triggerMethods = useMemo(
+    () => (igtfTriggerMethods && igtfTriggerMethods.length > 0 ? igtfTriggerMethods : DEFAULT_IGTF_ENTRY_METHODS),
+    [igtfTriggerMethods]
+  );
 
   // Derive splits from rows to expose upward
   const splits = useMemo<PaymentSplit[]>(() => {
     return rows.map(row => {
       const account = bankAccounts.find(a => a.id === row.accountId);
-      return buildSplit(row, account, tasaBcv, isFiscal);
+      return buildSplit(row, account, tasaBcv, isFiscal, isSpecialTaxpayer, triggerMethods);
     });
-  }, [rows, bankAccounts, tasaBcv, isFiscal]);
+  }, [rows, bankAccounts, tasaBcv, isFiscal, isSpecialTaxpayer, triggerMethods]);
 
   const totalPaidUsd = splits.reduce((acc, s) => acc + (s.equivalentUsd || 0), 0);
   const remainingUsd = Math.max(0, totalUsd - totalPaidUsd);
@@ -393,7 +421,7 @@ export function PaymentEngine({ totalUsd, tasaBcv, bankAccounts, onValidChange, 
                     {selectedAccount.nombre}
                     {selectedAccount.banco ? ` (${selectedAccount.banco})` : ''}
                   </span>
-                  {isUSD && isFiscal && (
+                  {(split?.igtfAmount ?? 0) > 0 && (
                     <span className="text-[10px] bg-amber-100 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5 font-bold ml-auto">
                       IGTF 3%
                     </span>

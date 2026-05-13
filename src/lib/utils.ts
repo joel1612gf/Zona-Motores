@@ -5,6 +5,12 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+export function roundMoney(amount: number, decimals = 2): number {
+  if (!Number.isFinite(amount)) return 0;
+  const factor = 10 ** decimals;
+  return Math.round((amount + Number.EPSILON) * factor) / factor;
+}
+
 export function formatCurrency(amount: number, currency: 'USD' | 'VES' = 'USD') {
   if (currency === 'VES') {
     return new Intl.NumberFormat('es-VE', {

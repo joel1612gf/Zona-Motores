@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import { 
   Loader2, 
   Package, 
@@ -118,8 +119,8 @@ export function ProductFormDialog({ open, onOpenChange, product, onSaved }: Prod
         setIsLoadingHistory(true);
         try {
            const snap = await getDocs(query(collection(firestore, 'concesionarios', concesionario.id, 'compras'), orderBy('created_at', 'desc')));
-           const docs = snap.docs.map(skip => ({ id: skip.id, ...skip.data() }));
-           const found = docs.filter(skip => skip.items?.some((i: any) => i.producto_id === product.id));
+           const docs = snap.docs.map(skip => ({ id: skip.id, ...skip.data() } as any));
+           const found = docs.filter((skip: any) => skip.items?.some((i: any) => i.producto_id === product.id));
            setHistory(found);
         } catch (e) {
            console.error('Error fetching history:', e);

@@ -19,7 +19,7 @@ export type PayablePaymentFormValues = z.infer<typeof payablePaymentSchema>;
  */
 export type PayableRow = {
   id: string;
-  origen: 'compra_factura' | 'compra_nota_entrega' | 'consignacion' | 'nota_debito' | 'gasto';
+  origen: 'compra_factura' | 'compra_nota_entrega' | 'consignacion' | 'nota_debito' | 'gasto' | 'vehiculo';
   // Source document IDs for atomic transaction writes
   compra_id?: string;
   consignacion_id?: string;
@@ -40,4 +40,6 @@ export type PayableRow = {
   fecha_vencimiento?: Date;
   // Status
   estado: 'pendiente' | 'parcial' | 'pagada';
+  // Debit notes attached to a parent invoice. When present, CXP groups them under the invoice.
+  linkedNotes?: PayableRow[];
 };

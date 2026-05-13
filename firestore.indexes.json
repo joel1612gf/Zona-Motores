@@ -1,4 +1,71 @@
 {
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionGroup": "cuotas",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "concesionario_id", "order": "ASCENDING" },
+        { "fieldPath": "estado", "order": "ASCENDING" },
+        { "fieldPath": "fecha_vencimiento", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "cuotas",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "concesionario_id", "order": "ASCENDING" },
+        { "fieldPath": "estado", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "cuotas",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "concesionario_id", "order": "ASCENDING" },
+        { "fieldPath": "fecha_vencimiento", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "cuentas_por_cobrar",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "fecha_emision", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "matches",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "matches",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "cliente_id", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "matches",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "cliente_id", "order": "ASCENDING" },
+        { "fieldPath": "vehiculo_id", "order": "ASCENDING" },
+        { "fieldPath": "requerido_id", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "kardex_movements",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "producto_id", "order": "ASCENDING" },
+        { "fieldPath": "fecha", "order": "ASCENDING" }
+      ]
+    }
+  ],
   "fieldOverrides": []
 }

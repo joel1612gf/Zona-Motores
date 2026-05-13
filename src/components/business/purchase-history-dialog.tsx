@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Search, Loader2, Calendar, FileText, User, ChevronDown, ChevronUp, Printer, Download, Trash2, ShieldCheck, AlertCircle, Package } from 'lucide-react';
 import type { Compra } from '@/lib/business-types';
 import { useToast } from '@/hooks/use-toast';
+import { assertPeriodOpen } from '@/lib/accounting-helpers';
 import { cn } from '@/lib/utils';
 import { LegalRetentionVoucher } from './legal-retention-voucher';
 import { DeliveryNotePrint } from './delivery-note-print';
@@ -181,6 +182,18 @@ export function PurchaseHistoryDialog({
 
   const executeDelete = async () => {
     if (!concesionario?.id || !compraToDelete) return;
+
+    // Fiscal period lock: cannot anular a compra whose fecha_factura falls in a closed period.
+    try {
+      const fechaRef = compraToDelete.fecha_factura
+        || (compraToDelete as any).created_at?.toDate?.()
+        || new Date();
+      assertPeriodOpen(fechaRef, concesionario.configuracion?.ultimo_periodo_cerrado, 'anular');
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Período Cerrado', description: (e as Error).message });
+      return;
+    }
+
     setIsDeleting(true);
     try {
       if (deductInventory) {

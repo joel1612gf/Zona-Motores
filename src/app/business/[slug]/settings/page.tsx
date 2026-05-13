@@ -43,6 +43,12 @@ export default function SettingsPage() {
   const [tasaCambioManual, setTasaCambioManual] = useState('');
   const [tasaCambioAuto, setTasaCambioAuto] = useState(false);
   const [vehiculosExentosIva, setVehiculosExentosIva] = useState(true);
+  const [sujetoPasivoEspecial, setSujetoPasivoEspecial] = useState(false);
+
+  // Payment Methods
+  const [metodosPago, setMetodosPago] = useState<string[]>([]);
+  const [metodosPagoDivisa, setMetodosPagoDivisa] = useState<string[]>([]);
+  const [nuevoMetodo, setNuevoMetodo] = useState('');
 
   // Location
   const [markerPos, setMarkerPos] = useState<{ lat: number; lng: number } | null>(null);
@@ -77,6 +83,7 @@ export default function SettingsPage() {
       setTasaCambioManual(String(concesionario.configuracion.tasa_cambio_manual || ''));
       setTasaCambioAuto(concesionario.configuracion.tasa_cambio_auto ?? false);
       setVehiculosExentosIva(concesionario.configuracion.vehiculos_exentos_iva !== false);
+      setSujetoPasivoEspecial(!!concesionario.configuracion.sujeto_pasivo_especial);
     }
     if (concesionario.geolocalizacion) {
       const pos = { lat: concesionario.geolocalizacion.latitude, lng: concesionario.geolocalizacion.longitude };
@@ -215,6 +222,7 @@ export default function SettingsPage() {
           tasa_cambio_manual: parseFloat(tasaCambioManual) || 0,
           tasa_cambio_auto: tasaCambioAuto,
           vehiculos_exentos_iva: vehiculosExentosIva,
+          sujeto_pasivo_especial: sujetoPasivoEspecial,
         },
       });
 
@@ -478,6 +486,26 @@ export default function SettingsPage() {
               >
                 <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
                   vehiculosExentosIva ? 'translate-x-6' : 'translate-x-1'
+                }`} />
+              </button>
+            </div>
+
+            {/* Sujeto Pasivo Especial (IGTF) */}
+            <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/30">
+              <div className="pr-3">
+                <p className="text-sm font-medium">Sujeto Pasivo Especial (IGTF)</p>
+                <p className="text-xs text-muted-foreground">Si la empresa está calificada por el SENIAT como Sujeto Pasivo Especial, los pagos a proveedores en divisas (Efectivo USD, Zelle, Cripto) sobre facturas fiscales generan un egreso adicional del 3% por IGTF, asumido por el concesionario.</p>
+              </div>
+              <button
+                type="button"
+                disabled={isReadOnly}
+                onClick={() => setSujetoPasivoEspecial(v => !v)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ${
+                  sujetoPasivoEspecial ? 'bg-primary' : 'bg-muted-foreground/30'
+                } disabled:opacity-50`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                  sujetoPasivoEspecial ? 'translate-x-6' : 'translate-x-1'
                 }`} />
               </button>
             </div>

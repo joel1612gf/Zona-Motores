@@ -14,17 +14,51 @@ service cloud.firestore {
       return request.auth != null && request.auth.token.email == 'zonamotores.ve@gmail.com';
     }
 
+    // Helpers for fiscal period lock (Cierre Fiscal)
+    function periodoCerrado(cid) {
+      return get(/databases/$(database)/documents/concesionarios/$(cid)).data.configuracion.ultimo_periodo_cerrado;
+    }
+
+    function docPeriodFromDate(dateStr) {
+      // Expects YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss. Returns YYYYMM.
+      return dateStr[0:4] + dateStr[5:7];
+    }
+
+    function isPeriodOpenForDate(cid, dateStr) {
+      let cerrado = periodoCerrado(cid);
+      return cerrado == null || docPeriodFromDate(dateStr) > cerrado;
+    }
+
     // Concesionarios - public read for business login
     match /concesionarios/{concesionarioId} {
       allow read: if true;
       allow write: if true;
-      
+
       match /staff/{staffId} {
         allow read: if true;
         allow write: if true;
       }
-      
+
+      // Compras: blocked from create/update/delete if fecha_factura is in a closed period.
+      match /compras/{compraId} {
+        allow read: if true;
+        allow create: if request.resource.data.fecha_factura == null
+          || isPeriodOpenForDate(concesionarioId, request.resource.data.fecha_factura);
+        allow update, delete: if resource.data.fecha_factura == null
+          || isPeriodOpenForDate(concesionarioId, resource.data.fecha_factura);
+      }
+
+      // Notas fiscales: blocked similarly. Field `date` (YYYY-MM-DD).
+      match /notas_fiscales/{notaId} {
+        allow read: if true;
+        allow create: if request.resource.data.date == null
+          || isPeriodOpenForDate(concesionarioId, request.resource.data.date);
+        allow update, delete: if resource.data.date == null
+          || isPeriodOpenForDate(concesionarioId, resource.data.date);
+      }
+
       // First-level subcollections (vehicles, sales, caja, cuentas_bancarias, etc.)
+      // Ventas use serverTimestamp at create-time → app-layer guard handles them.
       match /{subcollection}/{docId} {
         allow read: if true;
         allow write: if true;
@@ -86,6 +120,13 @@ service cloud.firestore {
     // A composite index will need to be created in Firestore for this to work.
     match /{path=**}/vehicleListings/{listingId} {
       allow list: if true;
+    }
+
+    // CXC: collectionGroup query on 'cuotas' for the receivables dashboard, owner-overview KPI,
+    // and customer account statement. Composite index on (concesionario_id, estado, fecha_vencimiento)
+    // and (concesionario_id, fecha_vencimiento) required.
+    match /{path=**}/cuotas/{cuotaId} {
+      allow read, list: if true;
     }
 
     // This collection is no longer used, so we deny all access to prevent confusion.

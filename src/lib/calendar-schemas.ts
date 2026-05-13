@@ -11,12 +11,13 @@ import {
   Circle,
   Handshake,
   Receipt,
+  HandCoins,
 } from 'lucide-react';
 import type { BusinessRole } from './business-types';
 
 // ==================== EVENT SOURCES ====================
 
-export type CalendarEventSource = 'cita' | 'cxp' | 'manual';
+export type CalendarEventSource = 'cita' | 'cxp' | 'cxc' | 'manual';
 
 // ==================== MANUAL EVENT CATEGORIES ====================
 
@@ -148,16 +149,25 @@ export const SOURCE_TONES: Record<Exclude<CalendarEventSource, 'manual'>, EventC
     borderLeft: 'border-l-amber-500',
     iconColor: 'text-amber-600',
   },
+  cxc: {
+    bg: '#059669',
+    chipBg: 'bg-emerald-50',
+    chipText: 'text-emerald-700',
+    borderLeft: 'border-l-emerald-500',
+    iconColor: 'text-emerald-600',
+  },
 };
 
 export const SOURCE_ICONS: Record<Exclude<CalendarEventSource, 'manual'>, LucideIcon> = {
   cita: Handshake,
   cxp: Receipt,
+  cxc: HandCoins,
 };
 
 export const SOURCE_LABELS: Record<CalendarEventSource, string> = {
   cita: 'Citas',
   cxp: 'Vencimientos',
+  cxc: 'Cobros',
   manual: 'Eventos',
 };
 
@@ -249,13 +259,13 @@ export function getVisibleSourcesForRole(role: BusinessRole | null): CalendarEve
   switch (role) {
     case 'dueno':
     case 'encargado':
-      return ['cita', 'cxp', 'manual'];
+      return ['cita', 'cxp', 'cxc', 'manual'];
     case 'vendedor':
-      return ['cita', 'manual'];
+      return ['cita', 'cxc', 'manual'];
     case 'secretario':
-      return ['cita', 'cxp', 'manual'];
+      return ['cita', 'cxp', 'cxc', 'manual'];
     case 'cajero':
-      return ['cxp', 'manual'];
+      return ['cxp', 'cxc', 'manual'];
     default:
       return [];
   }

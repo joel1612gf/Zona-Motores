@@ -20,6 +20,7 @@ const ROLE_COLORS: Record<BusinessRole, string> = {
   secretario: 'bg-purple-500/10 text-purple-700 border-purple-500/30',
   vendedor: 'bg-green-500/10 text-green-700 border-green-500/30',
   cajero: 'bg-orange-500/10 text-orange-700 border-orange-500/30',
+  contador: 'bg-cyan-500/10 text-cyan-700 border-cyan-500/30',
 };
 
 const ROLE_ICONS: Record<BusinessRole, React.ComponentType<{ className?: string }>> = {
@@ -28,6 +29,7 @@ const ROLE_ICONS: Record<BusinessRole, React.ComponentType<{ className?: string 
   secretario: Shield,
   vendedor: UserRound,
   cajero: UserRound,
+  contador: Shield,
 };
 
 export default function StaffPage() {

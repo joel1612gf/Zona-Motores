@@ -20,7 +20,7 @@ interface StaffFormDialogProps {
   onSave: () => void;
 }
 
-const AVAILABLE_ROLES: BusinessRole[] = ['dueno', 'encargado', 'secretario', 'vendedor', 'cajero'];
+const AVAILABLE_ROLES: BusinessRole[] = ['dueno', 'encargado', 'secretario', 'vendedor', 'cajero', 'contador'];
 
 export function StaffFormDialog({ open, onOpenChange, editingStaff, concesionarioId, onSave }: StaffFormDialogProps) {
   const firestore = useFirestore();

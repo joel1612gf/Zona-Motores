@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useBusinessAuth } from '@/context/business-auth-context';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, Timestamp } from 'firebase/firestore';
+import { collection, collectionGroup, query, where, Timestamp, orderBy, limit } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { KpiCard, KpiCardSkeleton } from './kpi-card';
 import { ActionCenter } from './action-center';
@@ -19,10 +19,11 @@ import {
   RefreshCw,
   Calendar,
   Plus,
+  FileWarning,
 } from 'lucide-react';
 import { startOfDay, subDays } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
-import type { Venta, RegistroCaja, Producto, Compra } from '@/lib/business-types';
+import type { Venta, RegistroCaja, Producto, Compra, CuentaPorCobrar, Cuota } from '@/lib/business-types';
 
 type OwnerOverviewProps = {
   /** Encargado is read-only on creation flows but sees the same dashboard */
@@ -85,7 +86,65 @@ export function OwnerOverview({ isReadOnly = false }: OwnerOverviewProps) {
     if (!concesionario?.id) return null;
     return query(
       collection(firestore, 'concesionarios', concesionario.id, 'compras'),
-      where('estado', '==', 'pendiente')
+      where('estado', 'in', ['pendiente', 'parcial'])
+    );
+  }, [concesionario?.id, firestore]);
+
+  // CxP: notas de débito pendientes
+  const notasDebitoPendQuery = useMemoFirebase(() => {
+    if (!concesionario?.id) return null;
+    return query(
+      collection(firestore, 'concesionarios', concesionario.id, 'notas_fiscales'),
+      where('type', '==', 'DEBIT')
+    );
+  }, [concesionario?.id, firestore]);
+
+  // CxP: consignaciones por pagar
+  const consignacionesPendQuery = useMemoFirebase(() => {
+    if (!concesionario?.id) return null;
+    return query(
+      collection(firestore, 'concesionarios', concesionario.id, 'consignaciones_por_pagar'),
+      where('estado', 'in', ['pendiente', 'parcial'])
+    );
+  }, [concesionario?.id, firestore]);
+
+  // CxP: gastos pendientes
+  const gastosPendQuery = useMemoFirebase(() => {
+    if (!concesionario?.id) return null;
+    return query(
+      collection(firestore, 'concesionarios', concesionario.id, 'gastos'),
+      where('status', '==', 'PENDIENTE')
+    );
+  }, [concesionario?.id, firestore]);
+
+  // CxP: vehiculos con saldo pendiente
+  const vehiculosPendQuery = useMemoFirebase(() => {
+    if (!concesionario?.id) return null;
+    return query(
+      collection(firestore, 'concesionarios', concesionario.id, 'inventario'),
+      where('estado_pago', '==', 'pendiente')
+    );
+  }, [concesionario?.id, firestore]);
+
+  // CXC: cuentas por cobrar activas + cuotas vencidas
+  const cxcActiveQuery = useMemoFirebase(() => {
+    if (!concesionario?.id) return null;
+    return query(
+      collection(firestore, 'concesionarios', concesionario.id, 'cuentas_por_cobrar'),
+      where('status', '!=', 'pagado'),
+      orderBy('status'),
+      orderBy('fecha_emision', 'desc'),
+      limit(100)
+    );
+  }, [concesionario?.id, firestore]);
+
+  const cxcVencidasQuery = useMemoFirebase(() => {
+    if (!concesionario?.id) return null;
+    return query(
+      collectionGroup(firestore, 'cuotas'),
+      where('concesionario_id', '==', concesionario.id),
+      where('estado', '==', 'vencida'),
+      limit(50)
     );
   }, [concesionario?.id, firestore]);
 
@@ -95,6 +154,12 @@ export function OwnerOverview({ isReadOnly = false }: OwnerOverviewProps) {
   const { data: preInvoices, isLoading: piLoading } = useCollection<any>(preInvoicesQuery);
   const { data: productos, isLoading: prodLoading } = useCollection<Producto>(productosQuery);
   const { data: comprasPend, isLoading: cxpLoading } = useCollection<Compra>(comprasPendQuery);
+  const { data: notasDebitoPend } = useCollection<any>(notasDebitoPendQuery);
+  const { data: consignacionesPend } = useCollection<any>(consignacionesPendQuery);
+  const { data: gastosPend } = useCollection<any>(gastosPendQuery);
+  const { data: vehiculosPend } = useCollection<any>(vehiculosPendQuery);
+  const { data: cxcActive } = useCollection<CuentaPorCobrar>(cxcActiveQuery);
+  const { data: cuotasVencidas } = useCollection<Cuota>(cxcVencidasQuery);
 
   const cajaBalance = useMemo(() => {
     if (!cajaHoy) return { balance: 0, count: 0 };
@@ -125,6 +190,23 @@ export function OwnerOverview({ isReadOnly = false }: OwnerOverviewProps) {
     return { count: preInvoices?.length || 0, total };
   }, [preInvoices]);
 
+  // CXC stats: total saldo + cuotas vencidas + prefacturas
+  const cxcStats = useMemo(() => {
+    const totalSaldoCxc = (cxcActive || []).reduce(
+      (s, c) => s + (c.saldo_pendiente_usd ?? 0),
+      0
+    );
+    const vencidasCount = cuotasVencidas?.length ?? 0;
+    const docs = cxcActive?.length ?? 0;
+    const combinedTotal = totalSaldoCxc + preInvoicesStats.total;
+    return {
+      totalSaldoCxc,
+      vencidasCount,
+      docs,
+      combinedTotal,
+    };
+  }, [cxcActive, cuotasVencidas, preInvoicesStats]);
+
   const alertasStats = useMemo(() => {
     const stockBajo = (productos || []).filter((p) => p.stock_actual <= p.stock_minimo).length;
     const now = new Date();
@@ -136,6 +218,48 @@ export function OwnerOverview({ isReadOnly = false }: OwnerOverviewProps) {
     }).length;
     return { count: stockBajo + cxpUrgentes, stockBajo, cxpUrgentes };
   }, [productos, comprasPend]);
+
+  // ── Deuda CxP total (suma saldo_pendiente USD de TODOS los pasivos)
+  const cxpStats = useMemo(() => {
+    let totalUsd = 0;
+    let docs = 0;
+    const safeRate = (concesionario as any)?.tasa_actual_bcv || 1;
+
+    (comprasPend || []).forEach((c: any) => {
+      const saldo = c.saldo_pendiente ?? c.neto_a_pagar ?? c.total_usd ?? 0;
+      if (saldo <= 0.001) return;
+      const usd = c.moneda_original === 'bs' ? saldo / safeRate : saldo;
+      totalUsd += usd;
+      docs += 1;
+    });
+    (notasDebitoPend || []).forEach((n: any) => {
+      if (n.status === 'ANULADO') return;
+      const saldo = n.saldo_pendiente ?? n.total_usd ?? 0;
+      if (saldo <= 0.001) return;
+      totalUsd += saldo;
+      docs += 1;
+    });
+    (consignacionesPend || []).forEach((c: any) => {
+      const saldo = c.saldo_pendiente ?? c.monto_a_pagar ?? 0;
+      if (saldo <= 0.001) return;
+      totalUsd += saldo;
+      docs += 1;
+    });
+    (gastosPend || []).forEach((g: any) => {
+      const saldo = g.saldo_pendiente ?? g.total_usd ?? 0;
+      if (saldo <= 0.001) return;
+      totalUsd += saldo;
+      docs += 1;
+    });
+    (vehiculosPend || []).forEach((v: any) => {
+      const saldo = v.saldo_pendiente ?? v.costo_compra ?? 0;
+      if (saldo <= 0.001) return;
+      totalUsd += saldo;
+      docs += 1;
+    });
+
+    return { totalUsd, docs };
+  }, [comprasPend, notasDebitoPend, consignacionesPend, gastosPend, vehiculosPend, concesionario]);
 
   const isLoading = cajaLoading || ventasLoading || piLoading || prodLoading || cxpLoading;
 
@@ -190,9 +314,10 @@ export function OwnerOverview({ isReadOnly = false }: OwnerOverviewProps) {
       </div>
 
       {/* KPIs §5 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 relative z-10">
         {isLoading ? (
           <>
+            <KpiCardSkeleton />
             <KpiCardSkeleton />
             <KpiCardSkeleton />
             <KpiCardSkeleton />
@@ -224,14 +349,14 @@ export function OwnerOverview({ isReadOnly = false }: OwnerOverviewProps) {
             />
             <KpiCard
               title="Por cobrar"
-              value={`${preInvoicesStats.count}`}
+              value={formatCurrency(cxcStats.totalSaldoCxc, 'USD')}
               description={
-                preInvoicesStats.count === 0
-                  ? 'Sin prefacturas pendientes'
-                  : `${formatCurrency(preInvoicesStats.total, 'USD')} en cola`
+                cxcStats.docs === 0 && preInvoicesStats.count === 0
+                  ? 'Sin cuentas activas'
+                  : `${cxcStats.docs} CXC · ${cxcStats.vencidasCount} vencida${cxcStats.vencidasCount === 1 ? '' : 's'}${preInvoicesStats.count > 0 ? ` · ${preInvoicesStats.count} prefactura(s)` : ''}`
               }
               icon={Receipt}
-              variant={preInvoicesStats.count > 0 ? 'warning' : 'success'}
+              variant={cxcStats.vencidasCount > 0 ? 'danger' : cxcStats.totalSaldoCxc > 0 ? 'warning' : 'success'}
             />
             <KpiCard
               title="Alertas activas"
@@ -245,6 +370,17 @@ export function OwnerOverview({ isReadOnly = false }: OwnerOverviewProps) {
               }
               icon={AlertCircle}
               variant={alertasStats.count > 0 ? 'danger' : 'success'}
+            />
+            <KpiCard
+              title="Deuda CxP"
+              value={formatCurrency(cxpStats.totalUsd, 'USD')}
+              description={
+                cxpStats.docs === 0
+                  ? 'Sin pasivos pendientes'
+                  : `${cxpStats.docs} documento${cxpStats.docs === 1 ? '' : 's'} por pagar`
+              }
+              icon={FileWarning}
+              variant={cxpStats.totalUsd > 0 ? 'warning' : 'success'}
             />
           </>
         )}

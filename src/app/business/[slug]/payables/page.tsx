@@ -11,10 +11,11 @@ import { formatCurrency } from '@/lib/utils';
 import type { Compra, StockVehicle } from '@/lib/business-types';
 import type { PayableRow } from '@/lib/payable-schemas';
 import { PayablePaymentDialog } from '@/components/business/payable-payment-dialog';
+import { PayableDocumentSelectorDialog } from '@/components/business/payable-document-selector-dialog';
 import {
   FileWarning, AlertCircle, Clock, CheckCircle2,
   ChevronRight, Loader2, FileText, Car, ArrowUpDown,
-  TrendingDown, Calendar, Wallet, Search, Filter
+  TrendingDown, Calendar, Wallet, Search, Filter, Layers
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -126,6 +127,8 @@ function PayableRowCard({
 }) {
   const days = ageInDays(row.fecha_emision);
   const isOverdue = days > 30;
+  const linkedNotesTotal = (row.linkedNotes ?? []).reduce((acc, n) => acc + (n.saldo_pendiente || 0), 0);
+  const hasLinkedNotes = (row.linkedNotes?.length ?? 0) > 0;
 
   return (
     <div className={cn(
@@ -157,6 +160,15 @@ function PayableRowCard({
                   <span className="text-[10px] font-black text-red-500 uppercase tracking-widest flex items-center gap-1">
                     <AlertCircle className="h-3 w-3" />
                     {days} días vencido
+                  </span>
+                </>
+              )}
+              {hasLinkedNotes && (
+                <>
+                  <span className="h-1 w-1 rounded-full bg-muted-foreground/20" />
+                  <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest flex items-center gap-1">
+                    <Layers className="h-3 w-3" />
+                    {row.linkedNotes!.length} {row.linkedNotes!.length === 1 ? 'nota vinculada' : 'notas vinculadas'} (+{formatCurrency(linkedNotesTotal, 'USD')})
                   </span>
                 </>
               )}
@@ -224,7 +236,8 @@ export default function PayablesPage() {
 
   const [aging, setAging] = useState<AgingBucket>('todas');
   const [search, setSearch] = useState('');
-  const [selectedRow, setSelectedRow] = useState<PayableRow | null>(null);
+  const [selectorRow, setSelectorRow] = useState<PayableRow | null>(null);
+  const [selectedRows, setSelectedRows] = useState<PayableRow[] | null>(null);
 
   const canWrite = hasPermission('payables') === 'full';
 
@@ -292,23 +305,63 @@ export default function PayablesPage() {
   // ── Normalization ─────────────────────────────────────────────────────────
 
   const allRows = useMemo(() => {
-    const rows: any[] = [];
+    const rows: PayableRow[] = [];
+
+    // Index DEBIT notes by parent invoice_id so they can be attached to their parent.
+    const debitNotesByInvoice = new Map<string, PayableRow[]>();
+    const standaloneDebitNotes: PayableRow[] = [];
+
+    if (notasDebito) {
+      notasDebito
+        .filter((n: any) => n.status !== 'ANULADO' && (n.saldo_pendiente ?? n.total_usd ?? 0) > 0.001)
+        .forEach((n: any) => {
+          const noteRow: PayableRow = {
+            id: n.id,
+            origen: 'nota_debito',
+            nota_id: n.id,
+            compra_id: n.invoice_id,
+            proveedor_nombre: n.provider_name || 'Proveedor',
+            descripcion: `ND ${n.note_number || n.id.slice(0, 6).toUpperCase()}`,
+            is_fiscal: true,
+            monto_original: n.total_usd || 0,
+            saldo_pendiente: n.saldo_pendiente ?? n.total_usd ?? 0,
+            moneda_original: 'usd',
+            fecha_emision: n.created_at ? (n.created_at as any).toDate?.() ?? new Date() : new Date(),
+            estado: ((n.saldo_pendiente ?? n.total_usd ?? 0) <= 0.001 ? 'pagada' : 'pendiente') as any,
+          };
+          if (n.invoice_id) {
+            const list = debitNotesByInvoice.get(n.invoice_id) ?? [];
+            list.push(noteRow);
+            debitNotesByInvoice.set(n.invoice_id, list);
+          } else {
+            standaloneDebitNotes.push(noteRow);
+          }
+        });
+    }
+
+    const consumedNoteInvoiceIds = new Set<string>();
 
     if (compras) {
       compras.forEach(c => {
+        const linked = debitNotesByInvoice.get(c.id);
+        if (linked) consumedNoteInvoiceIds.add(c.id);
+        // Fallback for legacy purchases that never persisted is_fiscal:
+        // if the document carries a numero_factura it was created as a fiscal invoice.
+        const isFiscal = (c as any).is_fiscal !== undefined ? !!(c as any).is_fiscal : !!c.numero_factura;
         rows.push({
           id: c.id,
-          origen: c.is_fiscal ? 'compra_factura' : 'compra_nota_entrega',
+          origen: isFiscal ? 'compra_factura' : 'compra_nota_entrega',
           compra_id: c.id,
           proveedor_nombre: c.proveedor_nombre,
           descripcion: c.numero_factura || 'Compra Crédito',
-          is_fiscal: !!c.is_fiscal,
-          monto_original: c.moneda_original === 'bs' ? c.total_bs : (c.total_usd || 0),
-          saldo_pendiente: c.moneda_original === 'bs' ? (c.saldo_pendiente ?? c.total_bs) : (c.saldo_pendiente ?? c.neto_a_pagar ?? c.total_usd ?? 0),
+          is_fiscal: isFiscal,
+          monto_original: c.moneda_original === 'bs' ? (c.total_bs ?? 0) : (c.total_usd || 0),
+          saldo_pendiente: c.moneda_original === 'bs' ? (c.saldo_pendiente ?? c.total_bs ?? 0) : (c.saldo_pendiente ?? c.neto_a_pagar ?? c.total_usd ?? 0),
           moneda_original: c.moneda_original || 'usd',
           tasa_cambio: c.tasa_cambio,
           fecha_emision: c.created_at ? (c.created_at as any).toDate?.() ?? new Date() : new Date(),
           estado: (c.estado as any) ?? 'pendiente',
+          linkedNotes: linked,
         });
       });
     }
@@ -347,26 +400,13 @@ export default function PayablesPage() {
       });
     }
 
-    // Notas de Débito — filter out cancelled and already-settled
-    if (notasDebito) {
-      notasDebito
-        .filter((n: any) => n.status !== 'ANULADO' && (n.saldo_pendiente ?? n.total_usd ?? 0) > 0.001)
-        .forEach((n: any) => {
-          rows.push({
-            id: n.id,
-            origen: 'nota_debito',
-            nota_id: n.id,
-            compra_id: n.invoice_id,
-            proveedor_nombre: n.provider_name || 'Proveedor',
-            descripcion: `ND ${n.note_number || n.id.slice(0, 6).toUpperCase()}`,
-            is_fiscal: true,
-            monto_original: n.total_usd || 0,
-            saldo_pendiente: n.saldo_pendiente ?? n.total_usd ?? 0,
-            fecha_emision: n.created_at ? (n.created_at as any).toDate?.() ?? new Date() : new Date(),
-            estado: ((n.saldo_pendiente ?? n.total_usd ?? 0) <= 0.001 ? 'pagada' : 'pendiente') as any,
-          });
-        });
-    }
+    // Notas de Débito huérfanas (cuya factura origen ya está pagada / no aparece) → fila independiente
+    debitNotesByInvoice.forEach((list, invoiceId) => {
+      if (!consumedNoteInvoiceIds.has(invoiceId)) {
+        list.forEach(n => rows.push(n));
+      }
+    });
+    standaloneDebitNotes.forEach(n => rows.push(n));
 
     if (vehiculos) {
       vehiculos.forEach(v => {
@@ -507,55 +547,68 @@ export default function PayablesPage() {
           <TabsContent value="todas" className="m-0 space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {isLoading ? <LoadingState /> : (
               filteredRows.length > 0 ? filteredRows.map(r => (
-                <PayableRowCard key={r.id} row={r} onPay={setSelectedRow} canWrite={canWrite} />
+                <PayableRowCard key={r.id} row={r} onPay={(r) => r.linkedNotes?.length ? setSelectorRow(r) : setSelectedRows([r])} canWrite={canWrite} />
               )) : <EmptyState />
             )}
           </TabsContent>
 
           <TabsContent value="compras" className="m-0 space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {filteredRows.filter(r => r.origen.includes('compra')).map(r => (
-              <PayableRowCard key={r.id} row={r} onPay={setSelectedRow} canWrite={canWrite} />
+              <PayableRowCard key={r.id} row={r} onPay={(r) => r.linkedNotes?.length ? setSelectorRow(r) : setSelectedRows([r])} canWrite={canWrite} />
             ))}
             {filteredRows.filter(r => r.origen.includes('compra')).length === 0 && <EmptyState />}
           </TabsContent>
 
           <TabsContent value="vehiculos" className="m-0 space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {filteredRows.filter(r => r.origen === 'vehiculo').map(r => (
-              <PayableRowCard key={r.id} row={r} onPay={setSelectedRow} canWrite={canWrite} />
+              <PayableRowCard key={r.id} row={r} onPay={(r) => r.linkedNotes?.length ? setSelectorRow(r) : setSelectedRows([r])} canWrite={canWrite} />
             ))}
             {filteredRows.filter(r => r.origen === 'vehiculo').length === 0 && <EmptyState />}
           </TabsContent>
 
           <TabsContent value="consignaciones" className="m-0 space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {filteredRows.filter(r => r.origen === 'consignacion').map(r => (
-              <PayableRowCard key={r.id} row={r} onPay={setSelectedRow} canWrite={canWrite} />
+              <PayableRowCard key={r.id} row={r} onPay={(r) => r.linkedNotes?.length ? setSelectorRow(r) : setSelectedRows([r])} canWrite={canWrite} />
             ))}
             {filteredRows.filter(r => r.origen === 'consignacion').length === 0 && <EmptyState />}
           </TabsContent>
 
           <TabsContent value="gastos" className="m-0 space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {filteredRows.filter(r => r.origen === 'gasto').map(r => (
-              <PayableRowCard key={r.id} row={r} onPay={setSelectedRow} canWrite={canWrite} />
+              <PayableRowCard key={r.id} row={r} onPay={(r) => r.linkedNotes?.length ? setSelectorRow(r) : setSelectedRows([r])} canWrite={canWrite} />
             ))}
             {filteredRows.filter(r => r.origen === 'gasto').length === 0 && <EmptyState />}
           </TabsContent>
 
           <TabsContent value="notas_debito" className="m-0 space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {filteredRows.filter(r => r.origen === 'nota_debito').map(r => (
-              <PayableRowCard key={r.id} row={r} onPay={setSelectedRow} canWrite={canWrite} />
+              <PayableRowCard key={r.id} row={r} onPay={(r) => r.linkedNotes?.length ? setSelectorRow(r) : setSelectedRows([r])} canWrite={canWrite} />
             ))}
             {filteredRows.filter(r => r.origen === 'nota_debito').length === 0 && <EmptyState />}
           </TabsContent>
         </div>
       </Tabs>
 
+      {/* ── Document Selector (factura + notas vinculadas) ──────────────── */}
+      {selectorRow && (
+        <PayableDocumentSelectorDialog
+          open={!!selectorRow}
+          parentRow={selectorRow}
+          onOpenChange={open => !open && setSelectorRow(null)}
+          onConfirm={(rows) => {
+            setSelectorRow(null);
+            setSelectedRows(rows);
+          }}
+        />
+      )}
+
       {/* ── Payment Dialog ─────────────────────────────────────────────────── */}
-      {selectedRow && (
+      {selectedRows && selectedRows.length > 0 && (
         <PayablePaymentDialog
-          open={!!selectedRow}
-          row={selectedRow}
-          onOpenChange={open => !open && setSelectedRow(null)}
-          onSuccess={() => setSelectedRow(null)}
+          open={!!selectedRows}
+          rows={selectedRows}
+          onOpenChange={open => !open && setSelectedRows(null)}
+          onSuccess={() => setSelectedRows(null)}
         />
       )}
     </div>

@@ -1327,6 +1327,7 @@ export function DeliveryNoteDialog({ open, onOpenChange, onSaved }: DeliveryNote
       <SupplierFormDialog
         open={newSupplierDialogOpen}
         onOpenChange={setNewSupplierDialogOpen}
+        supplier={null}
         onSaved={async () => {
           if (!concesionario?.id) return;
           const snap = await getDocs(query(collection(firestore, 'concesionarios', concesionario.id, 'proveedores'), orderBy('created_at', 'desc')));

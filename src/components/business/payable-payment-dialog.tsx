@@ -8,11 +8,13 @@ import {
 } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useCurrency } from '@/context/currency-context';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, roundMoney } from '@/lib/utils';
 import type { PayableRow } from '@/lib/payable-schemas';
 import type { PaymentSplit } from '@/lib/finance-schemas';
-import type { BankAccount } from '@/lib/business-types';
+import type { BankAccount, BankEntryMethod } from '@/lib/business-types';
 import { PaymentEngine } from './payment-engine';
+
+const DEFAULT_IGTF_ENTRY_METHODS: BankEntryMethod[] = ['efectivo_fisico', 'zelle', 'crypto', 'transferencia'];
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription
 } from '@/components/ui/dialog';
@@ -30,7 +32,7 @@ import { downloadPdf } from '@/lib/download-pdf';
 
 interface PayablePaymentDialogProps {
   open: boolean;
-  row: PayableRow;
+  rows: PayableRow[];
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
 }
@@ -38,14 +40,12 @@ interface PayablePaymentDialogProps {
 // ─── IGTF calculation (per split) ────────────────────────────────────────────
 
 /**
- * Calculates IGTF (3%) only on USD-denominated splits from fiscal invoices.
- * Non-fiscal documents (Nota de Entrega, Consignación) are exempt — is_fiscal === false.
+ * Sums the IGTF amount produced by the PaymentEngine for each split.
+ * The engine already enforces the triple condition: is_fiscal && special taxpayer && trigger entry method on a foreign-currency account.
  */
 function calcIgtf(splits: PaymentSplit[], isFiscal: boolean): number {
   if (!isFiscal) return 0;
-  return splits
-    .filter(s => s.currency === 'USD')
-    .reduce((acc, s) => acc + s.equivalentUsd * 0.03, 0);
+  return splits.reduce((acc, s) => acc + (s.igtfAmount ?? 0), 0);
 }
 
 // ─── Origin label ─────────────────────────────────────────────────────────────
@@ -63,37 +63,73 @@ function origenLabel(origen: string): string {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function PayablePaymentDialog({ open, row, onOpenChange, onSuccess }: PayablePaymentDialogProps) {
+export function PayablePaymentDialog({ open, rows, onOpenChange, onSuccess }: PayablePaymentDialogProps) {
   const { concesionario, staff } = useBusinessAuth();
   const { bcvRate } = useCurrency();
   const firestore = useFirestore();
   const { toast } = useToast();
   const concId = concesionario?.id;
+  const safeBcvRate = bcvRate || 1;
+
+  // Primary row drives header text and currency mode. When multiple docs are paid together,
+  // notes (always USD) are aggregated against the primary invoice in USD.
+  const primaryRow = rows[0];
+  const isMulti = rows.length > 1;
+
+  // Aggregate metrics. If primary debt is BS and there are linked notes (USD), we still treat
+  // the aggregate as primary's currency by converting notes to BS using the BCV rate.
+  // Always rounded — Firestore can carry legacy values with floating-point drift (e.g. 22794.139198293404).
+  const aggregateSaldo = useMemo(() => {
+    if (rows.length === 1) return roundMoney(primaryRow.saldo_pendiente);
+    return roundMoney(rows.reduce((acc, r) => {
+      const sameCurrency = (r.moneda_original ?? 'usd') === (primaryRow.moneda_original ?? 'usd');
+      if (sameCurrency) return acc + r.saldo_pendiente;
+      // Mixed: convert via BCV. Note saldos are USD, primary may be BS.
+      const usdAmount = (r.moneda_original ?? 'usd') === 'bs' ? r.saldo_pendiente / safeBcvRate : r.saldo_pendiente;
+      return acc + (primaryRow.moneda_original === 'bs' ? usdAmount * safeBcvRate : usdAmount);
+    }, 0));
+  }, [rows, primaryRow, safeBcvRate]);
+
+  const aggregateOriginal = useMemo(() => {
+    if (rows.length === 1) return roundMoney(primaryRow.monto_original);
+    return roundMoney(rows.reduce((acc, r) => {
+      const sameCurrency = (r.moneda_original ?? 'usd') === (primaryRow.moneda_original ?? 'usd');
+      if (sameCurrency) return acc + r.monto_original;
+      const usdAmount = (r.moneda_original ?? 'usd') === 'bs' ? r.monto_original / safeBcvRate : r.monto_original;
+      return acc + (primaryRow.moneda_original === 'bs' ? usdAmount * safeBcvRate : usdAmount);
+    }, 0));
+  }, [rows, primaryRow, safeBcvRate]);
+
+  // Any document fiscal? Drives engine's IGTF gate. The transaction layer still checks per-row.
+  const anyFiscal = rows.some(r => r.is_fiscal);
 
   const [step, setStep] = useState<'monto' | 'pago' | 'confirmar' | 'exito'>('monto');
   const [payCurrency, setPayCurrency] = useState<'USD' | 'VES'>('USD');
-  const [montoPagoOriginal, setMontoPagoOriginal] = useState(row.saldo_pendiente);
-  const [montoPagoInput, setMontoPagoInput] = useState(String(row.saldo_pendiente));
+  const [montoPagoOriginal, setMontoPagoOriginal] = useState(roundMoney(aggregateSaldo));
+  const [montoPagoInput, setMontoPagoInput] = useState(roundMoney(aggregateSaldo).toFixed(2));
   const [splits, setSplits] = useState<PaymentSplit[]>([]);
   const [payEngineValid, setPayEngineValid] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [referencia, setReferencia] = useState('');
   const [isDownloading, setIsDownloading] = useState(false);
 
-  const isDebtBs = row.moneda_original === 'bs';
-  const safeBcvRate = bcvRate || 1;
+  const isDebtBs = primaryRow.moneda_original === 'bs';
+  const isSpecialTaxpayer = !!concesionario?.configuracion?.sujeto_pasivo_especial;
+  const igtfTriggerMethods = (concesionario?.configuracion?.igtf_trigger_entry_methods?.length
+    ? concesionario.configuracion.igtf_trigger_entry_methods
+    : DEFAULT_IGTF_ENTRY_METHODS) as BankEntryMethod[];
 
-  // Reset local state whenever the source row changes (e.g. user opens a different debt)
+  // Reset local state whenever the source rows change (e.g. user opens a different debt)
   useEffect(() => {
     setStep('monto');
     setPayCurrency(isDebtBs ? 'VES' : 'USD');
-    setMontoPagoOriginal(row.saldo_pendiente);
-    setMontoPagoInput(String(row.saldo_pendiente));
+    setMontoPagoOriginal(roundMoney(aggregateSaldo));
+    setMontoPagoInput(roundMoney(aggregateSaldo).toFixed(2));
     setSplits([]);
     setPayEngineValid(false);
     setReferencia('');
     setIsDownloading(false);
-  }, [row.id, row.saldo_pendiente, isDebtBs]);
+  }, [primaryRow.id, aggregateSaldo, isDebtBs]);
 
   // ── Fetch active bank accounts for PaymentEngine ────────────────────────────
   const bankQuery = useMemoFirebase(() => {
@@ -109,7 +145,7 @@ export function PayablePaymentDialog({ open, row, onOpenChange, onSuccess }: Pay
 
   // Derived
   const totalUsdToPay = isDebtBs ? montoPagoOriginal / safeBcvRate : montoPagoOriginal;
-  const igtfMonto = useMemo(() => calcIgtf(splits, !!row.is_fiscal), [splits, row.is_fiscal]);
+  const igtfMonto = useMemo(() => calcIgtf(splits, anyFiscal), [splits, anyFiscal]);
   const totalSaleDelBanco = totalUsdToPay + igtfMonto;
   const hasIgtf = igtfMonto > 0;
 
@@ -118,25 +154,25 @@ export function PayablePaymentDialog({ open, row, onOpenChange, onSuccess }: Pay
     setPayCurrency(newCur);
     if (newCur === 'USD') {
       const val = isDebtBs ? montoPagoOriginal / safeBcvRate : montoPagoOriginal;
-      setMontoPagoInput(val.toFixed(2));
+      setMontoPagoInput(roundMoney(val).toFixed(2));
     } else {
       const val = isDebtBs ? montoPagoOriginal : montoPagoOriginal * safeBcvRate;
-      setMontoPagoInput(val.toFixed(2));
+      setMontoPagoInput(roundMoney(val).toFixed(2));
     }
   }
 
   function handleInputChange(valStr: string) {
     setMontoPagoInput(valStr);
     const val = parseFloat(valStr) || 0;
-    
+
     let originalVal = 0;
     if (payCurrency === 'USD') {
       originalVal = isDebtBs ? val * safeBcvRate : val;
     } else {
       originalVal = isDebtBs ? val : val / safeBcvRate;
     }
-    
-    setMontoPagoOriginal(Math.min(originalVal, row.saldo_pendiente));
+
+    setMontoPagoOriginal(Math.min(roundMoney(originalVal), aggregateSaldo));
   }
 
   const handleEngineChange = useCallback((valid: boolean, newSplits: PaymentSplit[], _totalEquivalentUsd: number) => {
@@ -145,6 +181,26 @@ export function PayablePaymentDialog({ open, row, onOpenChange, onSuccess }: Pay
   }, []);
 
   // ─── Atomic Transaction ────────────────────────────────────────────────────
+
+  function refForRow(r: PayableRow) {
+    if (!concId) return null;
+    if (r.origen === 'vehiculo' && r.compra_id) {
+      return doc(firestore, 'concesionarios', concId, 'inventario', r.compra_id);
+    }
+    if (r.origen === 'nota_debito' && r.nota_id) {
+      return doc(firestore, 'concesionarios', concId, 'notas_fiscales', r.nota_id);
+    }
+    if (r.compra_id) {
+      return doc(firestore, 'concesionarios', concId, 'compras', r.compra_id);
+    }
+    if (r.consignacion_id) {
+      return doc(firestore, 'concesionarios', concId, 'consignaciones_por_pagar', r.consignacion_id);
+    }
+    if (r.gasto_id) {
+      return doc(firestore, 'concesionarios', concId, 'gastos', r.gasto_id);
+    }
+    return null;
+  }
 
   async function handleConfirm() {
     if (!concId || !staff || splits.length === 0) return;
@@ -160,60 +216,75 @@ export function PayablePaymentDialog({ open, row, onOpenChange, onSuccess }: Pay
           }
         }
 
-        let sourceRef: ReturnType<typeof doc> | null = null;
-        let sourceData: any = null;
-
-        if (row.origen === 'vehiculo' && row.compra_id) {
-          sourceRef = doc(firestore, 'concesionarios', concId, 'inventario', row.compra_id);
-          const snap = await transaction.get(sourceRef);
-          if (!snap.exists()) throw new Error('El vehículo ya no existe.');
-          sourceData = snap.data();
-        } else if (row.compra_id) {
-          sourceRef = doc(firestore, 'concesionarios', concId, 'compras', row.compra_id);
-          const snap = await transaction.get(sourceRef);
-          if (!snap.exists()) throw new Error('El documento de compra ya no existe.');
-          sourceData = snap.data();
-        } else if (row.consignacion_id) {
-          sourceRef = doc(firestore, 'concesionarios', concId, 'consignaciones_por_pagar', row.consignacion_id);
-          const snap = await transaction.get(sourceRef);
-          if (!snap.exists()) throw new Error('El registro de consignación ya no existe.');
-          sourceData = snap.data();
-        } else if (row.gasto_id) {
-          sourceRef = doc(firestore, 'concesionarios', concId, 'gastos', row.gasto_id);
-          const snap = await transaction.get(sourceRef);
-          if (!snap.exists()) throw new Error('El registro de gasto ya no existe.');
-          sourceData = snap.data();
+        // Read every payable doc in FIFO order (invoice first, then linked notes).
+        const sourceEntries: { row: PayableRow; ref: ReturnType<typeof doc>; data: any }[] = [];
+        for (const r of rows) {
+          const ref = refForRow(r);
+          if (!ref) continue;
+          const snap = await transaction.get(ref);
+          if (!snap.exists()) throw new Error(`El documento ${r.descripcion} ya no existe.`);
+          sourceEntries.push({ row: r, ref, data: snap.data() });
         }
 
         // ── Writes second ────────────────────────────────────────────────────
 
-        // 1. Update source document balance
-        if (sourceRef && sourceData !== null) {
+        // 1. Distribute the payment in FIFO order across the selected documents.
+        let remainingToApply = montoPagoOriginal;
+        for (const entry of sourceEntries) {
+          if (remainingToApply <= 0.001) break;
+          const sourceData = entry.data;
+          const r = entry.row;
           const currentSaldo = sourceData.saldo_pendiente ?? sourceData.neto_a_pagar ?? sourceData.total_usd ?? sourceData.total_bs ?? 0;
-          const newSaldo = Math.max(0, currentSaldo - montoPagoOriginal);
-          const newMontoPagado = (sourceData.monto_pagado || 0) + montoPagoOriginal;
-          
+          if (currentSaldo <= 0.001) continue;
+
+          // If aggregate currency differs from this doc's currency, convert.
+          const docIsBs = (r.moneda_original ?? 'usd') === 'bs';
+          const aggregateIsBs = isDebtBs;
+          let amountForDoc: number;
+          if (docIsBs === aggregateIsBs) {
+            amountForDoc = Math.min(remainingToApply, currentSaldo);
+          } else if (aggregateIsBs && !docIsBs) {
+            // aggregate in BS, doc in USD
+            const remainingInUsd = remainingToApply / safeBcvRate;
+            const useUsd = Math.min(remainingInUsd, currentSaldo);
+            amountForDoc = useUsd;
+            remainingToApply = roundMoney(remainingToApply - useUsd * safeBcvRate);
+          } else {
+            // aggregate in USD, doc in BS
+            const remainingInBs = remainingToApply * safeBcvRate;
+            const useBs = Math.min(remainingInBs, currentSaldo);
+            amountForDoc = useBs;
+            remainingToApply = roundMoney(remainingToApply - useBs / safeBcvRate);
+          }
+
+          if (docIsBs === aggregateIsBs) {
+            remainingToApply = roundMoney(remainingToApply - amountForDoc);
+          }
+          amountForDoc = roundMoney(amountForDoc);
+
+          const newSaldo = roundMoney(Math.max(0, currentSaldo - amountForDoc));
+          const newMontoPagado = roundMoney((sourceData.monto_pagado || 0) + amountForDoc);
+
           const updateData: any = {
             saldo_pendiente: newSaldo,
             monto_pagado: newMontoPagado,
             updated_at: serverTimestamp(),
           };
 
-          // Map status based on collection conventions
-          // 'parcial' = at least one payment made but balance remains
-          if (row.origen === 'vehiculo') {
+          if (r.origen === 'vehiculo') {
             updateData.estado_pago = newSaldo <= 0.001 ? 'pagada' : 'pendiente';
-          } else if (row.gasto_id) {
+          } else if (r.gasto_id) {
             updateData.status = newSaldo <= 0.001 ? 'COMPLETADO' : 'PENDIENTE';
           } else {
             updateData.estado = newSaldo <= 0.001 ? 'pagada' : 'parcial';
           }
 
-          transaction.update(sourceRef, updateData);
+          transaction.update(entry.ref, updateData);
         }
 
         // 2. Process each bank split
         const bankTotals: Record<string, { prev: number; next: number }> = {};
+        const conceptDocs = rows.map(r => `${origenLabel(r.origen)} ${r.descripcion}`).join(' + ');
 
         for (const split of splits) {
           if (!split.accountId || !bankSnaps[split.accountId]?.exists()) continue;
@@ -227,9 +298,9 @@ export function PayablePaymentDialog({ open, row, onOpenChange, onSuccess }: Pay
           }
 
           const prevForSplit = bankTotals[split.accountId].next;
-          // IGTF: only if fiscal invoice and the split's currency is USD
-          const splitIgtf = (row.is_fiscal && split.currency === 'USD') ? split.equivalentUsd * 0.03 : 0;
-          bankTotals[split.accountId].next -= (split.amount + splitIgtf);
+          // IGTF: trust the engine's igtfAmount (already validates fiscal + special taxpayer + trigger method).
+          const splitIgtf = anyFiscal ? roundMoney(split.igtfAmount ?? 0) : 0;
+          bankTotals[split.accountId].next = roundMoney(bankTotals[split.accountId].next - (split.amount + splitIgtf));
           const nextAfterBoth = bankTotals[split.accountId].next;
 
           // CXP payment movement
@@ -240,14 +311,14 @@ export function PayablePaymentDialog({ open, row, onOpenChange, onSuccess }: Pay
             flujo: 'salida',
             monto: split.amount,
             metodo_pago: split.method,
-            concepto: `Pago CXP: ${origenLabel(row.origen)} — ${row.proveedor_nombre}`,
+            concepto: `Pago CXP: ${conceptDocs} — ${primaryRow.proveedor_nombre}`,
             referencia: referencia || null,
             registrado_por_id: staff.id,
             registrado_por_nombre: staff.nombre,
             saldo_anterior: prevForSplit,
             saldo_posterior: nextAfterBoth + splitIgtf, // balance before IGTF is deducted
             fecha: serverTimestamp(),
-            compra_id: row.compra_id || null,
+            compra_id: primaryRow.compra_id || null,
           });
 
           // Separate IGTF movement (fisco line item)
@@ -259,13 +330,13 @@ export function PayablePaymentDialog({ open, row, onOpenChange, onSuccess }: Pay
               flujo: 'salida',
               monto: splitIgtf,
               metodo_pago: split.method,
-              concepto: `IGTF (3%) — Pago CXP: ${row.proveedor_nombre}`,
+              concepto: `IGTF (3%) — Pago CXP: ${primaryRow.proveedor_nombre}`,
               registrado_por_id: staff.id,
               registrado_por_nombre: staff.nombre,
               saldo_anterior: nextAfterBoth + splitIgtf,
               saldo_posterior: nextAfterBoth,
               fecha: serverTimestamp(),
-              compra_id: row.compra_id || null,
+              compra_id: primaryRow.compra_id || null,
             });
           }
         }
@@ -302,7 +373,7 @@ export function PayablePaymentDialog({ open, row, onOpenChange, onSuccess }: Pay
               Registrar Pago
             </DialogTitle>
             <DialogDescription className="text-xs">
-              {origenLabel(row.origen)} — {row.proveedor_nombre}
+              {isMulti ? `${rows.length} documentos` : origenLabel(primaryRow.origen)} — {primaryRow.proveedor_nombre}
             </DialogDescription>
           </DialogHeader>
 
@@ -311,13 +382,13 @@ export function PayablePaymentDialog({ open, row, onOpenChange, onSuccess }: Pay
             <div className="flex-1 rounded-2xl bg-background/80 p-3 ring-1 ring-border">
               <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Original</p>
               <p className="text-lg font-bold text-foreground">
-                {formatCurrency(row.monto_original, row.moneda_original === 'bs' ? 'VES' : 'USD')}
+                {formatCurrency(aggregateOriginal, primaryRow.moneda_original === 'bs' ? 'VES' : 'USD')}
               </p>
             </div>
             <div className="flex-1 rounded-2xl bg-amber-500/5 p-3 ring-1 ring-amber-500/20">
               <p className="text-[10px] font-black uppercase tracking-widest text-amber-600">Saldo Pendiente</p>
               <p className="text-lg font-bold text-amber-700">
-                {formatCurrency(row.saldo_pendiente, row.moneda_original === 'bs' ? 'VES' : 'USD')}
+                {formatCurrency(aggregateSaldo, primaryRow.moneda_original === 'bs' ? 'VES' : 'USD')}
               </p>
             </div>
           </div>
@@ -369,7 +440,7 @@ export function PayablePaymentDialog({ open, row, onOpenChange, onSuccess }: Pay
                   </span>
                 </div>
                 <p className="text-[10px] text-muted-foreground text-center">
-                  Máx: {formatCurrency(isDebtBs ? (payCurrency === 'USD' ? row.saldo_pendiente / safeBcvRate : row.saldo_pendiente) : (payCurrency === 'USD' ? row.saldo_pendiente : row.saldo_pendiente * safeBcvRate), payCurrency)}
+                  Máx: {formatCurrency(roundMoney(isDebtBs ? (payCurrency === 'USD' ? aggregateSaldo / safeBcvRate : aggregateSaldo) : (payCurrency === 'USD' ? aggregateSaldo : aggregateSaldo * safeBcvRate)), payCurrency)}
                 </p>
               </div>
 
@@ -385,7 +456,7 @@ export function PayablePaymentDialog({ open, row, onOpenChange, onSuccess }: Pay
                 />
               </div>
 
-              {!row.is_fiscal && (
+              {!anyFiscal && (
                 <div className="flex items-start gap-2 p-3 rounded-2xl bg-slate-500/5 ring-1 ring-slate-500/20">
                   <CheckCircle2 className="h-4 w-4 text-slate-500 mt-0.5 shrink-0" />
                   <p className="text-xs text-slate-600 font-medium">
@@ -393,18 +464,26 @@ export function PayablePaymentDialog({ open, row, onOpenChange, onSuccess }: Pay
                   </p>
                 </div>
               )}
-              {row.is_fiscal && (
+              {anyFiscal && isSpecialTaxpayer && (
                 <div className="flex items-start gap-2 p-3 rounded-2xl bg-amber-500/5 ring-1 ring-amber-500/20">
                   <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
                   <p className="text-xs text-amber-700 font-medium">
-                    Factura fiscal: Si pagas en Divisas (USD), se aplicará IGTF 3% como egreso operativo del banco.
+                    Factura fiscal (Sujeto Pasivo Especial): si pagas en Divisas (Efectivo USD, Zelle, Cripto), se aplicará IGTF 3% como egreso operativo del banco.
+                  </p>
+                </div>
+              )}
+              {anyFiscal && !isSpecialTaxpayer && (
+                <div className="flex items-start gap-2 p-3 rounded-2xl bg-slate-500/5 ring-1 ring-slate-500/20">
+                  <CheckCircle2 className="h-4 w-4 text-slate-500 mt-0.5 shrink-0" />
+                  <p className="text-xs text-slate-600 font-medium">
+                    Factura fiscal: la empresa no está marcada como Sujeto Pasivo Especial, por lo que no se cobrará IGTF.
                   </p>
                 </div>
               )}
 
               <Button
                 className="w-full h-12 rounded-2xl font-bold text-base shadow-xl shadow-primary/20"
-                disabled={montoPagoOriginal <= 0 || montoPagoOriginal > row.saldo_pendiente}
+                disabled={montoPagoOriginal <= 0 || montoPagoOriginal > aggregateSaldo + 0.001}
                 onClick={() => setStep('pago')}
               >
                 Seleccionar Método de Pago
@@ -421,7 +500,9 @@ export function PayablePaymentDialog({ open, row, onOpenChange, onSuccess }: Pay
                 tasaBcv={bcvRate ?? 0}
                 bankAccounts={bankAccounts}
                 onValidChange={handleEngineChange}
-                isFiscal={!!row.is_fiscal}
+                isFiscal={anyFiscal}
+                isSpecialTaxpayer={isSpecialTaxpayer}
+                igtfTriggerMethods={igtfTriggerMethods}
               />
 
               {/* IGTF badge — live update */}
@@ -477,15 +558,18 @@ export function PayablePaymentDialog({ open, row, onOpenChange, onSuccess }: Pay
                   <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Resumen del Pago</p>
                 </div>
                 <div className="p-4 space-y-3">
-                  <SummaryRow label="Acreedor" value={row.proveedor_nombre} />
-                  <SummaryRow label="Tipo" value={origenLabel(row.origen)} />
+                  <SummaryRow label="Acreedor" value={primaryRow.proveedor_nombre} />
+                  <SummaryRow
+                    label="Documentos"
+                    value={isMulti ? `${rows.length}: ${rows.map(r => r.descripcion).join(', ')}` : origenLabel(primaryRow.origen)}
+                  />
                   <SummaryRow label="Monto a Pagar" value={formatCurrency(totalUsdToPay, 'USD')} bold />
                   {hasIgtf && <SummaryRow label="IGTF 3% (Egreso)" value={`+ ${formatCurrency(igtfMonto, 'USD')}`} accent="amber" />}
                   <SummaryRow label="Total sale del banco" value={formatCurrency(totalSaleDelBanco, 'USD')} bold accent={hasIgtf ? 'primary' : undefined} />
                   {bcvRate && (
                     <SummaryRow
                       label="Equiv. Bs (BCV)"
-                      value={`Bs ${(totalSaleDelBanco * bcvRate).toLocaleString('es-VE', { maximumFractionDigits: 2 })}`}
+                      value={`Bs ${roundMoney(totalSaleDelBanco * bcvRate).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                     />
                   )}
                   {referencia && <SummaryRow label="Referencia" value={referencia} />}
@@ -555,7 +639,7 @@ export function PayablePaymentDialog({ open, row, onOpenChange, onSuccess }: Pay
                   onClick={async () => {
                     setIsDownloading(true);
                     try {
-                      await downloadPdf({ elementId: 'cxp-receipt-print-root', filename: `Comprobante_Pago_${row.proveedor_nombre}.pdf` });
+                      await downloadPdf({ elementId: 'cxp-receipt-print-root', filename: `Comprobante_Pago_${primaryRow.proveedor_nombre}.pdf` });
                     } finally {
                       setIsDownloading(false);
                     }
@@ -606,8 +690,8 @@ export function PayablePaymentDialog({ open, row, onOpenChange, onSuccess }: Pay
         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '16px' }}>
           <tbody>
             {([
-              ['Acreedor / Proveedor', row.proveedor_nombre],
-              ['Tipo de Documento', origenLabel(row.origen)],
+              ['Acreedor / Proveedor', primaryRow.proveedor_nombre],
+              ['Documento(s)', isMulti ? rows.map(r => `${origenLabel(r.origen)} ${r.descripcion}`).join(' + ') : origenLabel(primaryRow.origen)],
               ['Monto Pagado', formatCurrency(totalUsdToPay, 'USD')],
               ...(hasIgtf ? [['IGTF 3% (Egreso Operativo)', `+ ${formatCurrency(igtfMonto, 'USD')}`]] : []),
               ['Total Debitado del Banco', formatCurrency(totalSaleDelBanco, 'USD')],
