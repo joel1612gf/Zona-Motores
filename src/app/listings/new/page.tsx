@@ -28,7 +28,7 @@ import imageCompression from 'browser-image-compression';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 
-import { ADMIN_EMAIL } from '@/lib/constants';
+import { useIsSuperAdmin } from '@/hooks/use-is-super-admin';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -77,7 +77,7 @@ function NewListingContent() {
     const { vehicles: allVehicles } = useVehicles();
     const { limits: planLimits, planName: currentPlanName, plan: currentPlan } = useSubscription();
 
-    const isAdmin = user?.email === ADMIN_EMAIL;
+    const { isSuperAdmin: isAdmin } = useIsSuperAdmin(user);
 
     const profileRef = useMemoFirebase(() => {
         if (!user) return null;

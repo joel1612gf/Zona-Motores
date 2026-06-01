@@ -191,6 +191,7 @@ export type Concesionario = {
   clave_maestra_hash: string; // SHA-256
   owner_uid: string; // Firebase Auth UID of the owner's personal account
   plan_activo: boolean; // Manually controlled by admin
+  precio_mensual_usd?: number; // Custom B2B monthly fee for this tenant (drives the global MRR). Set from /admin/dealerships.
   configuracion: ConcesionarioConfig;
   created_at: Timestamp;
 };

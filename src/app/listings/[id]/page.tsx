@@ -64,7 +64,7 @@ import { MapsProvider } from '@/components/maps-provider';
 import { Skeleton } from '@/components/ui/skeleton';
 import { UserProfile, Vehicle } from '@/lib/types';
 import { StaffMember } from '@/lib/business-types';
-import { ADMIN_EMAIL } from '@/lib/constants';
+import { useIsSuperAdmin } from '@/hooks/use-is-super-admin';
 
 
 function WhatsAppIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -252,7 +252,7 @@ function ListingDetailContent() {
   const [isTogglingStatus, setIsTogglingStatus] = useState(false);
   const [isBlocking, setIsBlocking] = useState(false);
 
-  const isAdmin = adminUser?.email === ADMIN_EMAIL;
+  const { isSuperAdmin: isAdmin } = useIsSuperAdmin(adminUser);
 
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
 

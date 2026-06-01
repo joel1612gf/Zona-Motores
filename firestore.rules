@@ -10,8 +10,29 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == userId;
     }
     
+    // ==================== SUPER ADMIN (GOD-MODE) ====================
+    // Platform administrators live in the `super_admins` collection, keyed by
+    // lowercased email. This replaces the legacy hardcoded admin email.
+    function adminEmail() {
+      return request.auth.token.email.lower();
+    }
+
+    function isSuperAdmin() {
+      return request.auth != null
+        && request.auth.token.email != null
+        && exists(/databases/$(database)/documents/super_admins/$(adminEmail()))
+        && get(/databases/$(database)/documents/super_admins/$(adminEmail())).data.activo == true;
+    }
+
+    function isSuperOwner() {
+      return isSuperAdmin()
+        && get(/databases/$(database)/documents/super_admins/$(adminEmail())).data.role == 'owner';
+    }
+
+    // Admin status is now driven by super_admins (no hardcoded email). Any active
+    // super_admin counts as an admin for the marketplace listing rules below.
     function isAdmin() {
-      return request.auth != null && request.auth.token.email == 'zonamotores.ve@gmail.com';
+      return isSuperAdmin();
     }
 
     // Helpers for fiscal period lock (Cierre Fiscal)
@@ -27,6 +48,20 @@ service cloud.firestore {
     function isPeriodOpenForDate(cid, dateStr) {
       let cerrado = periodoCerrado(cid);
       return cerrado == null || docPeriodFromDate(dateStr) > cerrado;
+    }
+
+    // Super Admins registry (doc id = lowercased email).
+    match /super_admins/{email} {
+      // A user may read their OWN doc (so the admin hook/context can resolve
+      // their status without triggering a global permission error for normal
+      // marketplace users).
+      allow get: if request.auth != null
+        && request.auth.token.email != null
+        && request.auth.token.email.lower() == email;
+      // Active admins can read the whole roster.
+      allow get, list: if isSuperAdmin();
+      // Only an active owner can invite/edit/remove administrators.
+      allow write: if isSuperOwner();
     }
 
     // Concesionarios - public read for business login

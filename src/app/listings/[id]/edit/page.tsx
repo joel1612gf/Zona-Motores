@@ -24,7 +24,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 
-import { ADMIN_EMAIL } from '@/lib/constants';
+import { useIsSuperAdmin } from '@/hooks/use-is-super-admin';
 
 type PhotoState = {
   file?: File;
@@ -42,7 +42,7 @@ export default function EditListingPage() {
   const firestore = useFirestore();
   const storage = useStorage();
 
-  const isAdmin = user?.email === ADMIN_EMAIL;
+  const { isSuperAdmin: isAdmin, isLoading: isAdminLoading } = useIsSuperAdmin(user);
 
   const [vehicleData, setVehicleData] = useState<Vehicle | null>(null);
   const [isVehicleLoading, setIsVehicleLoading] = useState(true);
@@ -82,12 +82,13 @@ export default function EditListingPage() {
       }
     };
 
-    // Trigger fetch when user/admin status is confirmed
-    if (!isUserLoading) {
+    // Trigger fetch when user/admin status is confirmed (wait for the admin
+    // check too, otherwise isAdmin can be false for a tick and wrongly block).
+    if (!isUserLoading && !isAdminLoading) {
       getVehicle();
     }
 
-  }, [params.id, firestore, isUserLoading, user, isAdmin, router, toast]);
+  }, [params.id, firestore, isUserLoading, isAdminLoading, user, isAdmin, router, toast]);
 
   const [photos, setPhotos] = useState<PhotoState[]>([]);
   const [photosToDelete, setPhotosToDelete] = useState<string[]>([]);

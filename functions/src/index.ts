@@ -7,6 +7,7 @@ import { findMatches, ClienteLite } from './match-engine';
 initializeApp();
 
 export { onCompraCreated, onVentaCreated, backfillKardex } from './kardex-functions';
+export { deleteTenant } from './admin-functions';
 const db = getFirestore();
 
 const HIDDEN_STATES = new Set(['vendido', 'oculto']);

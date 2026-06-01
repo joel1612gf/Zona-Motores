@@ -38,3 +38,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local one-time admin seed script (contains secrets — never commit)
+functions/scripts/
+# Service account keys
+*serviceAccount*.json
+*-sa.json
+sa-*.json
