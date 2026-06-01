@@ -38,6 +38,7 @@ interface BusinessAuthContextValue {
   // Actions
   validateEnterprise: (slug: string, masterKey: string) => Promise<boolean>;
   validateStaffPin: (staffId: string, pin: string) => Promise<boolean>;
+  authenticateAfterOnboarding: (newStaff: StaffMember) => Promise<void>;
   switchUser: () => void;
   logout: () => void;
   loadConcesionario: (slug: string) => Promise<boolean>;
@@ -187,7 +188,8 @@ export function BusinessAuthProvider({ children, slug }: { children: ReactNode; 
       return false;
     }
 
-    // Validate master key
+    // Validate master key (a tenant with no hash — blank or reset — cannot log in here)
+    if (!currentConcesionario.clave_maestra_hash) return false;
     const isValid = await verifySHA256(masterKey, currentConcesionario.clave_maestra_hash);
     if (!isValid) return false;
 
@@ -229,6 +231,35 @@ export function BusinessAuthProvider({ children, slug }: { children: ReactNode; 
     return true;
   }, [staffList]);
 
+  // Logs the owner straight in right after finishing the onboarding wizard,
+  // without re-asking for the master key / PIN they just created. We trust the
+  // freshly written credentials instead of re-verifying a stale in-memory hash.
+  const authenticateAfterOnboarding = useCallback(async (newStaff: StaffMember): Promise<void> => {
+    if (!concesionario) return;
+
+    // Reload the doc + staff list so the rest of the app sees the new fields.
+    await loadConcesionarioData(concesionario.id);
+
+    const session: BusinessSession = {
+      concesionarioId: concesionario.id,
+      slug: concesionario.slug,
+      validado: true,
+      timestamp: Date.now(),
+    };
+    sessionStorage.setItem(BUSINESS_SESSION_KEY, JSON.stringify(session));
+    setIsAuthenticated(true);
+
+    setStaff(newStaff);
+    setIsStaffLoggedIn(true);
+    const staffSession: StaffSession = {
+      staffId: newStaff.id,
+      rol: newStaff.rol,
+      nombre: newStaff.nombre,
+    };
+    sessionStorage.setItem(STAFF_SESSION_KEY, JSON.stringify(staffSession));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [concesionario]);
+
   const switchUser = useCallback(() => {
     setStaff(null);
     setIsStaffLoggedIn(false);
@@ -266,10 +297,11 @@ export function BusinessAuthProvider({ children, slug }: { children: ReactNode; 
     canSeeCosts,
     validateEnterprise,
     validateStaffPin,
+    authenticateAfterOnboarding,
     switchUser,
     logout,
     loadConcesionario,
-  }), [concesionario, staff, staffList, isLoading, isAuthenticated, isStaffLoggedIn, currentRole, hasPermission, canSeeCosts, validateEnterprise, validateStaffPin, switchUser, logout, loadConcesionario]);
+  }), [concesionario, staff, staffList, isLoading, isAuthenticated, isStaffLoggedIn, currentRole, hasPermission, canSeeCosts, validateEnterprise, validateStaffPin, authenticateAfterOnboarding, switchUser, logout, loadConcesionario]);
 
   return (
     <BusinessAuthContext.Provider value={value}>

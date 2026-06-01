@@ -9,17 +9,18 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { Building2, DollarSign, Trash2 } from 'lucide-react';
+import { Building2, DollarSign, Trash2, KeyRound } from 'lucide-react';
 
 type DealerRow = Concesionario & { id: string };
 
 type Props = {
   dealerships: DealerRow[];
   onEditPrice: (d: DealerRow) => void;
+  onResetKey: (d: DealerRow) => void;
   onDelete: (d: DealerRow) => void;
 };
 
-export function DealershipsTable({ dealerships, onEditPrice, onDelete }: Props) {
+export function DealershipsTable({ dealerships, onEditPrice, onResetKey, onDelete }: Props) {
   const firestore = useFirestore();
   const { toast } = useToast();
 
@@ -32,7 +33,9 @@ export function DealershipsTable({ dealerships, onEditPrice, onDelete }: Props) 
     });
   };
 
-  const ownerLabel = (d: DealerRow) => d.email || `${d.owner_uid.slice(0, 10)}…`;
+  const nameLabel = (d: DealerRow) => d.nombre_empresa?.trim() || 'Sin configurar';
+  const ownerLabel = (d: DealerRow) =>
+    d.email || (d.owner_uid ? `${d.owner_uid.slice(0, 10)}…` : 'Pendiente onboarding');
   const priceLabel = (d: DealerRow) =>
     d.precio_mensual_usd != null ? `${formatCurrency(d.precio_mensual_usd, 'USD')}/mes` : 'Sin tarifa';
 
@@ -77,7 +80,7 @@ export function DealershipsTable({ dealerships, onEditPrice, onDelete }: Props) 
                   <div className="flex items-center gap-3">
                     <Logo d={d} />
                     <div>
-                      <p className="font-medium">{d.nombre_empresa}</p>
+                      <p className="font-medium">{nameLabel(d)}</p>
                       <p className="text-xs text-muted-foreground">/{d.slug}</p>
                     </div>
                   </div>
@@ -102,6 +105,15 @@ export function DealershipsTable({ dealerships, onEditPrice, onDelete }: Props) 
                     <Button
                       variant="ghost"
                       size="icon"
+                      className="rounded-lg text-amber-600 hover:text-amber-600 hover:bg-amber-500/10"
+                      title="Resetear clave maestra"
+                      onClick={() => onResetKey(d)}
+                    >
+                      <KeyRound className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       className="rounded-lg text-destructive hover:text-destructive hover:bg-destructive/10"
                       onClick={() => onDelete(d)}
                     >
@@ -122,7 +134,7 @@ export function DealershipsTable({ dealerships, onEditPrice, onDelete }: Props) 
             <div className="flex items-center gap-3">
               <Logo d={d} />
               <div className="flex-1 min-w-0">
-                <p className="font-medium truncate">{d.nombre_empresa}</p>
+                <p className="font-medium truncate">{nameLabel(d)}</p>
                 <p className="text-xs text-muted-foreground truncate">{ownerLabel(d)}</p>
               </div>
               <Badge variant={d.plan_activo ? 'default' : 'secondary'}>{d.plan_activo ? 'Activo' : 'Inactivo'}</Badge>
@@ -137,6 +149,15 @@ export function DealershipsTable({ dealerships, onEditPrice, onDelete }: Props) 
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" className="rounded-lg flex-1" onClick={() => onEditPrice(d)}>
                 <DollarSign className="h-3.5 w-3.5 mr-1" /> Editar tarifa
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-lg text-amber-600 hover:text-amber-600 hover:bg-amber-500/10"
+                title="Resetear clave maestra"
+                onClick={() => onResetKey(d)}
+              >
+                <KeyRound className="h-4 w-4" />
               </Button>
               <Button
                 variant="ghost"

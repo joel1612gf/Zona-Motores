@@ -179,19 +179,21 @@ export const CAN_SEE_PURCHASE_COSTS: Record<BusinessRole, boolean> = {
 export type Concesionario = {
   id: string;
   slug: string; // URL-friendly name, e.g. 'mi-concesionario'
-  nombre_empresa: string;
-  rif: string;
-  direccion: string;
+  nombre_empresa?: string; // Optional: empty when created blank from /admin, filled during onboarding
+  rif?: string; // Optional: filled during onboarding (fiscal step)
+  direccion?: string; // Optional: filled during onboarding (fiscal step)
   geolocalizacion?: GeoPoint;
   logo_url?: string;
   banner_url?: string;
   telefono?: string;
   email?: string;
   marketplaceEmail?: string; // Tightly coupled marketplace credential email
-  clave_maestra_hash: string; // SHA-256
-  owner_uid: string; // Firebase Auth UID of the owner's personal account
+  clave_maestra_hash?: string | null; // SHA-256. Null when created blank from /admin or after a master-key reset
+  owner_uid: string; // Firebase Auth UID of the owner's personal account ('' for admin-created tenants)
   plan_activo: boolean; // Manually controlled by admin
   precio_mensual_usd?: number; // Custom B2B monthly fee for this tenant (drives the global MRR). Set from /admin/dealerships.
+  dia_cobro_mensual?: number; // Day of month (1-31) the SaaS fee is billed. Set from /admin/dealerships.
+  onboarding_completado?: boolean; // false when created blank; true once the client finishes the onboarding wizard. Legacy tenants leave this undefined.
   configuracion: ConcesionarioConfig;
   created_at: Timestamp;
 };
@@ -209,6 +211,19 @@ export type ConcesionarioConfig = {
   sujeto_pasivo_especial?: boolean; // SENIAT — if true, the company collects IGTF on USD payments to providers
   igtf_trigger_entry_methods?: BankEntryMethod[]; // Bank entry methods that trigger IGTF when account is es_divisa (default: efectivo_fisico, zelle, crypto, transferencia)
   ultimo_periodo_cerrado?: string; // YYYYMM. Locks creation/edition/anulation of fiscal docs (compras/ventas/notas) with date <= this period. Only the owner can close/reopen.
+};
+
+// Safe default config seeded when an admin creates a blank tenant. The app reads
+// concesionario.configuracion.* everywhere, so a tenant must never have it empty.
+// The owner refines these later in Settings; the onboarding wizard only toggles tasa_cambio_auto.
+export const DEFAULT_CONCESIONARIO_CONFIG: ConcesionarioConfig = {
+  margen_minimo: 0,
+  estructura_comision: 0,
+  metodos_pago: ['Efectivo', 'Pago Móvil', 'Transferencia', 'Zelle'],
+  metodos_pago_divisa: ['Zelle', 'Efectivo USD'],
+  margen_consignacion_porcentaje: 0,
+  tasa_cambio_auto: false,
+  tasa_cambio_manual: 0,
 };
 
 export type StaffMember = {

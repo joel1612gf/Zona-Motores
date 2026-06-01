@@ -3,12 +3,16 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { doc, updateDoc } from 'firebase/firestore';
+import { useFirestore } from '@/firebase';
 import { useBusinessAuth } from '@/context/business-auth-context';
+import { hashSHA256 } from '@/lib/business-types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, ShieldAlert, Lock, Building2, AlertTriangle } from 'lucide-react';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { Loader2, ShieldAlert, Lock, Building2, AlertTriangle, KeyRound } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function BusinessLoginPage() {
@@ -16,10 +20,50 @@ export default function BusinessLoginPage() {
   const slug = params.slug as string;
   const router = useRouter();
   const { toast } = useToast();
-  const { concesionario, isLoading, validateEnterprise } = useBusinessAuth();
+  const firestore = useFirestore();
+  const { concesionario, isLoading, validateEnterprise, loadConcesionario } = useBusinessAuth();
 
   const [masterKey, setMasterKey] = useState('');
   const [isValidating, setIsValidating] = useState(false);
+
+  // Master-key reset mini-flow: an admin nulled clave_maestra_hash; the client
+  // must define a new key here before logging in (onboarding is already complete).
+  const [newKey, setNewKey] = useState('');
+  const [newKeyConfirm, setNewKeyConfirm] = useState('');
+  const [isSettingKey, setIsSettingKey] = useState(false);
+  const [keyError, setKeyError] = useState<string | null>(null);
+
+  const needsNewKey =
+    !!concesionario && concesionario.onboarding_completado === true && concesionario.clave_maestra_hash == null;
+
+  const handleSetNewKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!concesionario) return;
+    if (newKey.length < 6) {
+      setKeyError('La clave maestra debe tener al menos 6 caracteres.');
+      return;
+    }
+    if (newKey !== newKeyConfirm) {
+      setKeyError('Las claves no coinciden.');
+      return;
+    }
+    setKeyError(null);
+    setIsSettingKey(true);
+    try {
+      await updateDoc(doc(firestore, 'concesionarios', concesionario.id), {
+        clave_maestra_hash: await hashSHA256(newKey),
+      });
+      await loadConcesionario(slug);
+      // The reset condition is now false → the normal login form renders below,
+      // prefilled with the new key so the client only has to press "Acceder".
+      setMasterKey(newKey);
+      toast({ title: 'Clave maestra definida', description: 'Ingresa para acceder al sistema.' });
+    } catch {
+      setKeyError('No se pudo guardar la clave. Inténtalo de nuevo.');
+    } finally {
+      setIsSettingKey(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,6 +153,79 @@ export default function BusinessLoginPage() {
             <p className="text-sm text-muted-foreground">
               La suscripción de esta empresa no está activa. Contacta al administrador de Zona Motores para renovar el acceso.
             </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Master-key reset → ask the client to define a new one before logging in.
+  if (needsNewKey) {
+    return (
+      <div className="flex items-center justify-center min-h-screen p-4 bg-gradient-to-br from-amber-500/5 via-background to-primary/10">
+        <Card className="w-full max-w-md shadow-xl">
+          <CardHeader className="text-center space-y-4">
+            <div className="mx-auto h-16 w-16 rounded-2xl bg-amber-500/10 flex items-center justify-center shadow-md">
+              <KeyRound className="h-8 w-8 text-amber-600" />
+            </div>
+            <div>
+              <CardTitle className="text-2xl font-bold">Definir nueva clave maestra</CardTitle>
+              <CardDescription>
+                Tu clave maestra fue reseteada. Crea una nueva para volver a acceder.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSetNewKey} className="space-y-5">
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Anótala en un lugar seguro</AlertTitle>
+                <AlertDescription>
+                  No podrás cambiarla luego desde el sistema. Si la olvidas, deberás pedir otro
+                  reseteo al administrador.
+                </AlertDescription>
+              </Alert>
+              <div className="space-y-2">
+                <Label htmlFor="new-key">Nueva clave maestra</Label>
+                <Input
+                  id="new-key"
+                  type="password"
+                  value={newKey}
+                  onChange={(e) => {
+                    setNewKey(e.target.value);
+                    setKeyError(null);
+                  }}
+                  placeholder="Mínimo 6 caracteres"
+                  disabled={isSettingKey}
+                  autoFocus
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-key-confirm">Confirmar nueva clave</Label>
+                <Input
+                  id="new-key-confirm"
+                  type="password"
+                  value={newKeyConfirm}
+                  onChange={(e) => {
+                    setNewKeyConfirm(e.target.value);
+                    setKeyError(null);
+                  }}
+                  placeholder="Repite la clave"
+                  disabled={isSettingKey}
+                />
+              </div>
+              {keyError && <p className="text-sm text-destructive">{keyError}</p>}
+              <Button type="submit" className="w-full" size="lg" disabled={isSettingKey}>
+                {isSettingKey ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  'Definir clave'
+                )}
+              </Button>
+            </form>
           </CardContent>
         </Card>
       </div>

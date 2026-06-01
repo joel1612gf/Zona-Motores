@@ -13,24 +13,39 @@ function BusinessLayoutInner({ children, slug }: { children: ReactNode; slug: st
 
   const isLoginPage = pathname === `/business/${slug}/login`;
   const isStaffLoginPage = pathname === `/business/${slug}/staff-login`;
+  const isOnboardingPage = pathname === `/business/${slug}/onboarding`;
 
   useEffect(() => {
     if (isLoading) return;
 
     // If concesionario doesn't exist, show 404 (handled by login page)
-    if (!concesionario && !isLoginPage) {
+    if (!concesionario && !isLoginPage && !isOnboardingPage) {
+      router.replace(`/business/${slug}/login`);
+      return;
+    }
+
+    // Onboarding gate (runs BEFORE auth gates). A blank tenant created from /admin
+    // has onboarding_completado === false: force the client into the wizard,
+    // skipping the master-key login. Legacy tenants (undefined) are never affected.
+    if (concesionario?.onboarding_completado === false && !isOnboardingPage) {
+      router.replace(`/business/${slug}/onboarding`);
+      return;
+    }
+
+    // Already configured but trying to re-open the wizard → bounce out.
+    if (concesionario && concesionario.onboarding_completado !== false && isOnboardingPage) {
       router.replace(`/business/${slug}/login`);
       return;
     }
 
     // If not authenticated (step 1), redirect to login
-    if (!isAuthenticated && !isLoginPage) {
+    if (!isAuthenticated && !isLoginPage && !isOnboardingPage) {
       router.replace(`/business/${slug}/login`);
       return;
     }
 
     // If authenticated but staff not logged in (step 2), redirect to staff login
-    if (isAuthenticated && !isStaffLoggedIn && !isStaffLoginPage && !isLoginPage) {
+    if (isAuthenticated && !isStaffLoggedIn && !isStaffLoginPage && !isLoginPage && !isOnboardingPage) {
       router.replace(`/business/${slug}/staff-login`);
       return;
     }
@@ -46,7 +61,7 @@ function BusinessLayoutInner({ children, slug }: { children: ReactNode; slug: st
       router.replace(`/business/${slug}/staff-login`);
       return;
     }
-  }, [isLoading, isAuthenticated, isStaffLoggedIn, isLoginPage, isStaffLoginPage, router, slug, concesionario]);
+  }, [isLoading, isAuthenticated, isStaffLoggedIn, isLoginPage, isStaffLoginPage, isOnboardingPage, router, slug, concesionario]);
 
   if (isLoading) {
     return (
@@ -59,8 +74,8 @@ function BusinessLayoutInner({ children, slug }: { children: ReactNode; slug: st
     );
   }
 
-  // Login and staff-login pages render without sidebar
-  if (isLoginPage || isStaffLoginPage) {
+  // Login, staff-login and onboarding pages render full-screen without sidebar
+  if (isLoginPage || isStaffLoginPage || isOnboardingPage) {
     return (
       <div className="min-h-screen bg-background">
         {children}

@@ -41,16 +41,18 @@ function DealershipsPageContent() {
     
     if (concesionarios) {
       concesionarios.forEach(c => {
+         // Skip blank tenants that haven't finished onboarding (no public profile yet).
+         if (c.onboarding_completado === false) return;
          const isAlreadyThere = allDealers.find(d => d.uid === c.owner_uid);
          if (!isAlreadyThere) {
            allDealers.push({
              uid: c.owner_uid,
-             displayName: c.nombre_empresa,
+             displayName: c.nombre_empresa || '',
              isVerified: true,
              accountType: 'dealer',
              logoUrl: c.logo_url || '',
              heroUrl: c.banner_url || '',
-             address: c.direccion,
+             address: c.direccion || '',
              isSaaSBusiness: true,
              saasSlug: c.slug
            });

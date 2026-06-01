@@ -243,7 +243,7 @@ export default function ClientsPage() {
       await sendMatchWhatsApp(
         firestore,
         concesionario.id,
-        concesionario.nombre_empresa,
+        concesionario.nombre_empresa || '',
         m,
         m.cliente_telefono,
         { id: staff.id, nombre: staff.nombre },

@@ -39,12 +39,12 @@ function DealershipPageContent() {
             const c = saasProfiles[0];
             return {
                 uid: c.owner_uid,
-                displayName: c.nombre_empresa,
+                displayName: c.nombre_empresa || '',
                 isVerified: true,
                 accountType: 'dealer',
                 logoUrl: c.logo_url || '',
                 heroUrl: '', // Forzamos banner vacío para usar el fondo azul corporativo
-                address: c.direccion,
+                address: c.direccion || '',
                 isSaaSBusiness: true,
                 saasSlug: c.slug
             } as UserProfile;

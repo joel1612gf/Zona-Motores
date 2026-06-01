@@ -26,6 +26,32 @@ export const editPriceSchema = z.object({
 export type EditPriceFormValues = z.infer<typeof editPriceSchema>;
 
 /**
+ * Create a blank tenant (concesionario) from /admin/dealerships. The admin only
+ * sets the slug (URL + doc ID), the monthly fee and the billing day; the client
+ * configures everything else through the onboarding wizard.
+ */
+export const createDealershipSchema = z.object({
+  slug: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .min(3, 'Mínimo 3 caracteres')
+    .max(40, 'Máximo 40 caracteres')
+    .regex(/^[a-z0-9-]+$/, 'Solo minúsculas, números y guiones'),
+  precio_mensual_usd: z.coerce
+    .number({ invalid_type_error: 'Debe ser un número' })
+    .min(0, 'No puede ser negativo')
+    .max(100000, 'Valor demasiado alto'),
+  dia_cobro_mensual: z.coerce
+    .number({ invalid_type_error: 'Debe ser un número' })
+    .int('Debe ser un día entero')
+    .min(1, 'El día debe estar entre 1 y 31')
+    .max(31, 'El día debe estar entre 1 y 31'),
+});
+
+export type CreateDealershipFormValues = z.infer<typeof createDealershipSchema>;
+
+/**
  * Hard-confirmation guard for destructive tenant deletion: the user must type
  * the exact word ELIMINAR before deleteTenant can be invoked.
  */

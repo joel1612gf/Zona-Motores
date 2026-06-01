@@ -31,7 +31,7 @@ export default function AdminMarketplacePage() {
 
   const dealerNameByUid = useMemo(() => {
     const m = new Map<string, string>();
-    dealers?.forEach((d) => m.set(d.owner_uid, d.nombre_empresa));
+    dealers?.forEach((d) => m.set(d.owner_uid, d.nombre_empresa || ''));
     return m;
   }, [dealers]);
 

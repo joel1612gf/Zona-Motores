@@ -356,7 +356,7 @@ export default function AccountingPage() {
           <RetentionsTab
             compras={comprasPeriod}
             notas={notasPeriod}
-            rifAgente={concesionario.rif}
+            rifAgente={concesionario.rif || ''}
             slug={String(slug)}
             year={year}
             month={month}
