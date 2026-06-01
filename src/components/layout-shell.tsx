@@ -7,10 +7,11 @@ import type { ReactNode } from 'react';
 
 export function LayoutShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const isBusinessRoute = pathname.startsWith('/business');
+  // Business (SaaS) and Admin (God-Mode) are standalone surfaces that bring
+  // their own chrome — they must NOT render the public site header/footer.
+  const isStandaloneRoute = pathname.startsWith('/business') || pathname.startsWith('/admin');
 
-  if (isBusinessRoute) {
-    // Business routes render their own layout (no SiteHeader/SiteFooter)
+  if (isStandaloneRoute) {
     return <>{children}</>;
   }
 
